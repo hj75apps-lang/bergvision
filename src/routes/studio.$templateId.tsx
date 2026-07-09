@@ -65,8 +65,9 @@ import {
   useHistoryStore,
 } from "@/lib/studio/history-store";
 import { TemplateBackground } from "@/components/studio/element-body";
-import { PreviewDialog } from "@/components/studio/preview-dialog";
 import { TemplateSettingsDialog } from "@/components/studio/template-settings-dialog";
+import { PreviewPanel } from "@/components/preview/preview-panel";
+import { useStudioDraftPayload } from "@/lib/studio/use-draft-payload";
 import { slugify } from "@/lib/template-utils";
 
 export const Route = createFileRoute("/studio/$templateId")({
