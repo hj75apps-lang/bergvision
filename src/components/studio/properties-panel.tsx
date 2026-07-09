@@ -538,18 +538,43 @@ function MediaContent({
   disabled,
   kind,
   allowFill,
+  requiredWidth,
+  requiredHeight,
 }: {
   c: Record<string, unknown>;
   patch: (p: Record<string, unknown>) => void;
   disabled: boolean;
   kind: "image" | "video";
   allowFill: boolean;
+  requiredWidth?: number;
+  requiredHeight?: number;
 }) {
   const [pickerOpen, setPickerOpen] = useState(false);
   const mediaName = (c.mediaFileName as string) ?? null;
+  const mediaFileId = (c.mediaFileId as string) ?? null;
   const fitOptions = allowFill
     ? ["contain", "cover", "fill"]
     : ["contain", "cover"];
+
+  const dimsQ = useQuery({
+    queryKey: ["studio_media_dims", mediaFileId],
+    enabled: !!mediaFileId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("media_files")
+        .select("width, height")
+        .eq("id", mediaFileId!)
+        .single();
+      if (error) throw error;
+      return data as { width: number | null; height: number | null };
+    },
+  });
+
+  const lowRes = useMemo(() => {
+    if (!requiredWidth || !requiredHeight || !dimsQ.data) return false;
+    return isLowRes(dimsQ.data, requiredWidth, requiredHeight);
+  }, [dimsQ.data, requiredWidth, requiredHeight]);
+
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-col gap-1">
@@ -568,6 +593,25 @@ function MediaContent({
             {mediaName ?? "Selecionar mídia..."}
           </span>
         </Button>
+        {lowRes && requiredWidth && requiredHeight && (
+          <div className="flex items-start gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 p-2 text-[11px] text-amber-200">
+            <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-400" />
+            <span>
+              Esta {kind === "image" ? "imagem" : "mídia"} pode ficar borrada
+              nesta área — resolução recomendada:{" "}
+              <strong>
+                {requiredWidth}×{requiredHeight}
+              </strong>{" "}
+              ou maior.
+              {dimsQ.data?.width && dimsQ.data?.height && (
+                <>
+                  {" "}
+                  Atual: {dimsQ.data.width}×{dimsQ.data.height}.
+                </>
+              )}
+            </span>
+          </div>
+        )}
       </div>
 
       <label className="flex flex-col gap-1">
@@ -596,6 +640,8 @@ function MediaContent({
         open={pickerOpen}
         onOpenChange={setPickerOpen}
         filter={kind}
+        requiredWidth={requiredWidth}
+        requiredHeight={requiredHeight}
         onPick={(f: PickerMediaFile) =>
           patch({
             mediaFileId: f.id,
@@ -613,10 +659,14 @@ function VideoContent({
   c,
   patch,
   disabled,
+  requiredWidth,
+  requiredHeight,
 }: {
   c: Record<string, unknown>;
   patch: (p: Record<string, unknown>) => void;
   disabled: boolean;
+  requiredWidth?: number;
+  requiredHeight?: number;
 }) {
   return (
     <div className="flex flex-col gap-3">
@@ -626,6 +676,8 @@ function VideoContent({
         disabled={disabled}
         kind="video"
         allowFill
+        requiredWidth={requiredWidth}
+        requiredHeight={requiredHeight}
       />
       <div className="flex items-center justify-between">
         <Label className="text-xs">Loop</Label>
