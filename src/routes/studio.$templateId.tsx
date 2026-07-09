@@ -201,7 +201,7 @@ function EditorPage() {
       const { data, error } = await supabase
         .from("templates")
         .select(
-          "id, name, canvas_width, canvas_height, background_color, organization_id",
+          "id, name, canvas_width, canvas_height, background_color, organization_id, scaling_mode, background_media_id",
         )
         .eq("id", templateId)
         .single();
