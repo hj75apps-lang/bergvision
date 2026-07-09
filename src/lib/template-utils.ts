@@ -161,12 +161,42 @@ function rectForSystemTemplate(template: TemplateReference, zone: Zone, total: n
   return { pos_x: 0, pos_y: 0, width_pct: 100, height_pct: 100 };
 }
 
+function isKnownReferenceShape(template: TemplateReference): boolean {
+  const key = normalizeText(`${template.name ?? ""} ${template.slug ?? ""}`);
+  return (
+    key.includes("quadrante") ||
+    key.includes("multi zona") ||
+    key.includes("multi 4k") ||
+    key.includes("layout em l") ||
+    key.includes("l shape") ||
+    key.includes("ticker") ||
+    key.includes("split") ||
+    key.includes("divid")
+  );
+}
+
+function isCollapsedLegacyShape(template: TemplateReference, zones: Zone[]): boolean {
+  return (
+    zones.length > 1 &&
+    isKnownReferenceShape(template) &&
+    zones.every(
+      (z) =>
+        hasCompleteRect(z) &&
+        Number(z.pos_x) === 0 &&
+        Number(z.pos_y) === 0 &&
+        Number(z.width_pct) === 100 &&
+        Number(z.height_pct) === 100,
+    )
+  );
+}
+
 // Convert a legacy zone without percent coordinates to a reference layout.
 // This keeps old system templates visually useful even when the SQL backfill
 // cannot identify localized names such as "Layout em L" or "Multi-zona 4K".
 export function zonesWithReferenceFallback(template: TemplateReference, zones: Zone[]): Zone[] {
+  const collapsedLegacyShape = isCollapsedLegacyShape(template, zones);
   return zones.map((z, index) => {
-    if (hasCompleteRect(z)) return z;
+    if (hasCompleteRect(z) && !collapsedLegacyShape) return z;
     const gridRect = rectFromGridArea(zones, z);
     const inferred = gridRect ?? rectForSystemTemplate(template, z, zones.length);
     return { ...z, ...inferred, z_index: z.z_index ?? index };
