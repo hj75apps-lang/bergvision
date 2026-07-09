@@ -174,3 +174,7 @@
   backdrop-filter: blur(24px) saturate(160%);
   border: 1px solid color-mix(in oklab, var(--color-border) 100%, transparent);
 }
+
+#lovable-badge {
+  display: none !important;
+}
