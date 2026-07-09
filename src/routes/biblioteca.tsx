@@ -47,6 +47,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
+import { GridSkeleton } from "@/components/layout/grid-skeleton";
 import {
   extractImageMeta,
   extractVideoMeta,
@@ -214,9 +215,7 @@ function BibliotecaPage() {
       </div>
 
       {filesQ.isLoading ? (
-        <div className="flex justify-center py-16">
-          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-        </div>
+        <GridSkeleton count={8} heightClass="h-52" />
       ) : filtered.length === 0 ? (
         <Card className="rounded-2xl border-dashed border-border/60 bg-card/40">
           <CardContent className="py-16 text-center text-sm text-muted-foreground">
