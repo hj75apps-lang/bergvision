@@ -275,6 +275,8 @@ export function TemplateSettingsDialog({
           open={!!pickerOpen}
           onOpenChange={(v) => !v && setPickerOpen(false)}
           filter={pickerOpen}
+          requiredWidth={template.canvas_width}
+          requiredHeight={template.canvas_height}
           onPick={(file) => {
             setMediaId(file.id);
             setPickerOpen(false);
