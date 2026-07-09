@@ -7,6 +7,7 @@ import {
   Loader2,
   Pencil,
   Plus,
+  Play,
   Settings2,
   Trash2,
 } from "lucide-react";
@@ -56,6 +57,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { GridSkeleton } from "@/components/layout/grid-skeleton";
 import { TemplateCanvas } from "@/components/template/template-canvas";
 import { LayoutEditorDialog } from "@/components/template/layout-editor-dialog";
+import { PreviewPanel } from "@/components/preview/preview-panel";
 import {
   aspectRatioLabel,
   slugify,
@@ -95,6 +97,7 @@ function TemplatesPage() {
   const [editingLayout, setEditingLayout] = useState<Template | null>(null);
   const [creating, setCreating] = useState(false);
   const [deleting, setDeleting] = useState<Template | null>(null);
+  const [previewing, setPreviewing] = useState<Template | null>(null);
   const qc = useQueryClient();
 
   const templatesQ = useQuery({
