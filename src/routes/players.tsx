@@ -1,7 +1,54 @@
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { MonitorPlay } from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  Loader2,
+  MonitorPlay,
+  Plus,
+  RadioTower,
+  Trash2,
+} from "lucide-react";
+import { toast } from "sonner";
 
-import { ComingSoon } from "@/components/layout/coming-soon";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import {
+  InputOTP,
+  InputOTPGroup,
+  InputOTPSlot,
+  InputOTPSeparator,
+} from "@/components/ui/input-otp";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/use-auth";
 
 export const Route = createFileRoute("/players")({
   head: () => ({
@@ -10,15 +57,456 @@ export const Route = createFileRoute("/players")({
       {
         name: "description",
         content:
-          "Gerencie os players da sua rede Berg Vision: pareamento, status e agendamento.",
+          "Gerencie os players da sua rede Berg Vision: pareamento, status e monitoramento em tempo real.",
       },
     ],
   }),
-  component: () => (
-    <ComingSoon
-      icon={MonitorPlay}
-      title="Players"
-      description="Em breve você vai parear, monitorar e agendar conteúdo para toda a sua rede de players a partir daqui."
-    />
-  ),
+  component: PlayersPage,
 });
+
+type Player = {
+  id: string;
+  organization_id: string;
+  name: string;
+  status: string | null;
+  last_heartbeat: string | null;
+  resolution: string | null;
+  orientation: string | null;
+  created_at?: string | null;
+};
+
+const HEARTBEAT_OFFLINE_MS = 60_000;
+
+function isOnline(p: Player, nowMs: number): boolean {
+  if (!p.last_heartbeat) return false;
+  const last = new Date(p.last_heartbeat).getTime();
+  if (Number.isNaN(last)) return false;
+  if (nowMs - last > HEARTBEAT_OFFLINE_MS) return false;
+  return (p.status ?? "").toLowerCase() === "online";
+}
+
+function formatOrientation(o: string | null | undefined): string {
+  if (!o) return "—";
+  const v = o.toLowerCase();
+  if (v === "landscape" || v === "horizontal") return "Paisagem";
+  if (v === "portrait" || v === "vertical") return "Retrato";
+  return o;
+}
+
+function formatRelative(iso: string | null): string {
+  if (!iso) return "nunca";
+  const diff = Date.now() - new Date(iso).getTime();
+  if (Number.isNaN(diff)) return "nunca";
+  const s = Math.max(1, Math.floor(diff / 1000));
+  if (s < 60) return `há ${s}s`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `há ${m}min`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `há ${h}h`;
+  const d = Math.floor(h / 24);
+  return `há ${d}d`;
+}
+
+function PlayersPage() {
+  const { membership } = useAuth();
+  const orgId = membership?.organization_id ?? null;
+  const role = membership?.role ?? "viewer";
+  const canManage = role === "owner" || role === "admin";
+  const qc = useQueryClient();
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  const [pairOpen, setPairOpen] = useState(false);
+
+  // Tick para re-avaliar status offline (last_heartbeat > 60s).
+  useEffect(() => {
+    const t = setInterval(() => setNowMs(Date.now()), 15_000);
+    return () => clearInterval(t);
+  }, []);
+
+  const playersQ = useQuery({
+    queryKey: ["players", orgId],
+    enabled: !!orgId,
+    queryFn: async (): Promise<Player[]> => {
+      const { data, error } = await supabase
+        .from("players")
+        .select(
+          "id, organization_id, name, status, last_heartbeat, resolution, orientation, created_at",
+        )
+        .eq("organization_id", orgId!)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return (data ?? []) as Player[];
+    },
+  });
+
+  // Realtime: quando players da org mudam (heartbeat, status), revalida.
+  useEffect(() => {
+    if (!orgId) return;
+    const channel = supabase
+      .channel(`org:${orgId}:players`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "players",
+          filter: `organization_id=eq.${orgId}`,
+        },
+        () => {
+          qc.invalidateQueries({ queryKey: ["players", orgId] });
+        },
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [orgId, qc]);
+
+  const players = playersQ.data ?? [];
+  const onlineCount = useMemo(
+    () => players.filter((p) => isOnline(p, nowMs)).length,
+    [players, nowMs],
+  );
+
+  return (
+    <div className="mx-auto max-w-6xl space-y-6">
+      <header className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Players</h1>
+          <p className="text-sm text-muted-foreground">
+            {players.length} player(s) · {onlineCount} online agora
+          </p>
+        </div>
+        {canManage && (
+          <Button
+            onClick={() => setPairOpen(true)}
+            className="h-10 rounded-xl"
+          >
+            <Plus className="mr-2 h-4 w-4" /> Adicionar player
+          </Button>
+        )}
+      </header>
+
+      {playersQ.isLoading ? (
+        <div className="flex justify-center py-16">
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        </div>
+      ) : players.length === 0 ? (
+        <Card className="rounded-2xl border-dashed border-border/60 bg-card/40 backdrop-blur-xl">
+          <CardContent className="flex flex-col items-center gap-3 py-16 text-center">
+            <div className="grid h-14 w-14 place-items-center rounded-2xl bg-primary/15 text-primary">
+              <MonitorPlay className="h-6 w-6" />
+            </div>
+            <h2 className="text-lg font-semibold">Nenhum player pareado</h2>
+            <p className="max-w-md text-sm text-muted-foreground">
+              Abra o app do player, gere um PIN de 6 dígitos e clique em
+              &ldquo;Adicionar player&rdquo; para parear.
+            </p>
+            {canManage && (
+              <Button onClick={() => setPairOpen(true)} className="mt-2 rounded-xl">
+                <Plus className="mr-2 h-4 w-4" /> Adicionar player
+              </Button>
+            )}
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          {players.map((p) => (
+            <PlayerCard
+              key={p.id}
+              player={p}
+              nowMs={nowMs}
+              canManage={canManage}
+              onChanged={() => qc.invalidateQueries({ queryKey: ["players", orgId] })}
+            />
+          ))}
+        </div>
+      )}
+
+      <PairDialog
+        open={pairOpen}
+        onOpenChange={setPairOpen}
+        onPaired={() => qc.invalidateQueries({ queryKey: ["players", orgId] })}
+      />
+    </div>
+  );
+}
+
+function PlayerCard({
+  player,
+  nowMs,
+  canManage,
+  onChanged,
+}: {
+  player: Player;
+  nowMs: number;
+  canManage: boolean;
+  onChanged: () => void;
+}) {
+  const online = isOnline(player, nowMs);
+  const [identifying, setIdentifying] = useState(false);
+
+  const identify = async () => {
+    setIdentifying(true);
+    try {
+      const channel = supabase.channel(`player:${player.id}`);
+      await new Promise<void>((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error("timeout")), 5000);
+        channel.subscribe((status) => {
+          if (status === "SUBSCRIBED") {
+            clearTimeout(timer);
+            resolve();
+          } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+            clearTimeout(timer);
+            reject(new Error(status));
+          }
+        });
+      });
+      const res = await channel.send({
+        type: "broadcast",
+        event: "command",
+        payload: { action: "identify" },
+      });
+      supabase.removeChannel(channel);
+      if (res !== "ok") throw new Error(String(res));
+      toast.success(`Sinal enviado para ${player.name}`);
+    } catch (err: any) {
+      toast.error("Falha ao identificar: " + (err?.message || err));
+    } finally {
+      setIdentifying(false);
+    }
+  };
+
+  const remove = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.from("players").delete().eq("id", player.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Player removido.");
+      onChanged();
+    },
+    onError: (err: any) => toast.error(err?.message || "Falha ao remover."),
+  });
+
+  return (
+    <Card className="group relative overflow-hidden rounded-2xl border-border/60 bg-card/60 backdrop-blur-xl transition-colors hover:border-border">
+      <CardHeader className="pb-3">
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0">
+            <CardTitle className="truncate text-base">{player.name}</CardTitle>
+            <CardDescription className="mt-1 flex items-center gap-1.5">
+              <span
+                className={`inline-block h-2 w-2 rounded-full ${
+                  online
+                    ? "bg-emerald-500 shadow-[0_0_8px] shadow-emerald-500/60"
+                    : "bg-red-500"
+                }`}
+              />
+              {online ? "Online" : "Offline"} · {formatRelative(player.last_heartbeat)}
+            </CardDescription>
+          </div>
+          <Badge
+            variant="secondary"
+            className={`rounded-full text-[10px] ${
+              online
+                ? "bg-emerald-500/15 text-emerald-500 hover:bg-emerald-500/15"
+                : "bg-red-500/15 text-red-500 hover:bg-red-500/15"
+            }`}
+          >
+            {online ? "ONLINE" : "OFFLINE"}
+          </Badge>
+        </div>
+      </CardHeader>
+      <CardContent className="grid grid-cols-2 gap-3 pb-4 text-xs">
+        <div>
+          <div className="text-muted-foreground">Resolução</div>
+          <div className="mt-0.5 font-medium">{player.resolution || "—"}</div>
+        </div>
+        <div>
+          <div className="text-muted-foreground">Orientação</div>
+          <div className="mt-0.5 font-medium">
+            {formatOrientation(player.orientation)}
+          </div>
+        </div>
+      </CardContent>
+      <CardFooter className="flex justify-between gap-2 pt-0">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={identify}
+          disabled={identifying}
+          className="h-9 rounded-xl"
+        >
+          {identifying ? (
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+          ) : (
+            <RadioTower className="mr-2 h-4 w-4" />
+          )}
+          Identificar
+        </Button>
+        {canManage && (
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-9 w-9 rounded-xl text-muted-foreground hover:text-destructive"
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Remover player?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  {player.name} será desvinculado da sua organização. Você pode
+                  parear novamente a qualquer momento.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={() => remove.mutate()}
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                >
+                  Remover
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        )}
+      </CardFooter>
+    </Card>
+  );
+}
+
+function PairDialog({
+  open,
+  onOpenChange,
+  onPaired,
+}: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  onPaired: () => void;
+}) {
+  const [pin, setPin] = useState("");
+  const [name, setName] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (!open) {
+      setPin("");
+      setName("");
+      setSubmitting(false);
+    }
+  }, [open]);
+
+  const submit = async (e: FormEvent) => {
+    e.preventDefault();
+    if (pin.length !== 6) {
+      toast.error("Informe o PIN de 6 dígitos exibido no player.");
+      return;
+    }
+    if (!name.trim()) {
+      toast.error("Dê um nome para o player.");
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("confirm-pairing", {
+        body: { pin_code: pin, name: name.trim() },
+      });
+      if (error) {
+        // Tenta extrair mensagem detalhada da resposta
+        let detail = "";
+        try {
+          const ctx = (error as any).context;
+          if (ctx?.json) detail = (await ctx.json())?.error ?? "";
+          else if (ctx?.text) detail = await ctx.text();
+        } catch {
+          /* noop */
+        }
+        const msg = (detail || error.message || "").toString().toLowerCase();
+        if (msg.includes("expired")) {
+          throw new Error("Este PIN expirou. Gere um novo no player.");
+        }
+        if (msg.includes("used") || msg.includes("already")) {
+          throw new Error("Este PIN já foi utilizado.");
+        }
+        if (msg.includes("invalid") || msg.includes("not found") || msg.includes("not_found")) {
+          throw new Error("PIN inválido. Verifique os 6 dígitos.");
+        }
+        throw new Error(detail || error.message);
+      }
+      if (data && (data as any).error) {
+        throw new Error((data as any).error);
+      }
+      toast.success("Player pareado com sucesso!");
+      onOpenChange(false);
+      onPaired();
+    } catch (err: any) {
+      toast.error(err?.message || "Falha ao parear player.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md rounded-2xl">
+        <DialogHeader>
+          <DialogTitle>Adicionar player</DialogTitle>
+          <DialogDescription>
+            Digite o PIN de 6 dígitos exibido na tela do player e dê a ele um nome.
+          </DialogDescription>
+        </DialogHeader>
+        <form onSubmit={submit} className="space-y-5">
+          <div className="space-y-2">
+            <Label>PIN de pareamento</Label>
+            <div className="flex justify-center">
+              <InputOTP maxLength={6} value={pin} onChange={setPin}>
+                <InputOTPGroup>
+                  <InputOTPSlot index={0} />
+                  <InputOTPSlot index={1} />
+                  <InputOTPSlot index={2} />
+                </InputOTPGroup>
+                <InputOTPSeparator />
+                <InputOTPGroup>
+                  <InputOTPSlot index={3} />
+                  <InputOTPSlot index={4} />
+                  <InputOTPSlot index={5} />
+                </InputOTPGroup>
+              </InputOTP>
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="player-name">Nome do player</Label>
+            <Input
+              id="player-name"
+              required
+              placeholder="Ex.: Recepção — TV 55"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="h-11 rounded-xl"
+            />
+          </div>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => onOpenChange(false)}
+              className="rounded-xl"
+            >
+              Cancelar
+            </Button>
+            <Button type="submit" disabled={submitting} className="rounded-xl">
+              {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Parear
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
