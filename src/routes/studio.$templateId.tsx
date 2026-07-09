@@ -178,6 +178,11 @@ function EditorPage() {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [canvasSize, setCanvasSize] = useState({ w: 0, h: 0 });
   const [zoom, setZoom] = useState(1);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [duplicateOpen, setDuplicateOpen] = useState(false);
+  const [duplicateName, setDuplicateName] = useState("");
+  const [duplicating, setDuplicating] = useState(false);
 
   const [pendingGeom, setPendingGeom] = useState<
     Record<string, Partial<Pick<TemplateElement, "x" | "y" | "width" | "height" | "rotation">>>
