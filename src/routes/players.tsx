@@ -282,42 +282,60 @@ function PlayerCard({
   const changeTemplate = async (tplId: string) => {
     setSavingTpl(true);
     try {
+      // Descobre o tipo do template alvo para escolher o payload correto.
+      const tpl = templates.find((t) => t.id === tplId);
+      const tplType = tpl?.type ?? "grid";
+
       const { error } = await supabase
         .from("players")
         .update({ current_template_id: tplId })
         .eq("id", player.id);
       if (error) throw error;
 
-      // Fetch full zone set so the player can re-render without a round trip.
-      const { data: zones, error: zErr } = await supabase
-        .from("template_zones")
-        .select(
-          "id, zone_name, pos_x, pos_y, width_pct, height_pct, z_index, content_type, media_file_id, playlist_id, widget_type, widget_config",
-        )
-        .eq("template_id", tplId)
-        .order("zone_index");
-      if (zErr) throw zErr;
-
-      // Broadcast config_updated no canal do player com payload completo
-      const channel = supabase.channel(`player:${player.id}`);
-      await new Promise<void>((resolve, reject) => {
-        const timer = setTimeout(() => reject(new Error("timeout")), 5000);
-        channel.subscribe((status) => {
-          if (status === "SUBSCRIBED") {
-            clearTimeout(timer);
-            resolve();
-          } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
-            clearTimeout(timer);
-            reject(new Error(status));
-          }
-        });
-      });
-      await channel.send({
-        type: "broadcast",
-        event: "config_updated",
-        payload: {
+      // Prepara payload conforme o tipo do template.
+      let payload: Record<string, unknown>;
+      if (tplType === "canvas") {
+        const [{ data: tData, error: tErr }, { data: els, error: eErr }] =
+          await Promise.all([
+            supabase
+              .from("templates")
+              .select(
+                "id, canvas_width, canvas_height, background_color, background_media_id, scaling_mode, orientation",
+              )
+              .eq("id", tplId)
+              .single(),
+            supabase
+              .from("template_elements")
+              .select(
+                "id, element_type, x, y, width, height, rotation, z_index, opacity, locked, visible, content",
+              )
+              .eq("template_id", tplId)
+              .order("z_index"),
+          ]);
+        if (tErr) throw tErr;
+        if (eErr) throw eErr;
+        payload = {
           event: "config_updated",
           template_id: tplId,
+          template_type: "canvas",
+          template: tData,
+          elements: els ?? [],
+          updated_at: new Date().toISOString(),
+          updated_by: null,
+        };
+      } else {
+        const { data: zones, error: zErr } = await supabase
+          .from("template_zones")
+          .select(
+            "id, zone_name, pos_x, pos_y, width_pct, height_pct, z_index, content_type, media_file_id, playlist_id, widget_type, widget_config",
+          )
+          .eq("template_id", tplId)
+          .order("zone_index");
+        if (zErr) throw zErr;
+        payload = {
+          event: "config_updated",
+          template_id: tplId,
+          template_type: "grid",
           zones: (zones ?? []).map((z: any) => ({
             zone_id: z.id,
             zone_name: z.zone_name,
@@ -334,7 +352,26 @@ function PlayerCard({
           })),
           updated_at: new Date().toISOString(),
           updated_by: null,
-        },
+        };
+      }
+
+      const channel = supabase.channel(`player:${player.id}`);
+      await new Promise<void>((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error("timeout")), 5000);
+        channel.subscribe((status) => {
+          if (status === "SUBSCRIBED") {
+            clearTimeout(timer);
+            resolve();
+          } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+            clearTimeout(timer);
+            reject(new Error(status));
+          }
+        });
+      });
+      await channel.send({
+        type: "broadcast",
+        event: "config_updated",
+        payload,
       });
       supabase.removeChannel(channel);
 
