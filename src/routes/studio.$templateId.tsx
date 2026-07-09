@@ -1048,6 +1048,8 @@ function EditorPage() {
           <PropertiesPanel
             element={activeElement}
             disabled={!canEdit}
+            canvasWidth={template.canvas_width}
+            canvasHeight={template.canvas_height}
             onGeomChange={(patch) => {
               if (!activeElement) return;
               void commitElementUpdate(activeElement.id, patch);
