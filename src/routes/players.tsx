@@ -86,7 +86,12 @@ type Player = {
   created_at?: string | null;
 };
 
-type TemplateOpt = { id: string; name: string };
+type TemplateOpt = {
+  id: string;
+  name: string;
+  type: string | null;
+  is_system: boolean | null;
+};
 
 const HEARTBEAT_OFFLINE_MS = 60_000;
 
@@ -156,7 +161,7 @@ function PlayersPage() {
     queryFn: async (): Promise<TemplateOpt[]> => {
       const { data, error } = await supabase
         .from("templates")
-        .select("id, name")
+        .select("id, name, type, is_system")
         .order("is_system", { ascending: false })
         .order("name");
       if (error) throw error;
