@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Loader2,
   MonitorPlay,
+  Play,
   Plus,
   RadioTower,
   Trash2,
@@ -59,6 +60,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { GridSkeleton } from "@/components/layout/grid-skeleton";
+import { PreviewPanel } from "@/components/preview/preview-panel";
 
 export const Route = createFileRoute("/players")({
   head: () => ({
@@ -278,6 +280,7 @@ function PlayerCard({
   const online = isOnline(player, nowMs);
   const [identifying, setIdentifying] = useState(false);
   const [savingTpl, setSavingTpl] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
 
   const changeTemplate = async (tplId: string) => {
     setSavingTpl(true);
@@ -531,20 +534,37 @@ function PlayerCard({
         </div>
       </CardContent>
       <CardFooter className="flex justify-between gap-2 pt-0">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={identify}
-          disabled={identifying}
-          className="h-9 rounded-xl"
-        >
-          {identifying ? (
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-          ) : (
-            <RadioTower className="mr-2 h-4 w-4" />
-          )}
-          Identificar
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={identify}
+            disabled={identifying}
+            className="h-9 rounded-xl"
+          >
+            {identifying ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <RadioTower className="mr-2 h-4 w-4" />
+            )}
+            Identificar
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setPreviewOpen(true)}
+            disabled={!player.current_template_id}
+            className="h-9 rounded-xl"
+            title={
+              player.current_template_id
+                ? "Ver o que este player está exibindo agora"
+                : "Sem template ativo"
+            }
+          >
+            <Play className="mr-2 h-4 w-4" />
+            Visualização atual
+          </Button>
+        </div>
         {canManage && (
           <AlertDialog>
             <AlertDialogTrigger asChild>
@@ -577,6 +597,13 @@ function PlayerCard({
           </AlertDialog>
         )}
       </CardFooter>
+      <PreviewPanel
+        mode="modal"
+        scope="player"
+        targetId={player.id}
+        open={previewOpen}
+        onOpenChange={setPreviewOpen}
+      />
     </Card>
   );
 }
