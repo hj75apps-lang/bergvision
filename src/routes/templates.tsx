@@ -35,6 +35,7 @@ import {
 } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
+import { GridSkeleton } from "@/components/layout/grid-skeleton";
 
 export const Route = createFileRoute("/templates")({
   head: () => ({
@@ -150,9 +151,7 @@ function TemplatesPage() {
       </header>
 
       {templatesQ.isLoading ? (
-        <div className="flex justify-center py-16">
-          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-        </div>
+        <GridSkeleton count={6} heightClass="h-64" />
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {(templatesQ.data ?? []).map((t) => (
