@@ -7,6 +7,7 @@ import {
   ListMusic,
   Users,
   Settings,
+  Wand2,
 } from "lucide-react";
 
 import {
@@ -35,6 +36,7 @@ const mainItems: NavItem[] = [
   { title: "Players", url: "/players", icon: MonitorPlay },
   { title: "Biblioteca", url: "/biblioteca", icon: Library },
   { title: "Templates", url: "/templates", icon: LayoutTemplate },
+  { title: "Studio", url: "/studio", icon: Wand2 },
   { title: "Playlists", url: "/playlists", icon: ListMusic },
 ];
 
