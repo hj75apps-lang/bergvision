@@ -917,6 +917,10 @@ function EditorPage() {
                   if (e.target === e.currentTarget) setSelectedIds([]);
                 }}
               >
+                <TemplateBackground
+                  color={bg}
+                  mediaId={template.background_media_id ?? null}
+                />
                 {elements.map((el) => (
                   <ElementView
                     key={el.id}
