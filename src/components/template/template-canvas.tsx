@@ -13,6 +13,7 @@ import {
   clampZoneRect,
   snapPct,
   zoneColor,
+  zonesWithReferenceFallback,
   zoneWithFallback,
   zonesOverlap,
   type Template,
@@ -22,7 +23,8 @@ import {
 export type CanvasMode = "preview" | "highlight" | "edit";
 
 type Props = {
-  template: Pick<Template, "aspect_ratio" | "canvas_width" | "canvas_height" | "allow_overlap">;
+  template: Pick<Template, "aspect_ratio" | "canvas_width" | "canvas_height" | "allow_overlap"> &
+    Partial<Pick<Template, "name" | "slug">>;
   zones: Zone[];
   mode?: CanvasMode;
   selectedId?: string | null;
@@ -55,6 +57,50 @@ const HANDLES: Array<{ key: string; cursor: string; style: React.CSSProperties }
   { key: "w", cursor: "ew-resize", style: { top: "50%", left: -6, transform: "translateY(-50%)" } },
 ];
 
+function PreviewReferencePattern({ index }: { index: number }) {
+  const variant = index % 4;
+
+  if (variant === 1) {
+    return (
+      <div className="pointer-events-none grid h-full w-full grid-cols-3 gap-1 opacity-70">
+        <div className="rounded-sm bg-foreground/20" />
+        <div className="rounded-sm bg-foreground/10" />
+        <div className="rounded-sm bg-foreground/20" />
+      </div>
+    );
+  }
+
+  if (variant === 2) {
+    return (
+      <div className="pointer-events-none flex h-full w-full flex-col justify-end gap-1 opacity-70">
+        <div className="h-1.5 w-2/3 rounded-full bg-foreground/20" />
+        <div className="h-1.5 w-1/2 rounded-full bg-foreground/10" />
+        <div className="h-1.5 w-5/6 rounded-full bg-foreground/20" />
+      </div>
+    );
+  }
+
+  if (variant === 3) {
+    return (
+      <div className="pointer-events-none grid h-full w-full place-items-center opacity-70">
+        <div className="h-8 w-8 rounded-full border border-foreground/25 bg-foreground/10" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="pointer-events-none flex h-full w-full flex-col gap-1 opacity-70">
+      <div className="h-2 w-1/3 rounded-full bg-foreground/20" />
+      <div className="mt-auto grid grid-cols-4 gap-1">
+        <div className="h-5 rounded-sm bg-foreground/15" />
+        <div className="h-5 rounded-sm bg-foreground/10" />
+        <div className="h-5 rounded-sm bg-foreground/15" />
+        <div className="h-5 rounded-sm bg-foreground/10" />
+      </div>
+    </div>
+  );
+}
+
 export function TemplateCanvas({
   template,
   zones,
@@ -65,14 +111,18 @@ export function TemplateCanvas({
   onCommit,
   snap = 1,
   className,
-  showLabels = true,
+  showLabels,
 }: Props) {
   const canvasRef = useRef<HTMLDivElement | null>(null);
   const dragRef = useRef<DragState | null>(null);
   const isEdit = mode === "edit";
   const isPreview = mode === "preview";
 
-  const normalized = useMemo(() => zones.map(zoneWithFallback), [zones]);
+  const normalized = useMemo(
+    () => (!isEdit ? zonesWithReferenceFallback(template, zones) : zones.map(zoneWithFallback)),
+    [isEdit, template, zones],
+  );
+  const renderLabels = showLabels ?? !isPreview;
 
   const overlapMap = useMemo(() => {
     if (template.allow_overlap || isPreview) return new Map<string, boolean>();
@@ -227,7 +277,7 @@ export function TemplateCanvas({
                 else onSelect?.(z.id);
               }}
             >
-              {showLabels && (z.width_pct ?? 0) >= 18 && (z.height_pct ?? 0) >= 12 && (
+              {renderLabels && (z.width_pct ?? 0) >= 18 && (z.height_pct ?? 0) >= 12 && (
                 <div className="pointer-events-none flex items-start justify-between gap-1">
                   <span className="max-w-full truncate rounded bg-black/50 px-1.5 py-0.5">
                     {z.zone_name}
@@ -239,6 +289,7 @@ export function TemplateCanvas({
                   )}
                 </div>
               )}
+              {isPreview && <PreviewReferencePattern index={z.zone_index ?? i} />}
               {isEdit && selected && (
                 <>
                   {HANDLES.map((h) => (
