@@ -119,8 +119,8 @@ export function TemplateCanvas({
   const isPreview = mode === "preview";
 
   const normalized = useMemo(
-    () => (isPreview ? zonesWithReferenceFallback(template, zones) : zones.map(zoneWithFallback)),
-    [isPreview, template, zones],
+    () => (!isEdit ? zonesWithReferenceFallback(template, zones) : zones.map(zoneWithFallback)),
+    [isEdit, template, zones],
   );
   const renderLabels = showLabels ?? !isPreview;
 
