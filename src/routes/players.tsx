@@ -478,11 +478,54 @@ function PlayerCard({
               <SelectValue placeholder="Selecione um template" />
             </SelectTrigger>
             <SelectContent>
-              {templates.map((t) => (
-                <SelectItem key={t.id} value={t.id}>
-                  {t.name}
-                </SelectItem>
-              ))}
+              {(() => {
+                const system = templates.filter((t) => t.is_system);
+                const custom = templates.filter((t) => !t.is_system);
+                return (
+                  <>
+                    {system.length > 0 && (
+                      <SelectGroup>
+                        <SelectLabel className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                          Sistema
+                        </SelectLabel>
+                        {system.map((t) => (
+                          <SelectItem key={t.id} value={t.id}>
+                            <span className="flex items-center gap-2">
+                              <span>{t.name}</span>
+                              <Badge
+                                variant="secondary"
+                                className="rounded-full bg-primary/15 px-1.5 py-0 text-[9px] font-medium text-primary"
+                              >
+                                Sistema
+                              </Badge>
+                            </span>
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    )}
+                    {custom.length > 0 && (
+                      <SelectGroup>
+                        <SelectLabel className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                          Personalizado (Studio)
+                        </SelectLabel>
+                        {custom.map((t) => (
+                          <SelectItem key={t.id} value={t.id}>
+                            <span className="flex items-center gap-2">
+                              <span>{t.name}</span>
+                              <Badge
+                                variant="secondary"
+                                className="rounded-full bg-emerald-500/15 px-1.5 py-0 text-[9px] font-medium text-emerald-500"
+                              >
+                                Personalizado
+                              </Badge>
+                            </span>
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    )}
+                  </>
+                );
+              })()}
             </SelectContent>
           </Select>
         </div>
