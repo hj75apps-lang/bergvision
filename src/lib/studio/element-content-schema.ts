@@ -86,29 +86,18 @@ export const NewsWidgetConfigSchema = z.object({
   rotationSeconds: z.number().int().min(3).max(120).default(10),
 });
 
-export const WidgetElementSchema = z
-  .object({
-    element_type: z.literal('widget'),
-    widgetType: z.enum(['clock', 'weather', 'rss', 'news']),
-    widgetConfig: z.record(z.any()),
-  })
-  .superRefine((val, ctx) => {
-    const map = {
-      clock: ClockWidgetConfigSchema,
-      weather: WeatherWidgetConfigSchema,
-      rss: RssWidgetConfigSchema,
-      news: NewsWidgetConfigSchema,
-    } as const;
-    const result = map[val.widgetType].safeParse(val.widgetConfig);
-    if (!result.success) {
-      for (const issue of result.error.issues) {
-        ctx.addIssue({
-          ...issue,
-          path: ['widgetConfig', ...issue.path],
-        });
-      }
-    }
-  });
+export const WidgetElementSchema = z.object({
+  element_type: z.literal('widget'),
+  widgetType: z.enum(['clock', 'weather', 'rss', 'news']),
+  widgetConfig: z.record(z.any()),
+});
+
+const widgetConfigByType = {
+  clock: ClockWidgetConfigSchema,
+  weather: WeatherWidgetConfigSchema,
+  rss: RssWidgetConfigSchema,
+  news: NewsWidgetConfigSchema,
+} as const;
 
 export const ShapeElementSchema = z.object({
   element_type: z.literal('shape'),
@@ -119,15 +108,25 @@ export const ShapeElementSchema = z.object({
   borderWidth: z.number().min(0).max(50).default(0),
 });
 
-export const ElementContentSchema = z.discriminatedUnion('element_type', [
-  TextElementSchema,
-  ImageElementSchema,
-  VideoElementSchema,
-  LogoElementSchema,
-  PlaylistElementSchema,
-  WidgetElementSchema,
-  ShapeElementSchema,
-]);
+export const ElementContentSchema = z
+  .discriminatedUnion('element_type', [
+    TextElementSchema,
+    ImageElementSchema,
+    VideoElementSchema,
+    LogoElementSchema,
+    PlaylistElementSchema,
+    WidgetElementSchema,
+    ShapeElementSchema,
+  ])
+  .superRefine((val, ctx) => {
+    if (val.element_type !== 'widget') return;
+    const result = widgetConfigByType[val.widgetType].safeParse(val.widgetConfig);
+    if (!result.success) {
+      for (const issue of result.error.issues) {
+        ctx.addIssue({ ...issue, path: ['widgetConfig', ...issue.path] });
+      }
+    }
+  });
 
 export type ElementContent = z.infer<typeof ElementContentSchema>;
 export type ElementType = ElementContent['element_type'];
