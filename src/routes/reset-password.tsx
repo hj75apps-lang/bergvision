@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
@@ -32,7 +32,7 @@ function ResetPage() {
     return () => sub.subscription.unsubscribe();
   }, []);
 
-  const requestReset = async (e: any) => {
+  const requestReset = async (e: FormEvent) => {
     e.preventDefault();
     setSubmitting(true);
     try {
@@ -48,7 +48,7 @@ function ResetPage() {
     }
   };
 
-  const updatePassword = async (e: any) => {
+  const updatePassword = async (e: FormEvent) => {
     e.preventDefault();
     if (newPassword.length < 6) {
       toast.error("A senha deve ter pelo menos 6 caracteres.");

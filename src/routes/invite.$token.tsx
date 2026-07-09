@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { createFileRoute, useNavigate, useParams } from "@tanstack/react-router";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
@@ -64,7 +64,7 @@ function InvitePage() {
     })();
   }, [token]);
 
-  const acceptInvite = async (e: any) => {
+  const acceptInvite = async (e: FormEvent) => {
     e.preventDefault();
     if (!invite) return;
     if (password.length < 6) {
