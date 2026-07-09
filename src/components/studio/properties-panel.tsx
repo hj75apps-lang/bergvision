@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { AlignCenter, AlignLeft, AlignRight, ImagePlus } from "lucide-react";
+import { AlertTriangle, AlignCenter, AlignLeft, AlignRight, ImagePlus } from "lucide-react";
 
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
@@ -24,6 +24,7 @@ import type { TemplateElement } from "@/lib/studio/types";
 import { ELEMENT_LABELS } from "@/lib/studio/types";
 import {
   MediaPickerDialog,
+  isLowRes,
   type PickerMediaFile,
 } from "./media-picker-dialog";
 
@@ -61,12 +62,16 @@ export function PropertiesPanel({
   onGeomChange,
   onFlagChange,
   onContentChange,
+  canvasWidth,
+  canvasHeight,
 }: {
   element: TemplateElement | null;
   disabled: boolean;
   onGeomChange: (patch: Partial<Pick<TemplateElement, NumericKey>>) => void;
   onFlagChange: (patch: Partial<Pick<TemplateElement, "locked" | "visible">>) => void;
   onContentChange: (content: Record<string, unknown>) => void;
+  canvasWidth: number;
+  canvasHeight: number;
 }) {
   return (
     <div className="flex h-full flex-col">
@@ -106,6 +111,8 @@ export function PropertiesPanel({
               element={element}
               disabled={disabled}
               onChange={onContentChange}
+              canvasWidth={canvasWidth}
+              canvasHeight={canvasHeight}
             />
           </div>
         )}
@@ -275,13 +282,20 @@ function ContentBlock({
   element,
   disabled,
   onChange,
+  canvasWidth,
+  canvasHeight,
 }: {
   element: TemplateElement;
   disabled: boolean;
   onChange: (content: Record<string, unknown>) => void;
+  canvasWidth: number;
+  canvasHeight: number;
 }) {
   const c = (element.content ?? {}) as Record<string, unknown>;
   const patch = (p: Record<string, unknown>) => onChange({ ...c, ...p });
+
+  const requiredWidth = Math.round((element.width / 100) * canvasWidth);
+  const requiredHeight = Math.round((element.height / 100) * canvasHeight);
 
   switch (element.element_type) {
     case "text":
@@ -295,10 +309,20 @@ function ContentBlock({
           disabled={disabled}
           kind="image"
           allowFill={element.element_type === "image"}
+          requiredWidth={requiredWidth}
+          requiredHeight={requiredHeight}
         />
       );
     case "video":
-      return <VideoContent c={c} patch={patch} disabled={disabled} />;
+      return (
+        <VideoContent
+          c={c}
+          patch={patch}
+          disabled={disabled}
+          requiredWidth={requiredWidth}
+          requiredHeight={requiredHeight}
+        />
+      );
     case "playlist":
       return <PlaylistContent c={c} patch={patch} disabled={disabled} />;
     case "widget":
@@ -514,18 +538,43 @@ function MediaContent({
   disabled,
   kind,
   allowFill,
+  requiredWidth,
+  requiredHeight,
 }: {
   c: Record<string, unknown>;
   patch: (p: Record<string, unknown>) => void;
   disabled: boolean;
   kind: "image" | "video";
   allowFill: boolean;
+  requiredWidth?: number;
+  requiredHeight?: number;
 }) {
   const [pickerOpen, setPickerOpen] = useState(false);
   const mediaName = (c.mediaFileName as string) ?? null;
+  const mediaFileId = (c.mediaFileId as string) ?? null;
   const fitOptions = allowFill
     ? ["contain", "cover", "fill"]
     : ["contain", "cover"];
+
+  const dimsQ = useQuery({
+    queryKey: ["studio_media_dims", mediaFileId],
+    enabled: !!mediaFileId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("media_files")
+        .select("width, height")
+        .eq("id", mediaFileId!)
+        .single();
+      if (error) throw error;
+      return data as { width: number | null; height: number | null };
+    },
+  });
+
+  const lowRes = useMemo(() => {
+    if (!requiredWidth || !requiredHeight || !dimsQ.data) return false;
+    return isLowRes(dimsQ.data, requiredWidth, requiredHeight);
+  }, [dimsQ.data, requiredWidth, requiredHeight]);
+
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-col gap-1">
@@ -544,6 +593,25 @@ function MediaContent({
             {mediaName ?? "Selecionar mídia..."}
           </span>
         </Button>
+        {lowRes && requiredWidth && requiredHeight && (
+          <div className="flex items-start gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 p-2 text-[11px] text-amber-200">
+            <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-400" />
+            <span>
+              Esta {kind === "image" ? "imagem" : "mídia"} pode ficar borrada
+              nesta área — resolução recomendada:{" "}
+              <strong>
+                {requiredWidth}×{requiredHeight}
+              </strong>{" "}
+              ou maior.
+              {dimsQ.data?.width && dimsQ.data?.height && (
+                <>
+                  {" "}
+                  Atual: {dimsQ.data.width}×{dimsQ.data.height}.
+                </>
+              )}
+            </span>
+          </div>
+        )}
       </div>
 
       <label className="flex flex-col gap-1">
@@ -572,6 +640,8 @@ function MediaContent({
         open={pickerOpen}
         onOpenChange={setPickerOpen}
         filter={kind}
+        requiredWidth={requiredWidth}
+        requiredHeight={requiredHeight}
         onPick={(f: PickerMediaFile) =>
           patch({
             mediaFileId: f.id,
@@ -589,10 +659,14 @@ function VideoContent({
   c,
   patch,
   disabled,
+  requiredWidth,
+  requiredHeight,
 }: {
   c: Record<string, unknown>;
   patch: (p: Record<string, unknown>) => void;
   disabled: boolean;
+  requiredWidth?: number;
+  requiredHeight?: number;
 }) {
   return (
     <div className="flex flex-col gap-3">
@@ -602,6 +676,8 @@ function VideoContent({
         disabled={disabled}
         kind="video"
         allowFill
+        requiredWidth={requiredWidth}
+        requiredHeight={requiredHeight}
       />
       <div className="flex items-center justify-between">
         <Label className="text-xs">Loop</Label>

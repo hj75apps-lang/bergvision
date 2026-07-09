@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Loader2, Search } from "lucide-react";
+import { AlertTriangle, Loader2, Search } from "lucide-react";
+import { toast } from "sonner";
 
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
@@ -22,6 +23,8 @@ export type PickerMediaFile = {
   type: string;
   storage_path: string;
   thumbnail_path: string | null;
+  width: number | null;
+  height: number | null;
 };
 
 export function MediaPickerDialog({
@@ -29,11 +32,17 @@ export function MediaPickerDialog({
   onOpenChange,
   filter,
   onPick,
+  requiredWidth,
+  requiredHeight,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   filter: "image" | "video";
   onPick: (file: PickerMediaFile) => void;
+  /** Área de exibição em pixels do slot onde a mídia será renderizada.
+   *  Se informado, arquivos com resolução nativa menor recebem aviso. */
+  requiredWidth?: number;
+  requiredHeight?: number;
 }) {
   const { membership } = useAuth();
   const orgId = membership?.organization_id ?? null;
@@ -45,7 +54,7 @@ export function MediaPickerDialog({
     queryFn: async (): Promise<PickerMediaFile[]> => {
       const { data, error } = await supabase
         .from("media_files")
-        .select("id, name, type, storage_path, thumbnail_path")
+        .select("id, name, type, storage_path, thumbnail_path, width, height")
         .eq("organization_id", orgId!)
         .eq("type", filter)
         .order("created_at", { ascending: false });
@@ -102,7 +111,20 @@ export function MediaPickerDialog({
                 <PickerCard
                   key={f.id}
                   file={f}
+                  requiredWidth={requiredWidth}
+                  requiredHeight={requiredHeight}
                   onPick={() => {
+                    if (
+                      requiredWidth &&
+                      requiredHeight &&
+                      isLowRes(f, requiredWidth, requiredHeight)
+                    ) {
+                      toast.warning(
+                        `Esta imagem pode ficar borrada nesta área — resolução recomendada: ${Math.round(
+                          requiredWidth,
+                        )}×${Math.round(requiredHeight)} ou maior.`,
+                      );
+                    }
                     onPick(f);
                     onOpenChange(false);
                   }}
@@ -116,21 +138,38 @@ export function MediaPickerDialog({
   );
 }
 
+export function isLowRes(
+  file: { width: number | null; height: number | null },
+  requiredWidth: number,
+  requiredHeight: number,
+): boolean {
+  if (!file.width || !file.height) return false;
+  return file.width < requiredWidth || file.height < requiredHeight;
+}
+
 function PickerCard({
   file,
   onPick,
+  requiredWidth,
+  requiredHeight,
 }: {
   file: PickerMediaFile;
   onPick: () => void;
+  requiredWidth?: number;
+  requiredHeight?: number;
 }) {
   const url = useSignedUrl(file.thumbnail_path ?? file.storage_path);
+  const lowRes =
+    requiredWidth && requiredHeight
+      ? isLowRes(file, requiredWidth, requiredHeight)
+      : false;
   return (
     <button
       type="button"
       onClick={onPick}
       className="group overflow-hidden rounded-xl border border-border/60 bg-card transition hover:border-primary/60 hover:shadow"
     >
-      <div className="aspect-video w-full overflow-hidden bg-muted">
+      <div className="relative aspect-video w-full overflow-hidden bg-muted">
         {url ? (
           <img
             src={url}
@@ -142,9 +181,20 @@ function PickerCard({
             <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
           </div>
         )}
+        {lowRes && (
+          <div className="absolute left-1.5 top-1.5 flex items-center gap-1 rounded-md bg-amber-500/95 px-1.5 py-0.5 text-[10px] font-semibold text-black shadow">
+            <AlertTriangle className="h-3 w-3" />
+            Baixa resolução
+          </div>
+        )}
       </div>
-      <div className="truncate p-2 text-left text-xs font-medium">
-        {file.name}
+      <div className="p-2 text-left">
+        <div className="truncate text-xs font-medium">{file.name}</div>
+        {file.width && file.height && (
+          <div className="text-[10px] text-muted-foreground">
+            {file.width}×{file.height}
+          </div>
+        )}
       </div>
     </button>
   );

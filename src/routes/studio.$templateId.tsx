@@ -1048,6 +1048,8 @@ function EditorPage() {
           <PropertiesPanel
             element={activeElement}
             disabled={!canEdit}
+            canvasWidth={template.canvas_width}
+            canvasHeight={template.canvas_height}
             onGeomChange={(patch) => {
               if (!activeElement) return;
               void commitElementUpdate(activeElement.id, patch);
@@ -1083,6 +1085,8 @@ function EditorPage() {
           scaling_mode: template.scaling_mode ?? "letterbox",
           background_color: template.background_color,
           background_media_id: template.background_media_id ?? null,
+          canvas_width: template.canvas_width,
+          canvas_height: template.canvas_height,
         }}
         disabled={!canEdit}
       />
