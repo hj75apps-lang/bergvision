@@ -63,9 +63,9 @@ function PreviewReferencePattern({ index }: { index: number }) {
   if (variant === 1) {
     return (
       <div className="pointer-events-none grid h-full w-full grid-cols-3 gap-1 opacity-70">
-        <div className="rounded-sm bg-white/18" />
+        <div className="rounded-sm bg-foreground/20" />
         <div className="rounded-sm bg-white/10" />
-        <div className="rounded-sm bg-white/18" />
+        <div className="rounded-sm bg-foreground/20" />
       </div>
     );
   }
@@ -73,9 +73,9 @@ function PreviewReferencePattern({ index }: { index: number }) {
   if (variant === 2) {
     return (
       <div className="pointer-events-none flex h-full w-full flex-col justify-end gap-1 opacity-70">
-        <div className="h-1.5 w-2/3 rounded-full bg-white/20" />
-        <div className="h-1.5 w-1/2 rounded-full bg-white/14" />
-        <div className="h-1.5 w-5/6 rounded-full bg-white/18" />
+        <div className="h-1.5 w-2/3 rounded-full bg-foreground/20" />
+        <div className="h-1.5 w-1/2 rounded-full bg-foreground/10" />
+        <div className="h-1.5 w-5/6 rounded-full bg-foreground/20" />
       </div>
     );
   }
@@ -83,18 +83,18 @@ function PreviewReferencePattern({ index }: { index: number }) {
   if (variant === 3) {
     return (
       <div className="pointer-events-none grid h-full w-full place-items-center opacity-70">
-        <div className="h-8 w-8 rounded-full border border-white/25 bg-white/10" />
+        <div className="h-8 w-8 rounded-full border border-foreground/25 bg-foreground/10" />
       </div>
     );
   }
 
   return (
     <div className="pointer-events-none flex h-full w-full flex-col gap-1 opacity-70">
-      <div className="h-2 w-1/3 rounded-full bg-white/20" />
+      <div className="h-2 w-1/3 rounded-full bg-foreground/20" />
       <div className="mt-auto grid grid-cols-4 gap-1">
-        <div className="h-5 rounded-sm bg-white/16" />
+        <div className="h-5 rounded-sm bg-foreground/15" />
         <div className="h-5 rounded-sm bg-white/10" />
-        <div className="h-5 rounded-sm bg-white/16" />
+        <div className="h-5 rounded-sm bg-foreground/15" />
         <div className="h-5 rounded-sm bg-white/10" />
       </div>
     </div>
