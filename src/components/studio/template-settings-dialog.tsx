@@ -176,6 +176,7 @@ export function TemplateSettingsDialog({
             <div className="flex flex-col gap-1.5">
               <Label>Mídia de fundo (opcional)</Label>
               {mediaId ? (
+                <>
                 <div className="flex items-center justify-between gap-2 rounded-xl border border-border/60 bg-muted/40 p-2">
                   <div className="flex min-w-0 items-center gap-2">
                     <div className="grid h-8 w-8 place-items-center rounded-md bg-primary/15 text-primary">
@@ -219,6 +220,7 @@ export function TemplateSettingsDialog({
                     </span>
                   </div>
                 )}
+                </>
               ) : (
                 <div className="flex gap-2">
                   <Button
