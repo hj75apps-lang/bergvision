@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Image as ImageIcon, Loader2, X } from "lucide-react";
+import { AlertTriangle, Image as ImageIcon, Loader2, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { supabase } from "@/integrations/supabase/client";
@@ -22,13 +22,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { MediaPickerDialog } from "./media-picker-dialog";
+import { MediaPickerDialog, isLowRes } from "./media-picker-dialog";
 
 export type TemplateSettings = {
   id: string;
   scaling_mode: string | null;
   background_color: string | null;
   background_media_id: string | null;
+  canvas_width: number;
+  canvas_height: number;
 };
 
 export function TemplateSettingsDialog({
@@ -70,13 +72,28 @@ export function TemplateSettingsDialog({
     queryFn: async () => {
       const { data, error } = await supabase
         .from("media_files")
-        .select("id, name, type")
+        .select("id, name, type, width, height")
         .eq("id", mediaId!)
         .single();
       if (error) throw error;
-      return data as { id: string; name: string; type: string };
+      return data as {
+        id: string;
+        name: string;
+        type: string;
+        width: number | null;
+        height: number | null;
+      };
     },
   });
+
+  const bgLowRes = useMemo(() => {
+    if (!mediaInfoQ.data) return false;
+    return isLowRes(
+      mediaInfoQ.data,
+      template.canvas_width,
+      template.canvas_height,
+    );
+  }, [mediaInfoQ.data, template.canvas_width, template.canvas_height]);
 
   const saveMut = useMutation({
     mutationFn: async () => {
@@ -183,6 +200,25 @@ export function TemplateSettingsDialog({
                     <X className="h-4 w-4" />
                   </Button>
                 </div>
+                {bgLowRes && (
+                  <div className="flex items-start gap-2 rounded-xl border border-amber-500/40 bg-amber-500/10 p-2 text-[11px] text-amber-200">
+                    <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-400" />
+                    <span>
+                      Esta mídia pode ficar borrada nesta área — resolução
+                      recomendada:{" "}
+                      <strong>
+                        {template.canvas_width}×{template.canvas_height}
+                      </strong>{" "}
+                      ou maior.
+                      {mediaInfoQ.data?.width && mediaInfoQ.data?.height && (
+                        <>
+                          {" "}
+                          Atual: {mediaInfoQ.data.width}×{mediaInfoQ.data.height}.
+                        </>
+                      )}
+                    </span>
+                  </div>
+                )}
               ) : (
                 <div className="flex gap-2">
                   <Button
