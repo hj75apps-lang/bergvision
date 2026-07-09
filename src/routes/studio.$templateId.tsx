@@ -747,6 +747,39 @@ function EditorPage() {
           <Button
             variant="ghost"
             size="sm"
+            onClick={() => setPreviewOpen(true)}
+            title="Preview em tela cheia"
+          >
+            <Eye className="mr-1.5 h-4 w-4" />
+            Preview
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setSettingsOpen(true)}
+            disabled={!canEdit}
+            title="Configurações"
+          >
+            <Settings className="mr-1.5 h-4 w-4" />
+            Configurações
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              setDuplicateName(`${template.name} (cópia)`);
+              setDuplicateOpen(true);
+            }}
+            disabled={!canEdit}
+            title="Salvar como novo"
+          >
+            <FileStack className="mr-1.5 h-4 w-4" />
+            Salvar como novo
+          </Button>
+          <Separator orientation="vertical" className="mx-1 h-6" />
+          <Button
+            variant="ghost"
+            size="sm"
             disabled={!canEdit || !canUndo}
             onClick={doUndo}
             title="Desfazer (Ctrl+Z)"
