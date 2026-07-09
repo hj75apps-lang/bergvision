@@ -64,7 +64,7 @@ function InvitePage() {
     })();
   }, [token]);
 
-  const acceptInvite = async (e: React.FormEvent) => {
+  const acceptInvite = async (e: any) => {
     e.preventDefault();
     if (!invite) return;
     if (password.length < 6) {

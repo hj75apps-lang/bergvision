@@ -112,7 +112,7 @@ function LoginForm() {
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
-  const submit = async (e: React.FormEvent) => {
+  const submit = async (e: any) => {
     e.preventDefault();
     setSubmitting(true);
     try {
@@ -182,7 +182,7 @@ function SignupForm() {
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
-  const submit = async (e: React.FormEvent) => {
+  const submit = async (e: any) => {
     e.preventDefault();
     if (password.length < 6) {
       toast.error("A senha deve ter pelo menos 6 caracteres.");

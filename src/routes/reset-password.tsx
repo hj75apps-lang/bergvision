@@ -32,7 +32,7 @@ function ResetPage() {
     return () => sub.subscription.unsubscribe();
   }, []);
 
-  const requestReset = async (e: React.FormEvent) => {
+  const requestReset = async (e: any) => {
     e.preventDefault();
     setSubmitting(true);
     try {
@@ -48,7 +48,7 @@ function ResetPage() {
     }
   };
 
-  const updatePassword = async (e: React.FormEvent) => {
+  const updatePassword = async (e: any) => {
     e.preventDefault();
     if (newPassword.length < 6) {
       toast.error("A senha deve ter pelo menos 6 caracteres.");
