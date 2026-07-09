@@ -284,6 +284,16 @@ function TemplatesPage() {
                   <Button
                     variant="outline"
                     size="sm"
+                    className="rounded-xl"
+                    disabled={role === "viewer"}
+                    onClick={() => setPreviewing(t)}
+                    title={role === "viewer" ? "Sem permissão para gerar preview" : "Preview"}
+                  >
+                    <Play className="mr-1.5 h-4 w-4" /> Preview
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
                     className="flex-1 rounded-xl"
                     disabled={!canConfigureContent}
                     onClick={() => setConfiguring(t)}
