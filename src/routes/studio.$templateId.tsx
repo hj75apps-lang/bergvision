@@ -65,8 +65,9 @@ import {
   useHistoryStore,
 } from "@/lib/studio/history-store";
 import { TemplateBackground } from "@/components/studio/element-body";
-import { PreviewDialog } from "@/components/studio/preview-dialog";
 import { TemplateSettingsDialog } from "@/components/studio/template-settings-dialog";
+import { PreviewPanel } from "@/components/preview/preview-panel";
+import { useStudioDraftPayload } from "@/lib/studio/use-draft-payload";
 import { slugify } from "@/lib/template-utils";
 
 export const Route = createFileRoute("/studio/$templateId")({
@@ -631,6 +632,8 @@ function EditorPage() {
 
   const template = templateQ.data;
 
+  const draftPayload = useStudioDraftPayload(template, elements, previewOpen);
+
   // ---- Zoom controls ----
   const zoomIn = () => setZoom((z) => Math.min(4, +(z + 0.1).toFixed(2)));
   const zoomOut = () => setZoom((z) => Math.max(0.25, +(z - 0.1).toFixed(2)));
@@ -748,10 +751,10 @@ function EditorPage() {
             variant="ghost"
             size="sm"
             onClick={() => setPreviewOpen(true)}
-            title="Preview em tela cheia"
+            title="Preview ao vivo (renderiza no Player)"
           >
             <Eye className="mr-1.5 h-4 w-4" />
-            Preview
+            Preview ao vivo
           </Button>
           <Button
             variant="ghost"
@@ -1071,10 +1074,13 @@ function EditorPage() {
         Ctrl+D duplicar · setas para mover (Shift = 5%)
       </p>
 
-      <PreviewDialog
+      <PreviewPanel
+        mode="modal"
+        scope="template"
+        targetId={templateId}
+        draftData={draftPayload}
         open={previewOpen}
         onOpenChange={setPreviewOpen}
-        template={template}
       />
 
       <TemplateSettingsDialog
