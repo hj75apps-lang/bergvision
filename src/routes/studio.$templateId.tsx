@@ -658,6 +658,67 @@ function EditorPage() {
   const aspect = `${template.canvas_width} / ${template.canvas_height}`;
   const bg = template.background_color ?? "#0F172A";
 
+  const doDuplicate = async () => {
+    if (!template || !duplicateName.trim() || duplicating) return;
+    setDuplicating(true);
+    try {
+      const { data: newT, error: tErr } = await supabase
+        .from("templates")
+        .insert({
+          name: duplicateName.trim(),
+          slug: `${slugify(duplicateName)}-${Math.random().toString(36).slice(2, 6)}`,
+          type: "canvas",
+          orientation:
+            template.canvas_width >= template.canvas_height
+              ? "landscape"
+              : "portrait",
+          canvas_width: template.canvas_width,
+          canvas_height: template.canvas_height,
+          aspect_ratio:
+            template.canvas_width >= template.canvas_height ? "16:9" : "9:16",
+          background_color: template.background_color ?? "#0F172A",
+          background_media_id: template.background_media_id ?? null,
+          scaling_mode: template.scaling_mode ?? "letterbox",
+          is_system: false,
+          organization_id: template.organization_id,
+          zone_count: 0,
+        })
+        .select("id")
+        .single();
+      if (tErr) throw tErr;
+      const newId = (newT as { id: string }).id;
+      const rows = (elementsQ.data ?? []).map((e) => ({
+        template_id: newId,
+        element_type: e.element_type,
+        x: e.x,
+        y: e.y,
+        width: e.width,
+        height: e.height,
+        rotation: e.rotation,
+        z_index: e.z_index,
+        opacity: e.opacity ?? 1,
+        locked: e.locked ?? false,
+        visible: e.visible ?? true,
+        content: e.content ?? {},
+      }));
+      if (rows.length > 0) {
+        const { error: elErr } = await supabase
+          .from("template_elements")
+          .insert(rows);
+        if (elErr) throw elErr;
+      }
+      toast.success("Template duplicado.");
+      setDuplicateOpen(false);
+      setDuplicateName("");
+      await qc.invalidateQueries({ queryKey: ["studio_templates"] });
+      navigate({ to: "/studio/$templateId", params: { templateId: newId } });
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Falha ao duplicar.");
+    } finally {
+      setDuplicating(false);
+    }
+  };
+
   return (
     <div className="mx-auto flex w-full max-w-[1800px] flex-col gap-3">
       {/* Top bar */}
