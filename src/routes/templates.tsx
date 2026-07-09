@@ -59,6 +59,7 @@ import { LayoutEditorDialog } from "@/components/template/layout-editor-dialog";
 import {
   aspectRatioLabel,
   slugify,
+  zonesWithReferenceFallback,
   type AspectRatio,
   type ContentType,
   type Template,
@@ -164,7 +165,7 @@ function TemplatesPage() {
   const duplicate = useMutation({
     mutationFn: async (src: Template) => {
       if (!orgId) throw new Error("Organização ausente.");
-      const zones = zonesByTemplate.get(src.id) ?? [];
+      const zones = zonesWithReferenceFallback(src, zonesByTemplate.get(src.id) ?? []);
       const { data: created, error } = await supabase
         .from("templates")
         .insert({
