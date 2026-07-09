@@ -183,8 +183,10 @@ function EquipePage() {
           </CardHeader>
           <CardContent>
             {invitesQ.isLoading ? (
-              <div className="flex justify-center py-8">
-                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+              <div className="space-y-2 py-2">
+                {Array.from({ length: 2 }).map((_, i) => (
+                  <div key={i} className="h-14 animate-pulse rounded-xl bg-muted/40" />
+                ))}
               </div>
             ) : (invitesQ.data ?? []).length === 0 ? (
               <p className="py-6 text-center text-sm text-muted-foreground">
