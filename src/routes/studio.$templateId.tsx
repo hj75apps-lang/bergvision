@@ -1068,6 +1068,63 @@ function EditorPage() {
         Ctrl+Z / Ctrl+Shift+Z desfazer/refazer · Delete/Backspace excluir ·
         Ctrl+D duplicar · setas para mover (Shift = 5%)
       </p>
+
+      <PreviewDialog
+        open={previewOpen}
+        onOpenChange={setPreviewOpen}
+        template={template}
+      />
+
+      <TemplateSettingsDialog
+        open={settingsOpen}
+        onOpenChange={setSettingsOpen}
+        template={{
+          id: template.id,
+          scaling_mode: template.scaling_mode ?? "letterbox",
+          background_color: template.background_color,
+          background_media_id: template.background_media_id ?? null,
+        }}
+        disabled={!canEdit}
+      />
+
+      <Dialog open={duplicateOpen} onOpenChange={setDuplicateOpen}>
+        <DialogContent className="rounded-2xl sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Salvar como novo template</DialogTitle>
+            <DialogDescription>
+              Cria uma cópia deste template com todos os elementos.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col gap-2 py-2">
+            <Label htmlFor="dup-name">Nome do novo template</Label>
+            <Input
+              id="dup-name"
+              value={duplicateName}
+              onChange={(e) => setDuplicateName(e.target.value)}
+              maxLength={80}
+              autoFocus
+            />
+          </div>
+          <DialogFooter>
+            <Button
+              variant="ghost"
+              onClick={() => setDuplicateOpen(false)}
+              disabled={duplicating}
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={doDuplicate}
+              disabled={duplicating || duplicateName.trim().length < 2}
+            >
+              {duplicating && (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              )}
+              Duplicar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
