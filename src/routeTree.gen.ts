@@ -19,6 +19,7 @@ import { Route as ConfiguracoesRouteImport } from './routes/configuracoes'
 import { Route as BibliotecaRouteImport } from './routes/biblioteca'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as StudioTemplateIdRouteImport } from './routes/studio.$templateId'
 import { Route as InviteTokenRouteImport } from './routes/invite.$token'
 
 const TemplatesRoute = TemplatesRouteImport.update({
@@ -71,6 +72,11 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const StudioTemplateIdRoute = StudioTemplateIdRouteImport.update({
+  id: '/$templateId',
+  path: '/$templateId',
+  getParentRoute: () => StudioRoute,
+} as any)
 const InviteTokenRoute = InviteTokenRouteImport.update({
   id: '/invite/$token',
   path: '/invite/$token',
@@ -86,9 +92,10 @@ export interface FileRoutesByFullPath {
   '/players': typeof PlayersRoute
   '/playlists': typeof PlaylistsRoute
   '/reset-password': typeof ResetPasswordRoute
-  '/studio': typeof StudioRoute
+  '/studio': typeof StudioRouteWithChildren
   '/templates': typeof TemplatesRoute
   '/invite/$token': typeof InviteTokenRoute
+  '/studio/$templateId': typeof StudioTemplateIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -99,9 +106,10 @@ export interface FileRoutesByTo {
   '/players': typeof PlayersRoute
   '/playlists': typeof PlaylistsRoute
   '/reset-password': typeof ResetPasswordRoute
-  '/studio': typeof StudioRoute
+  '/studio': typeof StudioRouteWithChildren
   '/templates': typeof TemplatesRoute
   '/invite/$token': typeof InviteTokenRoute
+  '/studio/$templateId': typeof StudioTemplateIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -113,9 +121,10 @@ export interface FileRoutesById {
   '/players': typeof PlayersRoute
   '/playlists': typeof PlaylistsRoute
   '/reset-password': typeof ResetPasswordRoute
-  '/studio': typeof StudioRoute
+  '/studio': typeof StudioRouteWithChildren
   '/templates': typeof TemplatesRoute
   '/invite/$token': typeof InviteTokenRoute
+  '/studio/$templateId': typeof StudioTemplateIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -131,6 +140,7 @@ export interface FileRouteTypes {
     | '/studio'
     | '/templates'
     | '/invite/$token'
+    | '/studio/$templateId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -144,6 +154,7 @@ export interface FileRouteTypes {
     | '/studio'
     | '/templates'
     | '/invite/$token'
+    | '/studio/$templateId'
   id:
     | '__root__'
     | '/'
@@ -157,6 +168,7 @@ export interface FileRouteTypes {
     | '/studio'
     | '/templates'
     | '/invite/$token'
+    | '/studio/$templateId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -168,7 +180,7 @@ export interface RootRouteChildren {
   PlayersRoute: typeof PlayersRoute
   PlaylistsRoute: typeof PlaylistsRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
-  StudioRoute: typeof StudioRoute
+  StudioRoute: typeof StudioRouteWithChildren
   TemplatesRoute: typeof TemplatesRoute
   InviteTokenRoute: typeof InviteTokenRoute
 }
@@ -245,6 +257,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/studio/$templateId': {
+      id: '/studio/$templateId'
+      path: '/$templateId'
+      fullPath: '/studio/$templateId'
+      preLoaderRoute: typeof StudioTemplateIdRouteImport
+      parentRoute: typeof StudioRoute
+    }
     '/invite/$token': {
       id: '/invite/$token'
       path: '/invite/$token'
@@ -255,6 +274,17 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface StudioRouteChildren {
+  StudioTemplateIdRoute: typeof StudioTemplateIdRoute
+}
+
+const StudioRouteChildren: StudioRouteChildren = {
+  StudioTemplateIdRoute: StudioTemplateIdRoute,
+}
+
+const StudioRouteWithChildren =
+  StudioRoute._addFileChildren(StudioRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthRoute: AuthRoute,
@@ -264,7 +294,7 @@ const rootRouteChildren: RootRouteChildren = {
   PlayersRoute: PlayersRoute,
   PlaylistsRoute: PlaylistsRoute,
   ResetPasswordRoute: ResetPasswordRoute,
-  StudioRoute: StudioRoute,
+  StudioRoute: StudioRouteWithChildren,
   TemplatesRoute: TemplatesRoute,
   InviteTokenRoute: InviteTokenRoute,
 }
