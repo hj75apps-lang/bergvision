@@ -22,6 +22,7 @@ import {
   ImageIcon,
   ListMusic,
   Loader2,
+  Play,
   Plus,
   Trash2,
   Video,
@@ -71,6 +72,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { GridSkeleton } from "@/components/layout/grid-skeleton";
+import { PreviewPanel } from "@/components/preview/preview-panel";
 
 export const Route = createFileRoute("/playlists")({
   head: () => ({
