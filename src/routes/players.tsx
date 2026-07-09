@@ -15,6 +15,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Card,
   CardContent,
   CardDescription,
@@ -72,8 +79,11 @@ type Player = {
   last_heartbeat: string | null;
   resolution: string | null;
   orientation: string | null;
+  current_template_id: string | null;
   created_at?: string | null;
 };
+
+type TemplateOpt = { id: string; name: string };
 
 const HEARTBEAT_OFFLINE_MS = 60_000;
 
@@ -129,12 +139,25 @@ function PlayersPage() {
       const { data, error } = await supabase
         .from("players")
         .select(
-          "id, organization_id, name, status, last_heartbeat, resolution, orientation, created_at",
+          "id, organization_id, name, status, last_heartbeat, resolution, orientation, current_template_id, created_at",
         )
         .eq("organization_id", orgId!)
         .order("created_at", { ascending: false });
       if (error) throw error;
       return (data ?? []) as Player[];
+    },
+  });
+
+  const templatesQ = useQuery({
+    queryKey: ["templates-opts"],
+    queryFn: async (): Promise<TemplateOpt[]> => {
+      const { data, error } = await supabase
+        .from("templates")
+        .select("id, name")
+        .order("is_system", { ascending: false })
+        .order("name");
+      if (error) throw error;
+      return (data ?? []) as TemplateOpt[];
     },
   });
 
@@ -217,6 +240,7 @@ function PlayersPage() {
               player={p}
               nowMs={nowMs}
               canManage={canManage}
+              templates={templatesQ.data ?? []}
               onChanged={() => qc.invalidateQueries({ queryKey: ["players", orgId] })}
             />
           ))}
