@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as TemplatesRouteImport } from './routes/templates'
+import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as PlaylistsRouteImport } from './routes/playlists'
 import { Route as PlayersRouteImport } from './routes/players'
 import { Route as EquipeRouteImport } from './routes/equipe'
@@ -21,6 +22,11 @@ import { Route as IndexRouteImport } from './routes/index'
 const TemplatesRoute = TemplatesRouteImport.update({
   id: '/templates',
   path: '/templates',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ResetPasswordRoute = ResetPasswordRouteImport.update({
+  id: '/reset-password',
+  path: '/reset-password',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PlaylistsRoute = PlaylistsRouteImport.update({
@@ -67,6 +73,7 @@ export interface FileRoutesByFullPath {
   '/equipe': typeof EquipeRoute
   '/players': typeof PlayersRoute
   '/playlists': typeof PlaylistsRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/templates': typeof TemplatesRoute
 }
 export interface FileRoutesByTo {
@@ -77,6 +84,7 @@ export interface FileRoutesByTo {
   '/equipe': typeof EquipeRoute
   '/players': typeof PlayersRoute
   '/playlists': typeof PlaylistsRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/templates': typeof TemplatesRoute
 }
 export interface FileRoutesById {
@@ -88,6 +96,7 @@ export interface FileRoutesById {
   '/equipe': typeof EquipeRoute
   '/players': typeof PlayersRoute
   '/playlists': typeof PlaylistsRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/templates': typeof TemplatesRoute
 }
 export interface FileRouteTypes {
@@ -100,6 +109,7 @@ export interface FileRouteTypes {
     | '/equipe'
     | '/players'
     | '/playlists'
+    | '/reset-password'
     | '/templates'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -110,6 +120,7 @@ export interface FileRouteTypes {
     | '/equipe'
     | '/players'
     | '/playlists'
+    | '/reset-password'
     | '/templates'
   id:
     | '__root__'
@@ -120,6 +131,7 @@ export interface FileRouteTypes {
     | '/equipe'
     | '/players'
     | '/playlists'
+    | '/reset-password'
     | '/templates'
   fileRoutesById: FileRoutesById
 }
@@ -131,6 +143,7 @@ export interface RootRouteChildren {
   EquipeRoute: typeof EquipeRoute
   PlayersRoute: typeof PlayersRoute
   PlaylistsRoute: typeof PlaylistsRoute
+  ResetPasswordRoute: typeof ResetPasswordRoute
   TemplatesRoute: typeof TemplatesRoute
 }
 
@@ -141,6 +154,13 @@ declare module '@tanstack/react-router' {
       path: '/templates'
       fullPath: '/templates'
       preLoaderRoute: typeof TemplatesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reset-password': {
+      id: '/reset-password'
+      path: '/reset-password'
+      fullPath: '/reset-password'
+      preLoaderRoute: typeof ResetPasswordRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/playlists': {
@@ -203,6 +223,7 @@ const rootRouteChildren: RootRouteChildren = {
   EquipeRoute: EquipeRoute,
   PlayersRoute: PlayersRoute,
   PlaylistsRoute: PlaylistsRoute,
+  ResetPasswordRoute: ResetPasswordRoute,
   TemplatesRoute: TemplatesRoute,
 }
 export const routeTree = rootRouteImport
