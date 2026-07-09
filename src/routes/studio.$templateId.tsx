@@ -819,8 +819,23 @@ function EditorPage() {
                     origin={false}
                     keepRatio={false}
                     snappable
-                    snapCenter
                     snapThreshold={5}
+                    snapDirections={{
+                      top: true,
+                      right: true,
+                      bottom: true,
+                      left: true,
+                      center: true,
+                      middle: true,
+                    }}
+                    elementSnapDirections={{
+                      top: true,
+                      right: true,
+                      bottom: true,
+                      left: true,
+                      center: true,
+                      middle: true,
+                    }}
                     elementGuidelines={unselectedTargets}
                     verticalGuidelines={verticalGuidelines}
                     horizontalGuidelines={horizontalGuidelines}
