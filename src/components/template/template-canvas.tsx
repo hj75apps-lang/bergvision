@@ -70,11 +70,12 @@ export function TemplateCanvas({
   const canvasRef = useRef<HTMLDivElement | null>(null);
   const dragRef = useRef<DragState | null>(null);
   const isEdit = mode === "edit";
+  const isPreview = mode === "preview";
 
   const normalized = useMemo(() => zones.map(zoneWithFallback), [zones]);
 
   const overlapMap = useMemo(() => {
-    if (template.allow_overlap) return new Map<string, boolean>();
+    if (template.allow_overlap || isPreview) return new Map<string, boolean>();
     const m = new Map<string, boolean>();
     for (let i = 0; i < normalized.length; i++) {
       for (let j = i + 1; j < normalized.length; j++) {
@@ -85,7 +86,7 @@ export function TemplateCanvas({
       }
     }
     return m;
-  }, [normalized, template.allow_overlap]);
+  }, [normalized, template.allow_overlap, isPreview]);
 
   const onPointerMove = useCallback(
     (e: PointerEvent) => {
@@ -226,11 +227,13 @@ export function TemplateCanvas({
                 else onSelect?.(z.id);
               }}
             >
-              {showLabels && (
+              {showLabels && (z.width_pct ?? 0) >= 18 && (z.height_pct ?? 0) >= 12 && (
                 <div className="pointer-events-none flex items-start justify-between gap-1">
-                  <span className="rounded bg-black/40 px-1.5 py-0.5">{z.zone_name}</span>
-                  {overlapping && (
-                    <span className="rounded bg-red-500/80 px-1.5 py-0.5 text-[9px]">
+                  <span className="max-w-full truncate rounded bg-black/50 px-1.5 py-0.5">
+                    {z.zone_name}
+                  </span>
+                  {overlapping && !isPreview && (
+                    <span className="shrink-0 rounded bg-red-500/80 px-1.5 py-0.5 text-[9px]">
                       sobreposição
                     </span>
                   )}
