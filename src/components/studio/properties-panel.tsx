@@ -62,12 +62,16 @@ export function PropertiesPanel({
   onGeomChange,
   onFlagChange,
   onContentChange,
+  canvasWidth,
+  canvasHeight,
 }: {
   element: TemplateElement | null;
   disabled: boolean;
   onGeomChange: (patch: Partial<Pick<TemplateElement, NumericKey>>) => void;
   onFlagChange: (patch: Partial<Pick<TemplateElement, "locked" | "visible">>) => void;
   onContentChange: (content: Record<string, unknown>) => void;
+  canvasWidth: number;
+  canvasHeight: number;
 }) {
   return (
     <div className="flex h-full flex-col">
@@ -107,6 +111,8 @@ export function PropertiesPanel({
               element={element}
               disabled={disabled}
               onChange={onContentChange}
+              canvasWidth={canvasWidth}
+              canvasHeight={canvasHeight}
             />
           </div>
         )}
@@ -276,13 +282,20 @@ function ContentBlock({
   element,
   disabled,
   onChange,
+  canvasWidth,
+  canvasHeight,
 }: {
   element: TemplateElement;
   disabled: boolean;
   onChange: (content: Record<string, unknown>) => void;
+  canvasWidth: number;
+  canvasHeight: number;
 }) {
   const c = (element.content ?? {}) as Record<string, unknown>;
   const patch = (p: Record<string, unknown>) => onChange({ ...c, ...p });
+
+  const requiredWidth = Math.round((element.width / 100) * canvasWidth);
+  const requiredHeight = Math.round((element.height / 100) * canvasHeight);
 
   switch (element.element_type) {
     case "text":
@@ -296,10 +309,20 @@ function ContentBlock({
           disabled={disabled}
           kind="image"
           allowFill={element.element_type === "image"}
+          requiredWidth={requiredWidth}
+          requiredHeight={requiredHeight}
         />
       );
     case "video":
-      return <VideoContent c={c} patch={patch} disabled={disabled} />;
+      return (
+        <VideoContent
+          c={c}
+          patch={patch}
+          disabled={disabled}
+          requiredWidth={requiredWidth}
+          requiredHeight={requiredHeight}
+        />
+      );
     case "playlist":
       return <PlaylistContent c={c} patch={patch} disabled={disabled} />;
     case "widget":
