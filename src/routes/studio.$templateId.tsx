@@ -749,10 +749,10 @@ function EditorPage() {
             variant="ghost"
             size="sm"
             onClick={() => setPreviewOpen(true)}
-            title="Preview em tela cheia"
+            title="Preview ao vivo (renderiza no Player)"
           >
             <Eye className="mr-1.5 h-4 w-4" />
-            Preview
+            Preview ao vivo
           </Button>
           <Button
             variant="ghost"
@@ -1072,10 +1072,13 @@ function EditorPage() {
         Ctrl+D duplicar · setas para mover (Shift = 5%)
       </p>
 
-      <PreviewDialog
+      <PreviewPanel
+        mode="modal"
+        scope="template"
+        targetId={templateId}
+        draftData={draftPayload}
         open={previewOpen}
         onOpenChange={setPreviewOpen}
-        template={template}
       />
 
       <TemplateSettingsDialog
