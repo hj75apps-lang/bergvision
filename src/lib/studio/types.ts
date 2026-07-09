@@ -31,6 +31,8 @@ export type CanvasTemplate = {
   canvas_height: number;
   background_color: string | null;
   organization_id: string | null;
+  scaling_mode?: string | null;
+  background_media_id?: string | null;
 };
 
 export const clampPct = (v: number, max = 100) =>
