@@ -7,6 +7,7 @@ import {
   Loader2,
   Pencil,
   Plus,
+  Play,
   Settings2,
   Trash2,
 } from "lucide-react";
@@ -56,6 +57,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { GridSkeleton } from "@/components/layout/grid-skeleton";
 import { TemplateCanvas } from "@/components/template/template-canvas";
 import { LayoutEditorDialog } from "@/components/template/layout-editor-dialog";
+import { PreviewPanel } from "@/components/preview/preview-panel";
 import {
   aspectRatioLabel,
   slugify,
@@ -95,6 +97,7 @@ function TemplatesPage() {
   const [editingLayout, setEditingLayout] = useState<Template | null>(null);
   const [creating, setCreating] = useState(false);
   const [deleting, setDeleting] = useState<Template | null>(null);
+  const [previewing, setPreviewing] = useState<Template | null>(null);
   const qc = useQueryClient();
 
   const templatesQ = useQuery({
@@ -281,6 +284,16 @@ function TemplatesPage() {
                   <Button
                     variant="outline"
                     size="sm"
+                    className="rounded-xl"
+                    disabled={role === "viewer"}
+                    onClick={() => setPreviewing(t)}
+                    title={role === "viewer" ? "Sem permissão para gerar preview" : "Preview"}
+                  >
+                    <Play className="mr-1.5 h-4 w-4" /> Preview
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
                     className="flex-1 rounded-xl"
                     disabled={!canConfigureContent}
                     onClick={() => setConfiguring(t)}
@@ -370,6 +383,16 @@ function TemplatesPage() {
             const t = (templatesQ.data ?? []).find((x) => x.id === id);
             if (t) setEditingLayout(t);
           }}
+        />
+      )}
+
+      {previewing && (
+        <PreviewPanel
+          mode="modal"
+          scope="template"
+          targetId={previewing.id}
+          open={!!previewing}
+          onOpenChange={(v) => !v && setPreviewing(null)}
         />
       )}
 
