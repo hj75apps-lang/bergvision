@@ -64,7 +64,7 @@ function PreviewReferencePattern({ index }: { index: number }) {
     return (
       <div className="pointer-events-none grid h-full w-full grid-cols-3 gap-1 opacity-70">
         <div className="rounded-sm bg-foreground/20" />
-        <div className="rounded-sm bg-white/10" />
+        <div className="rounded-sm bg-foreground/10" />
         <div className="rounded-sm bg-foreground/20" />
       </div>
     );
@@ -93,9 +93,9 @@ function PreviewReferencePattern({ index }: { index: number }) {
       <div className="h-2 w-1/3 rounded-full bg-foreground/20" />
       <div className="mt-auto grid grid-cols-4 gap-1">
         <div className="h-5 rounded-sm bg-foreground/15" />
-        <div className="h-5 rounded-sm bg-white/10" />
+        <div className="h-5 rounded-sm bg-foreground/10" />
         <div className="h-5 rounded-sm bg-foreground/15" />
-        <div className="h-5 rounded-sm bg-white/10" />
+        <div className="h-5 rounded-sm bg-foreground/10" />
       </div>
     </div>
   );
