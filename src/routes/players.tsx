@@ -56,6 +56,7 @@ import {
 } from "@/components/ui/input-otp";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
+import { GridSkeleton } from "@/components/layout/grid-skeleton";
 
 export const Route = createFileRoute("/players")({
   head: () => ({
@@ -211,9 +212,7 @@ function PlayersPage() {
       </header>
 
       {playersQ.isLoading ? (
-        <div className="flex justify-center py-16">
-          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-        </div>
+        <GridSkeleton count={6} heightClass="h-48" />
       ) : players.length === 0 ? (
         <Card className="rounded-2xl border-dashed border-border/60 bg-card/40 backdrop-blur-xl">
           <CardContent className="flex flex-col items-center gap-3 py-16 text-center">
