@@ -1,6 +1,6 @@
 ---
-name: Webdesign Review
-description: Meta-skill: revisão completa orquestrando as 20 skills de design em sequência de prioridade.
+name: webdesign-review
+description: "Meta-skill: revisão completa orquestrando as 20 skills de design em sequência de prioridade. Ativar quando o usuário pedir revisão de design, auditoria de UI/UX, checagem de acessibilidade/responsividade/performance visual, ou avaliação geral do projeto antes de lançamento."
 ---
 
 Run a comprehensive web design review of this project. You are acting as a senior design director reviewing the entire project.
