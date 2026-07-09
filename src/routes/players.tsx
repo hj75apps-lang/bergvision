@@ -260,15 +260,57 @@ function PlayerCard({
   player,
   nowMs,
   canManage,
+  templates,
   onChanged,
 }: {
   player: Player;
   nowMs: number;
   canManage: boolean;
+  templates: TemplateOpt[];
   onChanged: () => void;
 }) {
   const online = isOnline(player, nowMs);
   const [identifying, setIdentifying] = useState(false);
+  const [savingTpl, setSavingTpl] = useState(false);
+
+  const changeTemplate = async (tplId: string) => {
+    setSavingTpl(true);
+    try {
+      const { error } = await supabase
+        .from("players")
+        .update({ current_template_id: tplId })
+        .eq("id", player.id);
+      if (error) throw error;
+
+      // Broadcast config_updated no canal do player
+      const channel = supabase.channel(`player:${player.id}`);
+      await new Promise<void>((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error("timeout")), 5000);
+        channel.subscribe((status) => {
+          if (status === "SUBSCRIBED") {
+            clearTimeout(timer);
+            resolve();
+          } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+            clearTimeout(timer);
+            reject(new Error(status));
+          }
+        });
+      });
+      await channel.send({
+        type: "broadcast",
+        event: "config_updated",
+        payload: { template_id: tplId },
+      });
+      supabase.removeChannel(channel);
+
+      toast.success("Template atualizado.");
+      onChanged();
+    } catch (err: any) {
+      toast.error(err?.message || "Falha ao atualizar template.");
+    } finally {
+      setSavingTpl(false);
+    }
+  };
 
   const identify = async () => {
     setIdentifying(true);
@@ -352,6 +394,25 @@ function PlayerCard({
           <div className="mt-0.5 font-medium">
             {formatOrientation(player.orientation)}
           </div>
+        </div>
+        <div className="col-span-2 space-y-1.5">
+          <div className="text-muted-foreground">Template ativo</div>
+          <Select
+            value={player.current_template_id ?? ""}
+            onValueChange={changeTemplate}
+            disabled={!canManage || savingTpl}
+          >
+            <SelectTrigger className="h-9 rounded-xl text-xs">
+              <SelectValue placeholder="Selecione um template" />
+            </SelectTrigger>
+            <SelectContent>
+              {templates.map((t) => (
+                <SelectItem key={t.id} value={t.id}>
+                  {t.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
       </CardContent>
       <CardFooter className="flex justify-between gap-2 pt-0">
