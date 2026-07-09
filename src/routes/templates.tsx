@@ -274,7 +274,7 @@ function TemplatesPage() {
                   </div>
                 </CardHeader>
                 <CardContent className="pb-3">
-                  <TemplateCanvas template={t} zones={zones} mode="preview" />
+                  <TemplateCanvas template={t} zones={zones} mode="preview" showLabels={false} />
                 </CardContent>
                 <CardFooter className="flex-wrap gap-2 pt-0">
                   <Button
