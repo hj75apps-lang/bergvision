@@ -716,6 +716,16 @@ function PlaylistEditor({
           <Button variant="ghost" onClick={() => onOpenChange(false)} className="rounded-xl">
             Fechar
           </Button>
+          <Button
+            variant="outline"
+            onClick={() => setPreviewOpen(true)}
+            disabled={!canPreview}
+            title={canPreview ? "Preview da sequência" : "Sem permissão para gerar preview"}
+            className="rounded-xl"
+          >
+            <Play className="mr-2 h-4 w-4" />
+            Preview da Sequência
+          </Button>
           {canManage && (
             <Button
               onClick={() => saveMeta.mutate()}
@@ -728,6 +738,13 @@ function PlaylistEditor({
           )}
         </DialogFooter>
       </DialogContent>
+      <PreviewPanel
+        mode="modal"
+        scope="playlist"
+        targetId={playlist.id}
+        open={previewOpen}
+        onOpenChange={setPreviewOpen}
+      />
     </Dialog>
   );
 }
