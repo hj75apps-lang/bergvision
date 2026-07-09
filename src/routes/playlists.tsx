@@ -22,6 +22,7 @@ import {
   ImageIcon,
   ListMusic,
   Loader2,
+  Play,
   Plus,
   Trash2,
   Video,
@@ -71,6 +72,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { GridSkeleton } from "@/components/layout/grid-skeleton";
+import { PreviewPanel } from "@/components/preview/preview-panel";
 
 export const Route = createFileRoute("/playlists")({
   head: () => ({
@@ -364,6 +366,9 @@ function PlaylistEditor({
   const { membership } = useAuth();
   const orgId = membership?.organization_id ?? null;
   const qc = useQueryClient();
+  const role = membership?.role ?? "viewer";
+  const canPreview = role !== "viewer";
+  const [previewOpen, setPreviewOpen] = useState(false);
 
   const [name, setName] = useState(playlist.name);
   const [isActive, setIsActive] = useState(playlist.is_active);
@@ -711,6 +716,16 @@ function PlaylistEditor({
           <Button variant="ghost" onClick={() => onOpenChange(false)} className="rounded-xl">
             Fechar
           </Button>
+          <Button
+            variant="outline"
+            onClick={() => setPreviewOpen(true)}
+            disabled={!canPreview}
+            title={canPreview ? "Preview da sequência" : "Sem permissão para gerar preview"}
+            className="rounded-xl"
+          >
+            <Play className="mr-2 h-4 w-4" />
+            Preview da Sequência
+          </Button>
           {canManage && (
             <Button
               onClick={() => saveMeta.mutate()}
@@ -723,6 +738,13 @@ function PlaylistEditor({
           )}
         </DialogFooter>
       </DialogContent>
+      <PreviewPanel
+        mode="modal"
+        scope="playlist"
+        targetId={playlist.id}
+        open={previewOpen}
+        onOpenChange={setPreviewOpen}
+      />
     </Dialog>
   );
 }
