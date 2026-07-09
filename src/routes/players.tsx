@@ -281,7 +281,17 @@ function PlayerCard({
         .eq("id", player.id);
       if (error) throw error;
 
-      // Broadcast config_updated no canal do player
+      // Fetch full zone set so the player can re-render without a round trip.
+      const { data: zones, error: zErr } = await supabase
+        .from("template_zones")
+        .select(
+          "id, zone_name, pos_x, pos_y, width_pct, height_pct, z_index, content_type, media_file_id, playlist_id, widget_type, widget_config",
+        )
+        .eq("template_id", tplId)
+        .order("zone_index");
+      if (zErr) throw zErr;
+
+      // Broadcast config_updated no canal do player com payload completo
       const channel = supabase.channel(`player:${player.id}`);
       await new Promise<void>((resolve, reject) => {
         const timer = setTimeout(() => reject(new Error("timeout")), 5000);
@@ -298,7 +308,26 @@ function PlayerCard({
       await channel.send({
         type: "broadcast",
         event: "config_updated",
-        payload: { template_id: tplId },
+        payload: {
+          event: "config_updated",
+          template_id: tplId,
+          zones: (zones ?? []).map((z: any) => ({
+            zone_id: z.id,
+            zone_name: z.zone_name,
+            pos_x: z.pos_x,
+            pos_y: z.pos_y,
+            width_pct: z.width_pct,
+            height_pct: z.height_pct,
+            z_index: z.z_index,
+            content_type: z.content_type,
+            media_file_id: z.media_file_id,
+            playlist_id: z.playlist_id,
+            widget_type: z.widget_type,
+            widget_config: z.widget_config,
+          })),
+          updated_at: new Date().toISOString(),
+          updated_by: null,
+        },
       });
       supabase.removeChannel(channel);
 
