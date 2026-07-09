@@ -1,4 +1,10 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   createFileRoute,
   Link,
@@ -13,11 +19,16 @@ import {
   Image as ImageIcon,
   ListMusic,
   Loader2,
+  Maximize2,
+  Minus,
+  Plus,
+  Redo2,
   Shapes,
   Sparkles,
   Square,
   Trash2,
   Type as TypeIcon,
+  Undo2,
   Video as VideoIcon,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -26,6 +37,20 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
+import { LayersPanel } from "@/components/studio/layers-panel";
+import { PropertiesPanel } from "@/components/studio/properties-panel";
+import { useSignedUrl } from "@/lib/studio/use-signed-url";
+import {
+  clampPct,
+  ELEMENT_LABELS,
+  type CanvasTemplate,
+  type ElementType,
+  type TemplateElement,
+} from "@/lib/studio/types";
+import {
+  diffSnapshots,
+  useHistoryStore,
+} from "@/lib/studio/history-store";
 
 export const Route = createFileRoute("/studio/$templateId")({
   head: () => ({
@@ -36,40 +61,6 @@ export const Route = createFileRoute("/studio/$templateId")({
   }),
   component: EditorPage,
 });
-
-type CanvasTemplate = {
-  id: string;
-  name: string;
-  canvas_width: number;
-  canvas_height: number;
-  background_color: string | null;
-  organization_id: string | null;
-};
-
-type ElementType =
-  | "text"
-  | "image"
-  | "video"
-  | "logo"
-  | "playlist"
-  | "widget"
-  | "shape";
-
-type TemplateElement = {
-  id: string;
-  template_id: string;
-  element_type: ElementType;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  rotation: number;
-  z_index: number;
-  opacity: number | null;
-  locked: boolean | null;
-  visible: boolean | null;
-  content: Record<string, unknown> | null;
-};
 
 type ToolDef = {
   type: ElementType;
@@ -135,7 +126,7 @@ const TOOLS: ToolDef[] = [
     defaultContent: {
       element_type: "widget",
       widgetType: "clock",
-      widgetConfig: { format: "24h" },
+      widgetConfig: { format: "24h", timezone: "America/Sao_Paulo" },
     },
     defaultSize: { width: 25, height: 15 },
   },
@@ -154,8 +145,6 @@ const TOOLS: ToolDef[] = [
   },
 ];
 
-const clampPct = (v: number, max = 100) => Math.max(0, Math.min(max, v));
-
 function EditorPage() {
   const { templateId } = Route.useParams();
   const { membership } = useAuth();
@@ -165,20 +154,24 @@ function EditorPage() {
   const qc = useQueryClient();
 
   const canvasRef = useRef<HTMLDivElement | null>(null);
+  const stageWrapRef = useRef<HTMLDivElement | null>(null);
   const selectoRef = useRef<Selecto | null>(null);
   const moveableRef = useRef<Moveable | null>(null);
 
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [canvasSize, setCanvasSize] = useState<{ w: number; h: number }>({
-    w: 0,
-    h: 0,
-  });
+  const [canvasSize, setCanvasSize] = useState({ w: 0, h: 0 });
+  const [zoom, setZoom] = useState(1);
 
-  // In-flight positional overrides (percent) applied on top of server data
-  // during drag/resize/rotate. Flushed to DB by debounced save.
   const [pendingGeom, setPendingGeom] = useState<
     Record<string, Partial<Pick<TemplateElement, "x" | "y" | "width" | "height" | "rotation">>>
   >({});
+
+  const historyReset = useHistoryStore((s) => s.reset);
+  const historyPush = useHistoryStore((s) => s.push);
+  const historyUndo = useHistoryStore((s) => s.undo);
+  const historyRedo = useHistoryStore((s) => s.redo);
+  const canUndo = useHistoryStore((s) => s.past.length > 0);
+  const canRedo = useHistoryStore((s) => s.future.length > 0);
 
   const templateQ = useQuery({
     queryKey: ["studio_template", templateId],
@@ -210,14 +203,27 @@ function EditorPage() {
     },
   });
 
-  // Merge server data with pending in-flight geometry so the DOM stays smooth.
   const elements = useMemo<TemplateElement[]>(() => {
     const base = elementsQ.data ?? [];
     if (Object.keys(pendingGeom).length === 0) return base;
-    return base.map((e) => (pendingGeom[e.id] ? { ...e, ...pendingGeom[e.id] } : e));
+    return base.map((e) =>
+      pendingGeom[e.id] ? { ...e, ...pendingGeom[e.id] } : e,
+    );
   }, [elementsQ.data, pendingGeom]);
 
-  // ---- Canvas measure ----
+  const selectedElements = useMemo(
+    () => elements.filter((e) => selectedIds.includes(e.id)),
+    [elements, selectedIds],
+  );
+  const activeElement =
+    selectedElements.length === 1 ? selectedElements[0] : null;
+
+  // Reset history when switching templates.
+  useEffect(() => {
+    historyReset(templateId);
+  }, [templateId, historyReset]);
+
+  // ---- Canvas measurement ----
   useEffect(() => {
     const node = canvasRef.current;
     if (!node) return;
@@ -227,34 +233,35 @@ function EditorPage() {
     });
     ro.observe(node);
     return () => ro.disconnect();
-  }, [templateQ.data]);
+  }, [templateQ.data, zoom]);
 
   useEffect(() => {
-    // Give moveable a chance to reposition after size changes
     if (moveableRef.current) moveableRef.current.updateRect();
-  }, [canvasSize, selectedIds, elements]);
+  }, [canvasSize, selectedIds, elements, zoom]);
 
-  // ---- Mutations ----
+  // ---- Persistence primitives ----
   const saveTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
   const persistUpdate = useCallback(
     async (
       id: string,
-      patch: Partial<Pick<TemplateElement, "x" | "y" | "width" | "height" | "rotation" | "z_index">>,
+      patch: Partial<
+        Pick<TemplateElement, "x" | "y" | "width" | "height" | "rotation" | "z_index" | "opacity" | "locked" | "visible">
+      > & { content?: Record<string, unknown> },
     ) => {
       const { error } = await supabase
         .from("template_elements")
         .update(patch)
         .eq("id", id);
       if (error) {
-        toast.error("Falha ao salvar posição.");
+        toast.error("Falha ao salvar.");
         console.warn("[studio] save error", error.message);
       }
     },
     [],
   );
 
-  const scheduleSave = useCallback(
+  const scheduleGeomSave = useCallback(
     (
       id: string,
       patch: Partial<Pick<TemplateElement, "x" | "y" | "width" | "height" | "rotation">>,
@@ -265,7 +272,6 @@ function EditorPage() {
       const t = setTimeout(async () => {
         saveTimers.current.delete(id);
         await persistUpdate(id, patch);
-        // Refetch to reconcile server truth, then drop pending override.
         await qc.invalidateQueries({ queryKey: ["studio_elements", templateId] });
         setPendingGeom((prev) => {
           const next = { ...prev };
@@ -286,12 +292,16 @@ function EditorPage() {
     };
   }, []);
 
+  /** Push snapshot of current merged elements BEFORE a committing action. */
+  const snapshot = useCallback(() => {
+    historyPush(elements);
+  }, [historyPush, elements]);
+
+  // ---- Add / delete / duplicate / update ----
   const addElement = useMutation({
     mutationFn: async (tool: ToolDef) => {
-      const maxZ = (elementsQ.data ?? []).reduce(
-        (m, e) => Math.max(m, e.z_index ?? 0),
-        0,
-      );
+      snapshot();
+      const maxZ = elements.reduce((m, e) => Math.max(m, e.z_index ?? 0), 0);
       const { data, error } = await supabase
         .from("template_elements")
         .insert({
@@ -324,6 +334,7 @@ function EditorPage() {
   const deleteElements = useCallback(
     async (ids: string[]) => {
       if (ids.length === 0) return;
+      snapshot();
       const { error } = await supabase
         .from("template_elements")
         .delete()
@@ -335,18 +346,16 @@ function EditorPage() {
       setSelectedIds([]);
       await qc.invalidateQueries({ queryKey: ["studio_elements", templateId] });
     },
-    [qc, templateId],
+    [qc, snapshot, templateId],
   );
 
   const duplicateElements = useCallback(
     async (ids: string[]) => {
       if (ids.length === 0) return;
-      const src = (elementsQ.data ?? []).filter((e) => ids.includes(e.id));
+      const src = elements.filter((e) => ids.includes(e.id));
       if (src.length === 0) return;
-      const maxZ = (elementsQ.data ?? []).reduce(
-        (m, e) => Math.max(m, e.z_index ?? 0),
-        0,
-      );
+      snapshot();
+      const maxZ = elements.reduce((m, e) => Math.max(m, e.z_index ?? 0), 0);
       const rows = src.map((e, i) => ({
         template_id: templateId,
         element_type: e.element_type,
@@ -372,24 +381,136 @@ function EditorPage() {
       await qc.invalidateQueries({ queryKey: ["studio_elements", templateId] });
       setSelectedIds((data ?? []).map((r) => (r as { id: string }).id));
     },
-    [elementsQ.data, qc, templateId],
+    [elements, qc, snapshot, templateId],
+  );
+
+  const commitElementUpdate = useCallback(
+    async (
+      id: string,
+      patch: Partial<
+        Pick<TemplateElement, "x" | "y" | "width" | "height" | "rotation" | "z_index" | "opacity" | "locked" | "visible">
+      > & { content?: Record<string, unknown> },
+    ) => {
+      snapshot();
+      await persistUpdate(id, patch);
+      await qc.invalidateQueries({ queryKey: ["studio_elements", templateId] });
+    },
+    [persistUpdate, qc, snapshot, templateId],
   );
 
   const nudge = useCallback(
     (dx: number, dy: number) => {
       if (selectedIds.length === 0) return;
+      snapshot();
       for (const id of selectedIds) {
         const el = elements.find((e) => e.id === id);
         if (!el || el.locked) continue;
         const x = clampPct(el.x + dx, 100 - el.width);
         const y = clampPct(el.y + dy, 100 - el.height);
-        scheduleSave(id, { x, y });
+        scheduleGeomSave(id, { x, y });
       }
     },
-    [elements, scheduleSave, selectedIds],
+    [elements, scheduleGeomSave, selectedIds, snapshot],
   );
 
-  // ---- Keyboard ----
+  // ---- History apply ----
+  const applySnapshot = useCallback(
+    async (target: TemplateElement[]) => {
+      const current = elementsQ.data ?? [];
+      const { toInsert, toUpdate, toDeleteIds } = diffSnapshots(
+        current,
+        target,
+      );
+      const errors: string[] = [];
+
+      if (toDeleteIds.length > 0) {
+        const { error } = await supabase
+          .from("template_elements")
+          .delete()
+          .in("id", toDeleteIds);
+        if (error) errors.push(error.message);
+      }
+      if (toInsert.length > 0) {
+        const rows = toInsert.map((e) => ({
+          id: e.id,
+          template_id: e.template_id,
+          element_type: e.element_type,
+          x: e.x,
+          y: e.y,
+          width: e.width,
+          height: e.height,
+          rotation: e.rotation,
+          z_index: e.z_index,
+          opacity: e.opacity ?? 1,
+          locked: e.locked ?? false,
+          visible: e.visible ?? true,
+          content: e.content ?? {},
+        }));
+        const { error } = await supabase
+          .from("template_elements")
+          .insert(rows);
+        if (error) errors.push(error.message);
+      }
+      for (const e of toUpdate) {
+        const { error } = await supabase
+          .from("template_elements")
+          .update({
+            x: e.x,
+            y: e.y,
+            width: e.width,
+            height: e.height,
+            rotation: e.rotation,
+            z_index: e.z_index,
+            opacity: e.opacity ?? 1,
+            locked: e.locked ?? false,
+            visible: e.visible ?? true,
+            content: e.content ?? {},
+          })
+          .eq("id", e.id);
+        if (error) errors.push(error.message);
+      }
+
+      if (errors.length > 0) {
+        toast.error("Falha ao aplicar histórico.");
+        console.warn("[studio] history apply errors", errors);
+      }
+      await qc.invalidateQueries({ queryKey: ["studio_elements", templateId] });
+    },
+    [elementsQ.data, qc, templateId],
+  );
+
+  const doUndo = useCallback(async () => {
+    const target = historyUndo(elements);
+    if (target) await applySnapshot(target);
+  }, [applySnapshot, elements, historyUndo]);
+
+  const doRedo = useCallback(async () => {
+    const target = historyRedo(elements);
+    if (target) await applySnapshot(target);
+  }, [applySnapshot, elements, historyRedo]);
+
+  // ---- Layers actions ----
+  const reorderLayers = useCallback(
+    async (topToBottomIds: string[]) => {
+      snapshot();
+      // topToBottomIds[0] gets the highest z_index.
+      const total = topToBottomIds.length;
+      const updates = topToBottomIds.map((id, i) => ({
+        id,
+        z_index: total - i,
+      }));
+      for (const u of updates) {
+        await supabase
+          .from("template_elements")
+          .update({ z_index: u.z_index })
+          .eq("id", u.id);
+      }
+      await qc.invalidateQueries({ queryKey: ["studio_elements", templateId] });
+    },
+    [qc, snapshot, templateId],
+  );
+
+  // ---- Keyboard shortcuts ----
   useEffect(() => {
     if (!canEdit) return;
     const onKey = (e: KeyboardEvent) => {
@@ -398,17 +519,29 @@ function EditorPage() {
       if (tag === "INPUT" || tag === "TEXTAREA" || target?.isContentEditable)
         return;
 
+      const mod = e.ctrlKey || e.metaKey;
+      if (mod && (e.key === "z" || e.key === "Z")) {
+        e.preventDefault();
+        if (e.shiftKey) void doRedo();
+        else void doUndo();
+        return;
+      }
+      if (mod && (e.key === "y" || e.key === "Y")) {
+        e.preventDefault();
+        void doRedo();
+        return;
+      }
+      if (mod && (e.key === "d" || e.key === "D")) {
+        if (selectedIds.length > 0) {
+          e.preventDefault();
+          void duplicateElements(selectedIds);
+        }
+        return;
+      }
       if (e.key === "Delete" || e.key === "Backspace") {
         if (selectedIds.length > 0) {
           e.preventDefault();
           void deleteElements(selectedIds);
-        }
-        return;
-      }
-      if ((e.ctrlKey || e.metaKey) && (e.key === "d" || e.key === "D")) {
-        if (selectedIds.length > 0) {
-          e.preventDefault();
-          void duplicateElements(selectedIds);
         }
         return;
       }
@@ -431,9 +564,17 @@ function EditorPage() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [canEdit, deleteElements, duplicateElements, nudge, selectedIds]);
+  }, [
+    canEdit,
+    deleteElements,
+    doRedo,
+    doUndo,
+    duplicateElements,
+    nudge,
+    selectedIds,
+  ]);
 
-  // ---- Moveable handlers ----
+  // ---- Moveable helpers ----
   const pxToPctX = (px: number) => (canvasSize.w ? (px / canvasSize.w) * 100 : 0);
   const pxToPctY = (px: number) => (canvasSize.h ? (px / canvasSize.h) * 100 : 0);
 
@@ -446,7 +587,32 @@ function EditorPage() {
       .filter((n): n is HTMLElement => !!n);
   }, [selectedIds, elements, canvasSize]);
 
+  const unselectedTargets = useMemo(() => {
+    if (!canvasRef.current) return [];
+    return elements
+      .filter((e) => !selectedIds.includes(e.id))
+      .map((e) =>
+        canvasRef.current!.querySelector<HTMLElement>(`[data-el-id="${e.id}"]`),
+      )
+      .filter((n): n is HTMLElement => !!n);
+  }, [elements, selectedIds, canvasSize]);
+
+  // Center + edges of canvas as snap guidelines.
+  const verticalGuidelines = useMemo(
+    () => (canvasSize.w ? [0, canvasSize.w / 2, canvasSize.w] : []),
+    [canvasSize.w],
+  );
+  const horizontalGuidelines = useMemo(
+    () => (canvasSize.h ? [0, canvasSize.h / 2, canvasSize.h] : []),
+    [canvasSize.h],
+  );
+
   const template = templateQ.data;
+
+  // ---- Zoom controls ----
+  const zoomIn = () => setZoom((z) => Math.min(4, +(z + 0.1).toFixed(2)));
+  const zoomOut = () => setZoom((z) => Math.max(0.25, +(z - 0.1).toFixed(2)));
+  const zoomFit = () => setZoom(1);
 
   if (templateQ.isLoading) {
     return (
@@ -471,8 +637,8 @@ function EditorPage() {
   const bg = template.background_color ?? "#0F172A";
 
   return (
-    <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-4">
-      {/* Header */}
+    <div className="mx-auto flex w-full max-w-[1800px] flex-col gap-3">
+      {/* Top bar */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <Button
@@ -493,7 +659,27 @@ function EditorPage() {
             </span>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+
+        <div className="flex items-center gap-1.5">
+          <Button
+            variant="ghost"
+            size="sm"
+            disabled={!canEdit || !canUndo}
+            onClick={doUndo}
+            title="Desfazer (Ctrl+Z)"
+          >
+            <Undo2 className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            disabled={!canEdit || !canRedo}
+            onClick={doRedo}
+            title="Refazer (Ctrl+Shift+Z)"
+          >
+            <Redo2 className="h-4 w-4" />
+          </Button>
+          <Separator orientation="vertical" className="mx-1 h-6" />
           <Button
             variant="ghost"
             size="sm"
@@ -512,6 +698,19 @@ function EditorPage() {
           >
             <Trash2 className="mr-1.5 h-4 w-4" />
             Excluir
+          </Button>
+          <Separator orientation="vertical" className="mx-1 h-6" />
+          <Button variant="ghost" size="icon" onClick={zoomOut} title="Zoom -">
+            <Minus className="h-4 w-4" />
+          </Button>
+          <span className="min-w-[3.5rem] text-center text-xs tabular-nums text-muted-foreground">
+            {Math.round(zoom * 100)}%
+          </span>
+          <Button variant="ghost" size="icon" onClick={zoomIn} title="Zoom +">
+            <Plus className="h-4 w-4" />
+          </Button>
+          <Button variant="ghost" size="icon" onClick={zoomFit} title="Ajustar">
+            <Maximize2 className="h-4 w-4" />
           </Button>
         </div>
       </div>
@@ -537,135 +736,217 @@ function EditorPage() {
         ))}
       </div>
 
-      {/* Canvas stage */}
-      <div
-        className="relative flex w-full items-center justify-center rounded-2xl border border-border/60 bg-muted/20 p-4"
-        onMouseDown={(e) => {
-          // Clicks on empty stage area clear selection.
-          if (e.target === e.currentTarget) setSelectedIds([]);
-        }}
-      >
+      {/* Main workspace */}
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-[240px_1fr_280px]">
+        {/* Layers */}
+        <aside className="hidden overflow-hidden rounded-2xl border border-border/60 bg-card/40 backdrop-blur lg:flex lg:flex-col lg:h-[72vh]">
+          <LayersPanel
+            elements={elements}
+            selectedIds={selectedIds}
+            disabled={!canEdit}
+            onSelect={(id, additive) =>
+              setSelectedIds((prev) =>
+                additive
+                  ? prev.includes(id)
+                    ? prev.filter((v) => v !== id)
+                    : [...prev, id]
+                  : [id],
+              )
+            }
+            onRename={(id, name) => {
+              const el = elements.find((e) => e.id === id);
+              if (!el) return;
+              const content = { ...(el.content ?? {}), name };
+              void commitElementUpdate(id, { content });
+            }}
+            onToggleVisible={(id) => {
+              const el = elements.find((e) => e.id === id);
+              if (!el) return;
+              void commitElementUpdate(id, { visible: !(el.visible ?? true) });
+            }}
+            onToggleLocked={(id) => {
+              const el = elements.find((e) => e.id === id);
+              if (!el) return;
+              void commitElementUpdate(id, { locked: !(el.locked ?? false) });
+            }}
+            onReorder={reorderLayers}
+          />
+        </aside>
+
+        {/* Canvas stage */}
         <div
-          className="relative w-full max-w-full"
-          style={{
-            aspectRatio: aspect,
-            maxHeight: "min(72vh, 900px)",
-            maxWidth:
-              template.canvas_width >= template.canvas_height
-                ? "100%"
-                : `calc(min(72vh, 900px) * ${template.canvas_width} / ${template.canvas_height})`,
+          ref={stageWrapRef}
+          className="relative flex min-h-[60vh] w-full items-center justify-center overflow-auto rounded-2xl border border-border/60 bg-muted/20 p-4"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) setSelectedIds([]);
           }}
         >
           <div
-            ref={canvasRef}
-            className="canvas-stage relative h-full w-full overflow-hidden rounded-xl shadow-xl"
-            style={{ backgroundColor: bg }}
-            onMouseDown={(e) => {
-              if (e.target === e.currentTarget) setSelectedIds([]);
+            className="relative"
+            style={{
+              transform: `scale(${zoom})`,
+              transformOrigin: "center center",
+              width: "min(100%, calc(72vh * " + template.canvas_width + " / " + template.canvas_height + "))",
             }}
           >
-            {elements.map((el) => (
-              <ElementView
-                key={el.id}
-                el={el}
-                selected={selectedIds.includes(el.id)}
-              />
-            ))}
+            <div
+              className="relative w-full"
+              style={{ aspectRatio: aspect, maxHeight: "72vh" }}
+            >
+              <div
+                ref={canvasRef}
+                className="canvas-stage relative h-full w-full overflow-hidden rounded-xl shadow-xl"
+                style={{ backgroundColor: bg }}
+                onMouseDown={(e) => {
+                  if (e.target === e.currentTarget) setSelectedIds([]);
+                }}
+              >
+                {elements.map((el) => (
+                  <ElementView
+                    key={el.id}
+                    el={el}
+                    selected={selectedIds.includes(el.id)}
+                  />
+                ))}
 
-            {canEdit && selectedTargets.length > 0 && canvasSize.w > 0 && (
-              <Moveable
-                ref={moveableRef}
-                target={selectedTargets}
-                draggable
-                resizable
-                rotatable
-                origin={false}
-                keepRatio={false}
-                throttleDrag={0}
-                throttleResize={0}
-                throttleRotate={0}
-                onDrag={({ target, beforeTranslate }) => {
-                  target.style.transform = `translate(${beforeTranslate[0]}px, ${beforeTranslate[1]}px) rotate(${
-                    (target as HTMLElement).dataset.rot ?? "0"
-                  }deg)`;
-                }}
-                onDragEnd={({ target, isDrag }) => {
-                  if (!isDrag) return;
-                  const id = (target as HTMLElement).dataset.elId!;
-                  const rect = (target as HTMLElement).getBoundingClientRect();
-                  const parent = canvasRef.current!.getBoundingClientRect();
-                  const x = clampPct(pxToPctX(rect.left - parent.left));
-                  const y = clampPct(pxToPctY(rect.top - parent.top));
-                  scheduleSave(id, { x, y });
-                  target.style.transform = "";
-                }}
-                onResize={({ target, width, height, drag }) => {
-                  target.style.width = `${width}px`;
-                  target.style.height = `${height}px`;
-                  target.style.transform = `translate(${drag.beforeTranslate[0]}px, ${drag.beforeTranslate[1]}px) rotate(${
-                    (target as HTMLElement).dataset.rot ?? "0"
-                  }deg)`;
-                }}
-                onResizeEnd={({ target }) => {
-                  const id = (target as HTMLElement).dataset.elId!;
-                  const rect = (target as HTMLElement).getBoundingClientRect();
-                  const parent = canvasRef.current!.getBoundingClientRect();
-                  const x = clampPct(pxToPctX(rect.left - parent.left));
-                  const y = clampPct(pxToPctY(rect.top - parent.top));
-                  const width = clampPct(pxToPctX(rect.width));
-                  const height = clampPct(pxToPctY(rect.height));
-                  scheduleSave(id, { x, y, width, height });
-                  target.style.transform = "";
-                  target.style.width = "";
-                  target.style.height = "";
-                }}
-                onRotate={({ target, beforeRotate }) => {
-                  target.style.transform = `rotate(${beforeRotate}deg)`;
-                }}
-                onRotateEnd={({ target, lastEvent }) => {
-                  if (!lastEvent) return;
-                  const id = (target as HTMLElement).dataset.elId!;
-                  const rotation = Math.round(lastEvent.beforeRotate) % 360;
-                  scheduleSave(id, { rotation });
-                  target.style.transform = "";
-                }}
-              />
-            )}
+                {canEdit && selectedTargets.length > 0 && canvasSize.w > 0 && (
+                  <Moveable
+                    ref={moveableRef}
+                    target={selectedTargets}
+                    draggable
+                    resizable
+                    rotatable
+                    origin={false}
+                    keepRatio={false}
+                    snappable
+                    snapThreshold={5}
+                    snapDirections={{
+                      top: true,
+                      right: true,
+                      bottom: true,
+                      left: true,
+                      center: true,
+                      middle: true,
+                    }}
+                    elementSnapDirections={{
+                      top: true,
+                      right: true,
+                      bottom: true,
+                      left: true,
+                      center: true,
+                      middle: true,
+                    }}
+                    elementGuidelines={unselectedTargets}
+                    verticalGuidelines={verticalGuidelines}
+                    horizontalGuidelines={horizontalGuidelines}
+                    throttleDrag={0}
+                    throttleResize={0}
+                    throttleRotate={0}
+                    onDragStart={() => snapshot()}
+                    onDrag={({ target, beforeTranslate }) => {
+                      const rot = (target as HTMLElement).dataset.rot ?? "0";
+                      target.style.transform = `translate(${beforeTranslate[0]}px, ${beforeTranslate[1]}px) rotate(${rot}deg)`;
+                    }}
+                    onDragEnd={({ target, isDrag }) => {
+                      if (!isDrag) return;
+                      const id = (target as HTMLElement).dataset.elId!;
+                      const rect = (target as HTMLElement).getBoundingClientRect();
+                      const parent = canvasRef.current!.getBoundingClientRect();
+                      const x = clampPct(pxToPctX((rect.left - parent.left) / zoom));
+                      const y = clampPct(pxToPctY((rect.top - parent.top) / zoom));
+                      scheduleGeomSave(id, { x, y });
+                      target.style.transform = "";
+                    }}
+                    onResizeStart={() => snapshot()}
+                    onResize={({ target, width, height, drag }) => {
+                      const rot = (target as HTMLElement).dataset.rot ?? "0";
+                      target.style.width = `${width}px`;
+                      target.style.height = `${height}px`;
+                      target.style.transform = `translate(${drag.beforeTranslate[0]}px, ${drag.beforeTranslate[1]}px) rotate(${rot}deg)`;
+                    }}
+                    onResizeEnd={({ target }) => {
+                      const id = (target as HTMLElement).dataset.elId!;
+                      const rect = (target as HTMLElement).getBoundingClientRect();
+                      const parent = canvasRef.current!.getBoundingClientRect();
+                      const x = clampPct(pxToPctX((rect.left - parent.left) / zoom));
+                      const y = clampPct(pxToPctY((rect.top - parent.top) / zoom));
+                      const width = clampPct(pxToPctX(rect.width / zoom));
+                      const height = clampPct(pxToPctY(rect.height / zoom));
+                      scheduleGeomSave(id, { x, y, width, height });
+                      target.style.transform = "";
+                      target.style.width = "";
+                      target.style.height = "";
+                    }}
+                    onRotateStart={() => snapshot()}
+                    onRotate={({ target, beforeRotate }) => {
+                      target.style.transform = `rotate(${beforeRotate}deg)`;
+                    }}
+                    onRotateEnd={({ target, lastEvent }) => {
+                      if (!lastEvent) return;
+                      const id = (target as HTMLElement).dataset.elId!;
+                      const rotation = Math.round(lastEvent.beforeRotate) % 360;
+                      scheduleGeomSave(id, { rotation });
+                      target.style.transform = "";
+                    }}
+                  />
+                )}
+              </div>
+
+              {canEdit && canvasRef.current && (
+                <Selecto
+                  ref={selectoRef}
+                  container={canvasRef.current}
+                  dragContainer={canvasRef.current}
+                  selectableTargets={[".canvas-stage [data-el-id]"]}
+                  hitRate={0}
+                  selectByClick
+                  selectFromInside={false}
+                  toggleContinueSelect={["shift"]}
+                  onDragStart={(e) => {
+                    const t = e.inputEvent.target as HTMLElement;
+                    if (
+                      moveableRef.current &&
+                      moveableRef.current.isMoveableElement(t)
+                    ) {
+                      e.stop();
+                    }
+                  }}
+                  onSelect={(e) => {
+                    const ids = e.selected
+                      .map((n) => (n as HTMLElement).dataset.elId)
+                      .filter((v): v is string => !!v);
+                    setSelectedIds(ids);
+                  }}
+                />
+              )}
+            </div>
           </div>
-
-          {canEdit && canvasRef.current && (
-            <Selecto
-              ref={selectoRef}
-              container={canvasRef.current}
-              dragContainer={canvasRef.current}
-              selectableTargets={[".canvas-stage [data-el-id]"]}
-              hitRate={0}
-              selectByClick
-              selectFromInside={false}
-              toggleContinueSelect={["shift"]}
-              onDragStart={(e) => {
-                const t = e.inputEvent.target as HTMLElement;
-                if (
-                  moveableRef.current &&
-                  moveableRef.current.isMoveableElement(t)
-                ) {
-                  e.stop();
-                }
-              }}
-              onSelect={(e) => {
-                const ids = e.selected
-                  .map((n) => (n as HTMLElement).dataset.elId)
-                  .filter((v): v is string => !!v);
-                setSelectedIds(ids);
-              }}
-            />
-          )}
         </div>
+
+        {/* Properties */}
+        <aside className="hidden overflow-hidden rounded-2xl border border-border/60 bg-card/40 backdrop-blur lg:flex lg:flex-col lg:h-[72vh]">
+          <PropertiesPanel
+            element={activeElement}
+            disabled={!canEdit}
+            onGeomChange={(patch) => {
+              if (!activeElement) return;
+              void commitElementUpdate(activeElement.id, patch);
+            }}
+            onFlagChange={(patch) => {
+              if (!activeElement) return;
+              void commitElementUpdate(activeElement.id, patch);
+            }}
+            onContentChange={(content) => {
+              if (!activeElement) return;
+              void commitElementUpdate(activeElement.id, { content });
+            }}
+          />
+        </aside>
       </div>
 
       <p className="text-center text-xs text-muted-foreground">
-        Delete/Backspace para excluir · Ctrl+D para duplicar · setas para mover
-        (Shift para 5%) · arraste para seleção múltipla
+        Ctrl+Z / Ctrl+Shift+Z desfazer/refazer · Delete/Backspace excluir ·
+        Ctrl+D duplicar · setas para mover (Shift = 5%)
       </p>
     </div>
   );
@@ -678,6 +959,7 @@ function ElementView({
   el: TemplateElement;
   selected: boolean;
 }) {
+  const visible = el.visible ?? true;
   const style: React.CSSProperties = {
     position: "absolute",
     left: `${el.x}%`,
@@ -686,11 +968,12 @@ function ElementView({
     height: `${el.height}%`,
     transform: `rotate(${el.rotation ?? 0}deg)`,
     transformOrigin: "center center",
-    opacity: el.opacity ?? 1,
+    opacity: visible ? (el.opacity ?? 1) : 0.15,
     outline: selected ? "2px solid var(--primary, #3B82F6)" : "none",
     outlineOffset: "1px",
-    cursor: "move",
+    cursor: el.locked ? "not-allowed" : "move",
     userSelect: "none",
+    pointerEvents: el.locked ? "none" : "auto",
   };
 
   return (
@@ -698,7 +981,6 @@ function ElementView({
       data-el-id={el.id}
       data-rot={String(el.rotation ?? 0)}
       style={style}
-      className="group"
     >
       <ElementBody el={el} />
     </div>
@@ -714,7 +996,11 @@ function ElementBody({ el }: { el: TemplateElement }) {
       const color = (c.color as string) ?? "#FFFFFF";
       const weight = (c.fontWeight as string) ?? "500";
       const family = (c.fontFamily as string) ?? "Inter";
-      const sizePct = typeof c.fontSizePercent === "number" ? c.fontSizePercent : 6;
+      const sizePct =
+        typeof c.fontSizePercent === "number" ? c.fontSizePercent : 6;
+      const bg = typeof c.backgroundColor === "string" ? c.backgroundColor : undefined;
+      const bgOpacity =
+        typeof c.backgroundOpacity === "number" ? c.backgroundOpacity : 1;
       return (
         <div
           className="flex h-full w-full items-center overflow-hidden p-1"
@@ -730,6 +1016,9 @@ function ElementBody({ el }: { el: TemplateElement }) {
             fontWeight: weight as React.CSSProperties["fontWeight"],
             fontSize: `${sizePct}cqh`,
             containerType: "size",
+            backgroundColor: bg
+              ? bg + Math.round(bgOpacity * 255).toString(16).padStart(2, "0")
+              : undefined,
           }}
         >
           <span className="truncate">{text}</span>
@@ -753,21 +1042,96 @@ function ElementBody({ el }: { el: TemplateElement }) {
         />
       );
     }
+    case "image":
+    case "logo":
+      return <MediaImage path={(c.mediaStoragePath as string) ?? null} fit={(c.fit as string) ?? "cover"} label={ELEMENT_LABELS[el.element_type]} />;
+    case "video":
+      return (
+        <MediaVideo
+          path={(c.mediaStoragePath as string) ?? null}
+          fit={(c.fit as string) ?? "cover"}
+          loop={(c.loop as boolean) ?? true}
+          muted={(c.muted as boolean) ?? true}
+        />
+      );
     default: {
-      const labels: Record<ElementType, string> = {
-        text: "Texto",
-        image: "Imagem",
-        video: "Vídeo",
-        logo: "Logo",
-        playlist: "Playlist",
-        widget: "Widget",
-        shape: "Forma",
-      };
       return (
         <div className="flex h-full w-full items-center justify-center rounded-md border border-dashed border-white/40 bg-white/5 text-[10px] font-medium uppercase tracking-wider text-white/80 backdrop-blur">
-          {labels[el.element_type]}
+          {ELEMENT_LABELS[el.element_type]}
         </div>
       );
     }
   }
+}
+
+function MediaImage({
+  path,
+  fit,
+  label,
+}: {
+  path: string | null;
+  fit: string;
+  label: string;
+}) {
+  const url = useSignedUrl(path);
+  if (!path) return <PlaceholderBadge label={label} />;
+  if (!url)
+    return (
+      <div className="grid h-full w-full place-items-center bg-white/5">
+        <Loader2 className="h-4 w-4 animate-spin text-white/60" />
+      </div>
+    );
+  return (
+    <img
+      src={url}
+      alt=""
+      draggable={false}
+      className="h-full w-full"
+      style={{
+        objectFit: (fit as React.CSSProperties["objectFit"]) ?? "cover",
+      }}
+    />
+  );
+}
+
+function MediaVideo({
+  path,
+  fit,
+  loop,
+  muted,
+}: {
+  path: string | null;
+  fit: string;
+  loop: boolean;
+  muted: boolean;
+}) {
+  const url = useSignedUrl(path);
+  if (!path) return <PlaceholderBadge label="Vídeo" />;
+  if (!url)
+    return (
+      <div className="grid h-full w-full place-items-center bg-white/5">
+        <Loader2 className="h-4 w-4 animate-spin text-white/60" />
+      </div>
+    );
+  return (
+    <video
+      src={url}
+      className="h-full w-full"
+      style={{
+        objectFit: (fit as React.CSSProperties["objectFit"]) ?? "cover",
+      }}
+      autoPlay
+      loop={loop}
+      muted={muted}
+      playsInline
+    />
+  );
+}
+
+function PlaceholderBadge({ label }: { label: string }) {
+  return (
+    <div className="flex h-full w-full items-center justify-center rounded-md border border-dashed border-white/40 bg-white/5 text-[10px] font-medium uppercase tracking-wider text-white/80 backdrop-blur">
+      {label}
+    </div>
+  );
 }
