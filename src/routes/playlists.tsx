@@ -366,6 +366,9 @@ function PlaylistEditor({
   const { membership } = useAuth();
   const orgId = membership?.organization_id ?? null;
   const qc = useQueryClient();
+  const role = membership?.role ?? "viewer";
+  const canPreview = role !== "viewer";
+  const [previewOpen, setPreviewOpen] = useState(false);
 
   const [name, setName] = useState(playlist.name);
   const [isActive, setIsActive] = useState(playlist.is_active);
