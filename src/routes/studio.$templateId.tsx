@@ -632,6 +632,8 @@ function EditorPage() {
 
   const template = templateQ.data;
 
+  const draftPayload = useStudioDraftPayload(template, elements, previewOpen);
+
   // ---- Zoom controls ----
   const zoomIn = () => setZoom((z) => Math.min(4, +(z + 0.1).toFixed(2)));
   const zoomOut = () => setZoom((z) => Math.max(0.25, +(z - 0.1).toFixed(2)));
