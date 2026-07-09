@@ -133,6 +133,21 @@ function StudioPage() {
 
   const templates = templatesQ.data ?? [];
 
+  const deleteMut = useMutation({
+    mutationFn: async (id: string) => {
+      await supabase.from("template_elements").delete().eq("template_id", id);
+      const { error } = await supabase.from("templates").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["studio_templates"] });
+      toast.success("Template excluído.");
+    },
+    onError: (e: unknown) =>
+      toast.error(e instanceof Error ? e.message : "Falha ao excluir."),
+  });
+  const [deleteTarget, setDeleteTarget] = useState<CanvasTemplate | null>(null);
+
   return (
     <div className="mx-auto flex w-full max-w-7xl flex-col gap-6">
       <header className="flex flex-wrap items-end justify-between gap-4">
@@ -211,7 +226,23 @@ function StudioPage() {
                   }}
                 />
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-base">{t.name}</CardTitle>
+                  <div className="flex items-start justify-between gap-2">
+                    <CardTitle className="text-base">{t.name}</CardTitle>
+                    {canManage && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setDeleteTarget(t);
+                        }}
+                        title="Excluir template"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
                 </CardHeader>
                 <CardFooter className="justify-between text-xs text-muted-foreground">
                   <span>
@@ -233,6 +264,39 @@ function StudioPage() {
         onSubmit={(v) => createMut.mutate(v)}
         submitting={createMut.isPending}
       />
+
+      <AlertDialog
+        open={!!deleteTarget}
+        onOpenChange={(v) => !v && setDeleteTarget(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir template?</AlertDialogTitle>
+            <AlertDialogDescription>
+              "{deleteTarget?.name}" e todos os seus elementos serão removidos
+              permanentemente. Players que usam este template ficarão sem layout
+              ativo.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteMut.isPending}>
+              Cancelar
+            </AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                if (deleteTarget) {
+                  deleteMut.mutate(deleteTarget.id, {
+                    onSettled: () => setDeleteTarget(null),
+                  });
+                }
+              }}
+            >
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
