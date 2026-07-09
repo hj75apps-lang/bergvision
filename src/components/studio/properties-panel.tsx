@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { AlignCenter, AlignLeft, AlignRight, ImagePlus } from "lucide-react";
+import { AlertTriangle, AlignCenter, AlignLeft, AlignRight, ImagePlus } from "lucide-react";
 
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
@@ -24,6 +24,7 @@ import type { TemplateElement } from "@/lib/studio/types";
 import { ELEMENT_LABELS } from "@/lib/studio/types";
 import {
   MediaPickerDialog,
+  isLowRes,
   type PickerMediaFile,
 } from "./media-picker-dialog";
 
