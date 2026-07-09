@@ -101,19 +101,36 @@ export function PreviewDialog({
   const scaling = (template.scaling_mode ?? "letterbox").toLowerCase();
   const bgColor = template.background_color ?? "#000000";
 
-  // "Tela" simulada: área com a proporção do target, ajustada ao viewport.
-  // Deixa margem para o header (72px) e footer badge (48px).
-  const screenStyle = useMemo<React.CSSProperties>(() => {
+  // "Tela" simulada: renderizada em pixels NATIVOS (ex.: 3840×2160) e depois
+  // encolhida via transform: scale() para caber no viewport. Assim a
+  // rasterização de fontes/mídia acontece na resolução real do alvo, o que
+  // permite identificar textos ilegíveis em 4K antes de publicar.
+  const fitScale = useMemo(() => {
     const availW = Math.max(0, viewport.w - 32);
     const availH = Math.max(0, viewport.h - 120);
-    if (!availW || !availH || !target.width || !target.height)
-      return { width: 0, height: 0 };
-    const scale = Math.min(availW / target.width, availH / target.height);
-    return {
-      width: `${target.width * scale}px`,
-      height: `${target.height * scale}px`,
-    };
+    if (!availW || !availH || !target.width || !target.height) return 0;
+    return Math.min(availW / target.width, availH / target.height);
   }, [viewport, target]);
+
+  const screenStyle = useMemo<React.CSSProperties>(
+    () => ({
+      width: `${target.width}px`,
+      height: `${target.height}px`,
+      transform: `scale(${fitScale})`,
+      transformOrigin: "center center",
+    }),
+    [target.width, target.height, fitScale],
+  );
+
+  // Reserva no layout a caixa já escalada, para o flex centralizar corretamente
+  // sem que o frame gigante em pixels nativos empurre a viewport.
+  const screenBoxStyle = useMemo<React.CSSProperties>(
+    () => ({
+      width: `${target.width * fitScale}px`,
+      height: `${target.height * fitScale}px`,
+    }),
+    [target.width, target.height, fitScale],
+  );
 
   // Canvas dentro da tela: em stretch preenche 100%; em letterbox mantém a
   // proporção do template dentro da tela (barras onde sobrar).
@@ -207,11 +224,17 @@ export function PreviewDialog({
           </div>
 
           <div className="absolute inset-0 flex items-center justify-center">
-            {/* Screen frame — proporção do alvo simulado */}
+            {/* Caixa com o tamanho já escalado (mantém o layout estável) */}
             <div
-              className="relative flex items-center justify-center overflow-hidden shadow-2xl ring-1 ring-white/10"
-              style={{ ...screenStyle, backgroundColor: bgColor }}
+              className="relative flex items-center justify-center"
+              style={screenBoxStyle}
             >
+              {/* Screen frame — renderizado em pixels nativos do alvo e
+                  encolhido via transform: scale() */}
+              <div
+                className="relative flex items-center justify-center overflow-hidden shadow-2xl ring-1 ring-white/10"
+                style={{ ...screenStyle, backgroundColor: bgColor }}
+              >
               {/* Stage — canvas dentro da tela, respeitando scaling_mode */}
               <div className="relative overflow-hidden" style={stageStyle}>
                 <TemplateBackground
@@ -239,6 +262,7 @@ export function PreviewDialog({
                   ))}
               </div>
             </div>
+          </div>
           </div>
 
           <div className="pointer-events-none absolute bottom-4 left-1/2 -translate-x-1/2 rounded-full bg-white/10 px-3 py-1 text-[11px] uppercase tracking-wider text-white/80 backdrop-blur">
