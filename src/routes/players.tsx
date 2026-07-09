@@ -17,6 +17,8 @@ import { Badge } from "@/components/ui/badge";
 import {
   Select,
   SelectContent,
+  SelectGroup,
+  SelectLabel,
   SelectItem,
   SelectTrigger,
   SelectValue,
@@ -84,7 +86,12 @@ type Player = {
   created_at?: string | null;
 };
 
-type TemplateOpt = { id: string; name: string };
+type TemplateOpt = {
+  id: string;
+  name: string;
+  type: string | null;
+  is_system: boolean | null;
+};
 
 const HEARTBEAT_OFFLINE_MS = 60_000;
 
@@ -154,7 +161,7 @@ function PlayersPage() {
     queryFn: async (): Promise<TemplateOpt[]> => {
       const { data, error } = await supabase
         .from("templates")
-        .select("id, name")
+        .select("id, name, type, is_system")
         .order("is_system", { ascending: false })
         .order("name");
       if (error) throw error;
@@ -275,42 +282,60 @@ function PlayerCard({
   const changeTemplate = async (tplId: string) => {
     setSavingTpl(true);
     try {
+      // Descobre o tipo do template alvo para escolher o payload correto.
+      const tpl = templates.find((t) => t.id === tplId);
+      const tplType = tpl?.type ?? "grid";
+
       const { error } = await supabase
         .from("players")
         .update({ current_template_id: tplId })
         .eq("id", player.id);
       if (error) throw error;
 
-      // Fetch full zone set so the player can re-render without a round trip.
-      const { data: zones, error: zErr } = await supabase
-        .from("template_zones")
-        .select(
-          "id, zone_name, pos_x, pos_y, width_pct, height_pct, z_index, content_type, media_file_id, playlist_id, widget_type, widget_config",
-        )
-        .eq("template_id", tplId)
-        .order("zone_index");
-      if (zErr) throw zErr;
-
-      // Broadcast config_updated no canal do player com payload completo
-      const channel = supabase.channel(`player:${player.id}`);
-      await new Promise<void>((resolve, reject) => {
-        const timer = setTimeout(() => reject(new Error("timeout")), 5000);
-        channel.subscribe((status) => {
-          if (status === "SUBSCRIBED") {
-            clearTimeout(timer);
-            resolve();
-          } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
-            clearTimeout(timer);
-            reject(new Error(status));
-          }
-        });
-      });
-      await channel.send({
-        type: "broadcast",
-        event: "config_updated",
-        payload: {
+      // Prepara payload conforme o tipo do template.
+      let payload: Record<string, unknown>;
+      if (tplType === "canvas") {
+        const [{ data: tData, error: tErr }, { data: els, error: eErr }] =
+          await Promise.all([
+            supabase
+              .from("templates")
+              .select(
+                "id, canvas_width, canvas_height, background_color, background_media_id, scaling_mode, orientation",
+              )
+              .eq("id", tplId)
+              .single(),
+            supabase
+              .from("template_elements")
+              .select(
+                "id, element_type, x, y, width, height, rotation, z_index, opacity, locked, visible, content",
+              )
+              .eq("template_id", tplId)
+              .order("z_index"),
+          ]);
+        if (tErr) throw tErr;
+        if (eErr) throw eErr;
+        payload = {
           event: "config_updated",
           template_id: tplId,
+          template_type: "canvas",
+          template: tData,
+          elements: els ?? [],
+          updated_at: new Date().toISOString(),
+          updated_by: null,
+        };
+      } else {
+        const { data: zones, error: zErr } = await supabase
+          .from("template_zones")
+          .select(
+            "id, zone_name, pos_x, pos_y, width_pct, height_pct, z_index, content_type, media_file_id, playlist_id, widget_type, widget_config",
+          )
+          .eq("template_id", tplId)
+          .order("zone_index");
+        if (zErr) throw zErr;
+        payload = {
+          event: "config_updated",
+          template_id: tplId,
+          template_type: "grid",
           zones: (zones ?? []).map((z: any) => ({
             zone_id: z.id,
             zone_name: z.zone_name,
@@ -327,7 +352,26 @@ function PlayerCard({
           })),
           updated_at: new Date().toISOString(),
           updated_by: null,
-        },
+        };
+      }
+
+      const channel = supabase.channel(`player:${player.id}`);
+      await new Promise<void>((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error("timeout")), 5000);
+        channel.subscribe((status) => {
+          if (status === "SUBSCRIBED") {
+            clearTimeout(timer);
+            resolve();
+          } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+            clearTimeout(timer);
+            reject(new Error(status));
+          }
+        });
+      });
+      await channel.send({
+        type: "broadcast",
+        event: "config_updated",
+        payload,
       });
       supabase.removeChannel(channel);
 
@@ -434,11 +478,54 @@ function PlayerCard({
               <SelectValue placeholder="Selecione um template" />
             </SelectTrigger>
             <SelectContent>
-              {templates.map((t) => (
-                <SelectItem key={t.id} value={t.id}>
-                  {t.name}
-                </SelectItem>
-              ))}
+              {(() => {
+                const system = templates.filter((t) => t.is_system);
+                const custom = templates.filter((t) => !t.is_system);
+                return (
+                  <>
+                    {system.length > 0 && (
+                      <SelectGroup>
+                        <SelectLabel className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                          Sistema
+                        </SelectLabel>
+                        {system.map((t) => (
+                          <SelectItem key={t.id} value={t.id}>
+                            <span className="flex items-center gap-2">
+                              <span>{t.name}</span>
+                              <Badge
+                                variant="secondary"
+                                className="rounded-full bg-primary/15 px-1.5 py-0 text-[9px] font-medium text-primary"
+                              >
+                                Sistema
+                              </Badge>
+                            </span>
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    )}
+                    {custom.length > 0 && (
+                      <SelectGroup>
+                        <SelectLabel className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                          Personalizado (Studio)
+                        </SelectLabel>
+                        {custom.map((t) => (
+                          <SelectItem key={t.id} value={t.id}>
+                            <span className="flex items-center gap-2">
+                              <span>{t.name}</span>
+                              <Badge
+                                variant="secondary"
+                                className="rounded-full bg-emerald-500/15 px-1.5 py-0 text-[9px] font-medium text-emerald-500"
+                              >
+                                Personalizado
+                              </Badge>
+                            </span>
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    )}
+                  </>
+                );
+              })()}
             </SelectContent>
           </Select>
         </div>

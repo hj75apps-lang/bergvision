@@ -16,6 +16,8 @@ import Selecto from "react-selecto";
 import {
   ArrowLeft,
   Copy,
+  Eye,
+  FileStack,
   Image as ImageIcon,
   ListMusic,
   Loader2,
@@ -23,6 +25,7 @@ import {
   Minus,
   Plus,
   Redo2,
+  Settings,
   Shapes,
   Sparkles,
   Square,
@@ -35,6 +38,16 @@ import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { LayersPanel } from "@/components/studio/layers-panel";
@@ -51,6 +64,10 @@ import {
   diffSnapshots,
   useHistoryStore,
 } from "@/lib/studio/history-store";
+import { TemplateBackground } from "@/components/studio/element-body";
+import { PreviewDialog } from "@/components/studio/preview-dialog";
+import { TemplateSettingsDialog } from "@/components/studio/template-settings-dialog";
+import { slugify } from "@/lib/template-utils";
 
 export const Route = createFileRoute("/studio/$templateId")({
   head: () => ({
@@ -161,6 +178,11 @@ function EditorPage() {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [canvasSize, setCanvasSize] = useState({ w: 0, h: 0 });
   const [zoom, setZoom] = useState(1);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [duplicateOpen, setDuplicateOpen] = useState(false);
+  const [duplicateName, setDuplicateName] = useState("");
+  const [duplicating, setDuplicating] = useState(false);
 
   const [pendingGeom, setPendingGeom] = useState<
     Record<string, Partial<Pick<TemplateElement, "x" | "y" | "width" | "height" | "rotation">>>
@@ -179,7 +201,7 @@ function EditorPage() {
       const { data, error } = await supabase
         .from("templates")
         .select(
-          "id, name, canvas_width, canvas_height, background_color, organization_id",
+          "id, name, canvas_width, canvas_height, background_color, organization_id, scaling_mode, background_media_id",
         )
         .eq("id", templateId)
         .single();
@@ -636,6 +658,67 @@ function EditorPage() {
   const aspect = `${template.canvas_width} / ${template.canvas_height}`;
   const bg = template.background_color ?? "#0F172A";
 
+  const doDuplicate = async () => {
+    if (!template || !duplicateName.trim() || duplicating) return;
+    setDuplicating(true);
+    try {
+      const { data: newT, error: tErr } = await supabase
+        .from("templates")
+        .insert({
+          name: duplicateName.trim(),
+          slug: `${slugify(duplicateName)}-${Math.random().toString(36).slice(2, 6)}`,
+          type: "canvas",
+          orientation:
+            template.canvas_width >= template.canvas_height
+              ? "landscape"
+              : "portrait",
+          canvas_width: template.canvas_width,
+          canvas_height: template.canvas_height,
+          aspect_ratio:
+            template.canvas_width >= template.canvas_height ? "16:9" : "9:16",
+          background_color: template.background_color ?? "#0F172A",
+          background_media_id: template.background_media_id ?? null,
+          scaling_mode: template.scaling_mode ?? "letterbox",
+          is_system: false,
+          organization_id: template.organization_id,
+          zone_count: 0,
+        })
+        .select("id")
+        .single();
+      if (tErr) throw tErr;
+      const newId = (newT as { id: string }).id;
+      const rows = (elementsQ.data ?? []).map((e) => ({
+        template_id: newId,
+        element_type: e.element_type,
+        x: e.x,
+        y: e.y,
+        width: e.width,
+        height: e.height,
+        rotation: e.rotation,
+        z_index: e.z_index,
+        opacity: e.opacity ?? 1,
+        locked: e.locked ?? false,
+        visible: e.visible ?? true,
+        content: e.content ?? {},
+      }));
+      if (rows.length > 0) {
+        const { error: elErr } = await supabase
+          .from("template_elements")
+          .insert(rows);
+        if (elErr) throw elErr;
+      }
+      toast.success("Template duplicado.");
+      setDuplicateOpen(false);
+      setDuplicateName("");
+      await qc.invalidateQueries({ queryKey: ["studio_templates"] });
+      navigate({ to: "/studio/$templateId", params: { templateId: newId } });
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Falha ao duplicar.");
+    } finally {
+      setDuplicating(false);
+    }
+  };
+
   return (
     <div className="mx-auto flex w-full max-w-[1800px] flex-col gap-3">
       {/* Top bar */}
@@ -661,6 +744,39 @@ function EditorPage() {
         </div>
 
         <div className="flex items-center gap-1.5">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setPreviewOpen(true)}
+            title="Preview em tela cheia"
+          >
+            <Eye className="mr-1.5 h-4 w-4" />
+            Preview
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setSettingsOpen(true)}
+            disabled={!canEdit}
+            title="Configurações"
+          >
+            <Settings className="mr-1.5 h-4 w-4" />
+            Configurações
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              setDuplicateName(`${template.name} (cópia)`);
+              setDuplicateOpen(true);
+            }}
+            disabled={!canEdit}
+            title="Salvar como novo"
+          >
+            <FileStack className="mr-1.5 h-4 w-4" />
+            Salvar como novo
+          </Button>
+          <Separator orientation="vertical" className="mx-1 h-6" />
           <Button
             variant="ghost"
             size="sm"
@@ -801,6 +917,10 @@ function EditorPage() {
                   if (e.target === e.currentTarget) setSelectedIds([]);
                 }}
               >
+                <TemplateBackground
+                  color={bg}
+                  mediaId={template.background_media_id ?? null}
+                />
                 {elements.map((el) => (
                   <ElementView
                     key={el.id}
@@ -948,6 +1068,63 @@ function EditorPage() {
         Ctrl+Z / Ctrl+Shift+Z desfazer/refazer · Delete/Backspace excluir ·
         Ctrl+D duplicar · setas para mover (Shift = 5%)
       </p>
+
+      <PreviewDialog
+        open={previewOpen}
+        onOpenChange={setPreviewOpen}
+        template={template}
+      />
+
+      <TemplateSettingsDialog
+        open={settingsOpen}
+        onOpenChange={setSettingsOpen}
+        template={{
+          id: template.id,
+          scaling_mode: template.scaling_mode ?? "letterbox",
+          background_color: template.background_color,
+          background_media_id: template.background_media_id ?? null,
+        }}
+        disabled={!canEdit}
+      />
+
+      <Dialog open={duplicateOpen} onOpenChange={setDuplicateOpen}>
+        <DialogContent className="rounded-2xl sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Salvar como novo template</DialogTitle>
+            <DialogDescription>
+              Cria uma cópia deste template com todos os elementos.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col gap-2 py-2">
+            <Label htmlFor="dup-name">Nome do novo template</Label>
+            <Input
+              id="dup-name"
+              value={duplicateName}
+              onChange={(e) => setDuplicateName(e.target.value)}
+              maxLength={80}
+              autoFocus
+            />
+          </div>
+          <DialogFooter>
+            <Button
+              variant="ghost"
+              onClick={() => setDuplicateOpen(false)}
+              disabled={duplicating}
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={doDuplicate}
+              disabled={duplicating || duplicateName.trim().length < 2}
+            >
+              {duplicating && (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              )}
+              Duplicar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
