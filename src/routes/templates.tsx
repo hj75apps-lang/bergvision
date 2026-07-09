@@ -386,6 +386,16 @@ function TemplatesPage() {
         />
       )}
 
+      {previewing && (
+        <PreviewPanel
+          mode="modal"
+          scope="template"
+          targetId={previewing.id}
+          open={!!previewing}
+          onOpenChange={(v) => !v && setPreviewing(null)}
+        />
+      )}
+
       {deleting && (
         <AlertDialog open={!!deleting} onOpenChange={(v) => !v && setDeleting(null)}>
           <AlertDialogContent className="rounded-2xl">
