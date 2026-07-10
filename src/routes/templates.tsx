@@ -183,6 +183,7 @@ function TemplatesPage() {
           canvas_width: src.canvas_width,
           canvas_height: src.canvas_height,
           allow_overlap: src.allow_overlap,
+          layout_css: (src as any).layout_css ?? "{}",
         })
         .select("id")
         .single();
@@ -473,6 +474,7 @@ function CreateTemplateDialog({
           canvas_width: w,
           canvas_height: h,
           allow_overlap: false,
+          layout_css: "{}",
         })
         .select("id")
         .single();
