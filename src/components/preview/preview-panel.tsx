@@ -24,6 +24,21 @@ const PLAYER_PREVIEW_URL = (
   import.meta.env.VITE_PLAYER_PREVIEW_URL ?? ""
 ).replace(/\/+$/, "");
 
+function getOrigin(value: string) {
+  if (!value) return "";
+  try {
+    return new URL(value).origin;
+  } catch {
+    return "";
+  }
+}
+
+const PLAYER_PREVIEW_ORIGIN = getOrigin(PLAYER_PREVIEW_URL);
+
+type PlayerAvailability =
+  | { status: "idle" | "checking" | "available"; error: null }
+  | { status: "unavailable"; error: string };
+
 // ---------------------------------------------------------------------------
 // Resoluções simuladas
 // ---------------------------------------------------------------------------
@@ -162,7 +177,51 @@ function usePreviewController({
   const [token, setToken] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [playerAvailability, setPlayerAvailability] =
+    useState<PlayerAvailability>({ status: "idle", error: null });
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
+
+  useEffect(() => {
+    if (!active || !PLAYER_PREVIEW_URL) {
+      setPlayerAvailability({ status: "idle", error: null });
+      return;
+    }
+
+    let cancelled = false;
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 7000);
+
+    setPlayerAvailability({ status: "checking", error: null });
+
+    fetch(`${PLAYER_PREVIEW_URL}/preview`, {
+      cache: "no-store",
+      mode: "no-cors",
+      signal: controller.signal,
+    })
+      .then(() => {
+        if (!cancelled) {
+          setPlayerAvailability({ status: "available", error: null });
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setPlayerAvailability({
+            status: "unavailable",
+            error: [
+              `Não foi possível acessar ${PLAYER_PREVIEW_URL}.`,
+              "Confirme se o app Player está publicado, se o DNS do domínio está ativo e se a rota /preview existe no Player.",
+            ].join("\n"),
+          });
+        }
+      })
+      .finally(() => window.clearTimeout(timeout));
+
+    return () => {
+      cancelled = true;
+      controller.abort();
+      window.clearTimeout(timeout);
+    };
+  }, [active]);
 
   // Cria token via Edge Function quando não é draft.
   const tokenMut = useMutation({
@@ -188,15 +247,17 @@ function usePreviewController({
   useEffect(() => {
     if (!active) return;
     if (isDraft) return;
+    if (playerAvailability.status !== "available") return;
     setReady(false);
     setToken(null);
     tokenMut.mutate();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [active, isDraft, scope, targetId]);
+  }, [active, isDraft, scope, targetId, playerAvailability.status]);
 
   // URL do iframe
   const iframeSrc = useMemo(() => {
     if (!PLAYER_PREVIEW_URL) return "";
+    if (playerAvailability.status !== "available") return "";
     if (isDraft) return `${PLAYER_PREVIEW_URL}/preview`;
     if (!token) return "";
     const qs = new URLSearchParams({
@@ -205,14 +266,14 @@ function usePreviewController({
       orientation: resolution.orientation,
     });
     return `${PLAYER_PREVIEW_URL}/preview?${qs.toString()}`;
-  }, [isDraft, token, resolution]);
+  }, [isDraft, token, resolution, playerAvailability.status]);
 
   // Recebe PREVIEW_READY do iframe
   useEffect(() => {
     if (!active) return;
     const onMessage = (ev: MessageEvent) => {
-      if (!PLAYER_PREVIEW_URL) return;
-      if (ev.origin !== PLAYER_PREVIEW_URL) return;
+      if (!PLAYER_PREVIEW_ORIGIN) return;
+      if (ev.origin !== PLAYER_PREVIEW_ORIGIN) return;
       const msg = ev.data as IncomingMessage | null;
       if (!msg || typeof msg !== "object") return;
       if (msg.type === "PREVIEW_READY") setReady(true);
@@ -235,12 +296,12 @@ function usePreviewController({
   // ---- Draft: envia PREVIEW_DRAFT_UPDATE ao iframe ----
   const postDraft = (payload: unknown) => {
     const win = iframeRef.current?.contentWindow;
-    if (!win || !PLAYER_PREVIEW_URL) return;
+    if (!win || !PLAYER_PREVIEW_ORIGIN) return;
     const message: OutgoingMessage = {
       type: "PREVIEW_DRAFT_UPDATE",
       payload,
     };
-    win.postMessage(message, PLAYER_PREVIEW_URL);
+    win.postMessage(message, PLAYER_PREVIEW_ORIGIN);
   };
 
   // Envio imediato quando iframe fica ready (modo draft)
@@ -263,7 +324,12 @@ function usePreviewController({
     iframeSrc,
     ready,
     error,
-    isTokenLoading: !isDraft && (tokenMut.isPending || (!token && !error)),
+    playerError: playerAvailability.error,
+    isCheckingPlayer: playerAvailability.status === "checking",
+    isTokenLoading:
+      !isDraft &&
+      playerAvailability.status === "available" &&
+      (tokenMut.isPending || (!token && !error)),
     resolutionId,
     setResolutionId,
     resolution,
@@ -290,6 +356,8 @@ function PreviewBody({
     iframeSrc,
     ready,
     error,
+    playerError,
+    isCheckingPlayer,
     isTokenLoading,
     resolutionId,
     setResolutionId,
@@ -366,6 +434,8 @@ function PreviewBody({
             title="VITE_PLAYER_PREVIEW_URL não configurada"
             detail="Defina a URL do Player publicado para habilitar o preview."
           />
+        ) : playerError ? (
+          <StatusOverlay title="Player indisponível" detail={playerError} />
         ) : error ? (
           <StatusOverlay title="Falha ao gerar preview" detail={error} />
         ) : (
@@ -386,11 +456,13 @@ function PreviewBody({
                 onLoad={ctrl.handleIframeLoad}
               />
             )}
-            {(isTokenLoading || !ready) && (
+            {(isCheckingPlayer || isTokenLoading || !ready) && (
               <StatusOverlay
                 spinner
                 title={
-                  isTokenLoading
+                  isCheckingPlayer
+                    ? "Verificando Player…"
+                    : isTokenLoading
                     ? "Preparando preview…"
                     : "Carregando conteúdo…"
                 }
