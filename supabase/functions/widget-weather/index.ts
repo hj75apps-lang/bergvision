@@ -1,0 +1,131 @@
+// Edge Function: widget-weather
+//
+// POST { city: string, units?: "metric" | "imperial" }
+// Requer JWT do Supabase Auth (Authorization: Bearer ...).
+//
+// Usa Open-Meteo (sem chave de API) para geocodificação + previsão atual.
+// Retorna: { temp, unit, code, description, city, country }
+//
+// Deploy:
+//   supabase functions deploy widget-weather
+
+// deno-lint-ignore-file no-explicit-any
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
+
+const CORS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type",
+};
+
+function json(body: unknown, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { "Content-Type": "application/json", ...CORS },
+  });
+}
+
+// WMO weather codes → descrição PT-BR curta
+const WMO: Record<number, string> = {
+  0: "Céu limpo",
+  1: "Predominantemente limpo",
+  2: "Parcialmente nublado",
+  3: "Nublado",
+  45: "Neblina",
+  48: "Neblina com geada",
+  51: "Garoa fraca",
+  53: "Garoa",
+  55: "Garoa intensa",
+  61: "Chuva fraca",
+  63: "Chuva",
+  65: "Chuva forte",
+  66: "Chuva congelante",
+  67: "Chuva congelante forte",
+  71: "Neve fraca",
+  73: "Neve",
+  75: "Neve intensa",
+  77: "Grãos de neve",
+  80: "Pancadas de chuva",
+  81: "Pancadas fortes",
+  82: "Pancadas violentas",
+  85: "Pancadas de neve",
+  86: "Pancadas de neve fortes",
+  95: "Trovoadas",
+  96: "Trovoadas com granizo",
+  99: "Trovoadas com granizo forte",
+};
+
+Deno.serve(async (req) => {
+  if (req.method === "OPTIONS")
+    return new Response(null, { status: 204, headers: CORS });
+  if (req.method !== "POST") return json({ error: "method_not_allowed" }, 405);
+
+  const supabaseUrl = Deno.env.get("SUPABASE_URL");
+  const anonKey =
+    Deno.env.get("ANON_KEY") ?? Deno.env.get("SUPABASE_ANON_KEY");
+  if (!supabaseUrl || !anonKey) return json({ error: "missing_env" }, 500);
+
+  const authHeader = req.headers.get("Authorization") ?? "";
+  const token = authHeader.replace(/^Bearer\s+/i, "").trim();
+  if (!token) return json({ error: "missing_authorization" }, 401);
+
+  const userClient = createClient(supabaseUrl, anonKey, {
+    global: { headers: { Authorization: `Bearer ${token}` } },
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+  const { data: userData, error: userErr } = await userClient.auth.getUser();
+  if (userErr || !userData?.user) return json({ error: "invalid_token" }, 401);
+
+  let body: any;
+  try {
+    body = await req.json();
+  } catch {
+    return json({ error: "invalid_json" }, 400);
+  }
+
+  const city = String(body?.city ?? "").trim().slice(0, 120);
+  const units = body?.units === "imperial" ? "imperial" : "metric";
+  if (!city) return json({ error: "missing_city" }, 400);
+
+  try {
+    const geoUrl = new URL("https://geocoding-api.open-meteo.com/v1/search");
+    geoUrl.searchParams.set("name", city);
+    geoUrl.searchParams.set("count", "1");
+    geoUrl.searchParams.set("language", "pt");
+    geoUrl.searchParams.set("format", "json");
+    const geoRes = await fetch(geoUrl);
+    if (!geoRes.ok) return json({ error: "geocoding_failed" }, 502);
+    const geo = await geoRes.json();
+    const place = geo?.results?.[0];
+    if (!place) return json({ error: "city_not_found" }, 404);
+
+    const unit = units === "imperial" ? "fahrenheit" : "celsius";
+    const wUrl = new URL("https://api.open-meteo.com/v1/forecast");
+    wUrl.searchParams.set("latitude", String(place.latitude));
+    wUrl.searchParams.set("longitude", String(place.longitude));
+    wUrl.searchParams.set("current", "temperature_2m,weather_code");
+    wUrl.searchParams.set("temperature_unit", unit);
+    wUrl.searchParams.set("timezone", "auto");
+    const wRes = await fetch(wUrl);
+    if (!wRes.ok) return json({ error: "weather_failed" }, 502);
+    const w = await wRes.json();
+    const cur = w?.current;
+    if (!cur) return json({ error: "no_current" }, 502);
+
+    const code = Number(cur.weather_code ?? 0);
+    return json(
+      {
+        temp: Math.round(Number(cur.temperature_2m)),
+        unit: units === "imperial" ? "°F" : "°C",
+        code,
+        description: WMO[code] ?? "—",
+        city: place.name,
+        country: place.country_code ?? place.country ?? "",
+      },
+      200,
+    );
+  } catch (e) {
+    return json({ error: "fetch_failed", detail: (e as Error).message }, 502);
+  }
+});
