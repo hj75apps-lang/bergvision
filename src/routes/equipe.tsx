@@ -137,6 +137,22 @@ function EquipePage() {
         />
       )}
 
+      {!canManage && (
+        <Card className="rounded-2xl border-amber-500/30 bg-amber-500/5">
+          <CardHeader>
+            <CardTitle className="text-base text-amber-200">
+              Acesso restrito à gestão de equipe
+            </CardTitle>
+            <CardDescription className="text-amber-200/80">
+              Seu papel atual é <strong>{myRole}</strong>. Apenas{" "}
+              <strong>owner</strong> ou <strong>admin</strong> podem convidar
+              novos membros, alterar papéis ou remover pessoas. Peça a um
+              administrador da organização para elevar seu papel.
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      )}
+
       <Card className="rounded-2xl border-border/60 bg-card/60 backdrop-blur-xl">
         <CardHeader>
           <CardTitle className="text-base">Membros</CardTitle>
