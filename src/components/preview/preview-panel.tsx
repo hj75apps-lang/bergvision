@@ -295,7 +295,7 @@ function PreviewBody({
       </div>
 
       {/* Palco */}
-      <div className="relative flex-1 overflow-hidden bg-black">
+      <div className="relative flex-1 overflow-hidden bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.04),transparent_70%)] bg-black p-4">
         {envMissing ? (
           <StatusOverlay
             title="VITE_PLAYER_PREVIEW_URL não configurada"
@@ -304,7 +304,11 @@ function PreviewBody({
         ) : error ? (
           <StatusOverlay title="Falha ao gerar preview" detail={error} />
         ) : (
-          <>
+          <ResolutionStage
+            width={ctrl.resolution.width}
+            height={ctrl.resolution.height}
+            label={ctrl.resolution.label}
+          >
             {iframeSrc && (
               <iframe
                 ref={iframeRef}
@@ -319,11 +323,58 @@ function PreviewBody({
             {(isTokenLoading || !ready) && (
               <StatusOverlay
                 spinner
-                title={isTokenLoading ? "Preparando preview…" : "Carregando conteúdo…"}
+                title={
+                  isTokenLoading
+                    ? "Preparando preview…"
+                    : "Carregando conteúdo…"
+                }
               />
             )}
-          </>
+          </ResolutionStage>
         )}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Palco com aspect ratio real da resolução selecionada (letterbox)
+// ---------------------------------------------------------------------------
+
+function ResolutionStage({
+  width,
+  height,
+  label,
+  children,
+}: {
+  width: number;
+  height: number;
+  label: string;
+  children: React.ReactNode;
+}) {
+  const ratio = `${width} / ${height}`;
+  return (
+    <div className="grid h-full w-full place-items-center">
+      <div
+        className="relative max-h-full max-w-full overflow-hidden rounded-lg bg-black shadow-[0_10px_40px_-10px_rgba(0,0,0,0.9)] ring-1 ring-white/10"
+        style={{ aspectRatio: ratio, width: "100%", height: "100%" }}
+      >
+        {/* Wrapper interno respeita o aspect ratio sem estourar o container */}
+        <div
+          className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"
+          style={{
+            aspectRatio: ratio,
+            maxWidth: "100%",
+            maxHeight: "100%",
+            width: width >= height ? "100%" : "auto",
+            height: height > width ? "100%" : "auto",
+          }}
+        >
+          <div className="relative h-full w-full">{children}</div>
+        </div>
+        <div className="pointer-events-none absolute bottom-2 right-2 rounded-md bg-black/70 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-white/80 ring-1 ring-white/10">
+          {label}
+        </div>
       </div>
     </div>
   );
