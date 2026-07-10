@@ -107,8 +107,12 @@ function StudioPage() {
         return (retry.data ?? []) as CanvasTemplate[];
       }
       if (error) throw error;
-      const rows = (data ?? []) as (CanvasTemplate & { type?: string | null })[];
-      return rows.filter((r) => !r.type || r.type === "canvas");
+      // Org filter already scopes to user's own templates (system templates
+      // have organization_id = null). Do not filter by `type` on the client
+      // because rows created before the column existed (or via a retry that
+      // stripped it) may have NULL/'grid' — dropping them here hides the
+      // template the operator just created.
+      return (data ?? []) as CanvasTemplate[];
     },
   });
 
