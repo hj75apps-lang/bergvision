@@ -24,9 +24,16 @@ const PLAYER_PREVIEW_URL = (
   import.meta.env.VITE_PLAYER_PREVIEW_URL ?? ""
 ).replace(/\/+$/, "");
 
-const PLAYER_PREVIEW_ORIGIN = PLAYER_PREVIEW_URL
-  ? new URL(PLAYER_PREVIEW_URL).origin
-  : "";
+function getOrigin(value: string) {
+  if (!value) return "";
+  try {
+    return new URL(value).origin;
+  } catch {
+    return "";
+  }
+}
+
+const PLAYER_PREVIEW_ORIGIN = getOrigin(PLAYER_PREVIEW_URL);
 
 type PlayerAvailability =
   | { status: "idle" | "checking" | "available"; error: null }
