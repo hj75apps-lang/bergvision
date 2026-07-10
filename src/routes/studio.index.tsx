@@ -41,7 +41,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { GridSkeleton } from "@/components/layout/grid-skeleton";
 import { slugify } from "@/lib/template-utils";
 
-export const Route = createFileRoute("/studio")({
+export const Route = createFileRoute("/studio/")({
   head: () => ({
     meta: [
       { title: "Studio · Berg Vision" },
