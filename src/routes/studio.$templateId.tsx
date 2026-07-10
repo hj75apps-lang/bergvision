@@ -78,6 +78,28 @@ export const Route = createFileRoute("/studio/$templateId")({
     ],
   }),
   component: EditorPage,
+  errorComponent: ({ error, reset }) => (
+    <div className="mx-auto max-w-lg py-16 text-center">
+      <h1 className="text-lg font-semibold">Erro ao abrir o editor</h1>
+      <p className="mt-2 text-sm text-muted-foreground">
+        {error instanceof Error ? error.message : String(error)}
+      </p>
+      <div className="mt-4 flex justify-center gap-2">
+        <Button variant="outline" onClick={reset}>Tentar novamente</Button>
+        <Button asChild variant="link">
+          <Link to="/studio">Voltar</Link>
+        </Button>
+      </div>
+    </div>
+  ),
+  notFoundComponent: () => (
+    <div className="mx-auto max-w-lg py-16 text-center">
+      <h1 className="text-lg font-semibold">Template não encontrado.</h1>
+      <Button asChild variant="link">
+        <Link to="/studio">Voltar ao Studio</Link>
+      </Button>
+    </div>
+  ),
 });
 
 type ToolDef = {
@@ -199,15 +221,36 @@ function EditorPage() {
   const templateQ = useQuery({
     queryKey: ["studio_template", templateId],
     queryFn: async (): Promise<CanvasTemplate> => {
-      const { data, error } = await supabase
-        .from("templates")
-        .select(
-          "id, name, canvas_width, canvas_height, background_color, organization_id, scaling_mode, background_media_id",
-        )
-        .eq("id", templateId)
-        .single();
-      if (error) throw error;
-      return data as CanvasTemplate;
+      // Try full column set first, then fall back stripping optional columns
+      // that may not exist in this project's `templates` schema.
+      const optional = ["background_media_id", "scaling_mode"];
+      const base = [
+        "id",
+        "name",
+        "canvas_width",
+        "canvas_height",
+        "background_color",
+        "organization_id",
+      ];
+      let cols = [...base, ...optional];
+      for (let i = 0; i <= optional.length; i++) {
+        const { data, error } = await supabase
+          .from("templates")
+          .select(cols.join(", "))
+          .eq("id", templateId)
+          .maybeSingle();
+        if (!error) {
+          if (!data) throw new Error("Template não encontrado.");
+          return data as unknown as CanvasTemplate;
+        }
+        const msg = `${error.message} ${error.details ?? ""}`.toLowerCase();
+        const missing = optional.find(
+          (k) => cols.includes(k) && (msg.includes(`"${k}"`) || msg.includes(` ${k} `) || msg.includes(`'${k}'`)),
+        );
+        if (!missing) throw error;
+        cols = cols.filter((c) => c !== missing);
+      }
+      throw new Error("Falha ao carregar template.");
     },
   });
 
