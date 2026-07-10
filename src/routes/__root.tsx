@@ -78,30 +78,32 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Berg Vision — Painel de mídia indoor" },
+      { title: "Berg Vision" },
       {
         name: "description",
         content:
-          "Berg Vision: gestão de mídia indoor moderna — players, playlists, templates e equipes em um único painel premium.",
+          "Visão geral da sua rede de mídia indoor: players, agendamentos e desempenho em tempo real.",
       },
       { name: "author", content: "Berg Vision" },
       { name: "theme-color", content: "#0e0f19" },
-      { property: "og:title", content: "Berg Vision — Painel de mídia indoor" },
+      { property: "og:title", content: "Berg Vision" },
       {
         property: "og:description",
         content:
-          "Gestão de mídia indoor moderna e intuitiva para redes de players.",
+          "Visão geral da sua rede de mídia indoor: players, agendamentos e desempenho em tempo real.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:title", content: "Berg Vision" },
+      { name: "twitter:description", content: "Visão geral da sua rede de mídia indoor: players, agendamentos e desempenho em tempo real." },
+      { property: "og:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/XG7rgY7IMVYyVWpgYje1vSZKukC3/social-images/social-1783693947583-Gemini_Generated_Image_k14p86k14p86k14p.webp" },
+      { name: "twitter:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/XG7rgY7IMVYyVWpgYje1vSZKukC3/social-images/social-1783693947583-Gemini_Generated_Image_k14p86k14p86k14p.webp" },
     ],
     links: [
       {
         rel: "stylesheet",
         href: appCss,
       },
-      { rel: "icon", href: "/favicon.ico", type: "image/x-icon" },
-      { rel: "icon", href: "/icon-512.png", type: "image/png", sizes: "512x512" },
       { rel: "apple-touch-icon", href: "/icon-512.png" },
       { rel: "manifest", href: "/manifest.webmanifest" },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
