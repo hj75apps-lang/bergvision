@@ -129,6 +129,7 @@ function StudioPage() {
 
       // Retry stripping optional columns that may not exist in this schema.
       const optionalKeys = [
+        "type",
         "aspect_ratio",
         "scaling_mode",
         "zone_count",
