@@ -222,14 +222,14 @@ function EditorPage() {
     queryKey: ["studio_template", templateId],
     queryFn: async (): Promise<CanvasTemplate> => {
       // Try full column set first, then fall back stripping optional columns
-      // that may not exist in this project's `templates` schema.
-      const optional = ["background_media_id", "scaling_mode"];
+      // that may not exist in this project's `templates` schema (Studio
+      // schema é aplicado via docs/sql/20260710_studio_canvas_schema.sql).
+      const optional = ["background_media_id", "scaling_mode", "background_color"];
       const base = [
         "id",
         "name",
         "canvas_width",
         "canvas_height",
-        "background_color",
         "organization_id",
       ];
       let cols = [...base, ...optional];
