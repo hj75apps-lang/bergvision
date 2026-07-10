@@ -222,14 +222,14 @@ function EditorPage() {
     queryKey: ["studio_template", templateId],
     queryFn: async (): Promise<CanvasTemplate> => {
       // Try full column set first, then fall back stripping optional columns
-      // that may not exist in this project's `templates` schema.
-      const optional = ["background_media_id", "scaling_mode"];
+      // that may not exist in this project's `templates` schema (Studio
+      // schema é aplicado via docs/sql/20260710_studio_canvas_schema.sql).
+      const optional = ["background_media_id", "scaling_mode", "background_color"];
       const base = [
         "id",
         "name",
         "canvas_width",
         "canvas_height",
-        "background_color",
         "organization_id",
       ];
       let cols = [...base, ...optional];
@@ -264,7 +264,16 @@ function EditorPage() {
         )
         .eq("template_id", templateId)
         .order("z_index");
-      if (error) throw error;
+      if (error) {
+        // Se a tabela ainda não foi provisionada, dá mensagem clara em vez
+        // de quebrar o editor com erro genérico.
+        if (error.code === "PGRST205" || /template_elements/i.test(error.message)) {
+          throw new Error(
+            "Schema do Studio não aplicado no Supabase. Rode docs/sql/20260710_studio_canvas_schema.sql no SQL Editor.",
+          );
+        }
+        throw error;
+      }
       return (data ?? []) as TemplateElement[];
     },
   });

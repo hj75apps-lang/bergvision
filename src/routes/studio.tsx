@@ -176,12 +176,19 @@ function StudioPage() {
         }
         break;
       }
-      const err = new Error(
+      // Se sobrou erro de coluna faltando depois de todos os retries, o
+      // schema do Studio ainda não foi aplicado — mensagem acionável.
+      const raw = `${lastError?.message ?? ""} ${lastError?.details ?? ""}`.toLowerCase();
+      if (/column .* does not exist/.test(raw) || raw.includes("template_elements")) {
+        throw new Error(
+          "Schema do Studio não aplicado no Supabase. Rode docs/sql/20260710_studio_canvas_schema.sql no SQL Editor.",
+        );
+      }
+      throw new Error(
         [lastError?.message, lastError?.details, lastError?.hint, lastError?.code]
           .filter(Boolean)
           .join(" · ") || "Falha desconhecida ao criar template",
       );
-      throw err;
     },
     onSuccess: (id) => {
       qc.invalidateQueries({ queryKey: ["studio_templates"] });
