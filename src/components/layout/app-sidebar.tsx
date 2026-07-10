@@ -1,4 +1,5 @@
 import { Link, useRouterState } from "@tanstack/react-router";
+import { Logo } from "@/components/brand/logo";
 import {
   LayoutDashboard,
   MonitorPlay,
@@ -58,19 +59,11 @@ export function AppSidebar() {
       className="border-r border-sidebar-border/60 bg-sidebar/70 backdrop-blur-2xl supports-[backdrop-filter]:bg-sidebar/50"
     >
       <SidebarHeader className="px-3 pt-4 pb-2">
-        <Link to="/" className="flex items-center gap-2.5 px-1">
-          <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-linear-to-br from-primary to-primary/60 text-primary-foreground shadow-lg shadow-primary/30">
-            <span className="text-sm font-bold tracking-tight">BV</span>
-          </div>
-          {!collapsed && (
-            <div className="flex min-w-0 flex-col leading-tight">
-              <span className="truncate text-sm font-semibold tracking-tight">
-                Berg Vision
-              </span>
-              <span className="truncate text-[11px] text-sidebar-foreground/60">
-                Indoor Media Suite
-              </span>
-            </div>
+        <Link to="/" className="flex items-center px-1">
+          {collapsed ? (
+            <Logo className="h-9 w-9" alt="Berg Vision" />
+          ) : (
+            <Logo className="h-10 max-w-full" alt="Berg Vision" />
           )}
         </Link>
       </SidebarHeader>

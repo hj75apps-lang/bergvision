@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth, slugify } from "@/hooks/use-auth";
+import { Logo } from "@/components/brand/logo";
 
 export const Route = createFileRoute("/auth")({
   head: () => ({
@@ -74,11 +75,8 @@ function AuthPage() {
     <div className="flex min-h-svh items-center justify-center px-4 py-10">
       <div className="w-full max-w-md">
         <div className="mb-8 flex flex-col items-center text-center">
-          <div className="grid h-12 w-12 place-items-center rounded-2xl bg-linear-to-br from-primary to-primary/60 text-primary-foreground shadow-lg shadow-primary/30">
-            <span className="text-base font-bold">BV</span>
-          </div>
-          <h1 className="mt-4 text-2xl font-semibold tracking-tight">Berg Vision</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
+          <Logo className="h-20 max-w-[240px]" />
+          <p className="mt-3 text-sm text-muted-foreground">
             Painel de mídia indoor
           </p>
         </div>
