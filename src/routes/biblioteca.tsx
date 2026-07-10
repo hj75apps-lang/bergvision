@@ -51,6 +51,7 @@ import { GridSkeleton } from "@/components/layout/grid-skeleton";
 import {
   extractImageMeta,
   extractVideoMeta,
+  formatBytes,
   formatDuration,
   slugifyFilename,
   validateFile,
@@ -81,6 +82,7 @@ type MediaFile = {
   folder: string | null;
   type: MediaKind | string;
   mime_type: string | null;
+  size: number | null;
   width: number | null;
   height: number | null;
   duration: number | null;
@@ -88,6 +90,111 @@ type MediaFile = {
   thumbnail_path: string | null;
   created_at?: string | null;
 };
+
+const MEDIA_FILE_COLUMNS = [
+  "id",
+  "organization_id",
+  "name",
+  "folder",
+  "type",
+  "mime_type",
+  "size",
+  "width",
+  "height",
+  "duration",
+  "storage_path",
+  "thumbnail_path",
+  "created_at",
+];
+
+function getMissingSchemaColumn(error: unknown): string | null {
+  const text = [
+    (error as any)?.message,
+    (error as any)?.details,
+    (error as any)?.hint,
+  ]
+    .filter(Boolean)
+    .join(" ");
+  return (
+    text.match(/Could not find the '([^']+)' column/)?.[1] ??
+    text.match(/column\s+(?:\w+\.)?"?([a-zA-Z_][\w]*)"?\s+does not exist/)?.[1] ??
+    null
+  );
+}
+
+function normalizeMediaFile(row: Partial<MediaFile>): MediaFile {
+  return {
+    id: row.id ?? "",
+    organization_id: row.organization_id ?? "",
+    name: row.name ?? "Sem nome",
+    folder: row.folder ?? null,
+    type: row.type ?? "image",
+    mime_type: row.mime_type ?? null,
+    size: row.size ?? null,
+    width: row.width ?? null,
+    height: row.height ?? null,
+    duration: row.duration ?? null,
+    storage_path: row.storage_path ?? "",
+    thumbnail_path: row.thumbnail_path ?? null,
+    created_at: row.created_at ?? null,
+  };
+}
+
+async function fetchMediaFiles(orgId: string): Promise<MediaFile[]> {
+  let columns = [...MEDIA_FILE_COLUMNS];
+
+  for (let attempt = 0; attempt < MEDIA_FILE_COLUMNS.length; attempt += 1) {
+    let query = supabase
+      .from("media_files")
+      .select(columns.join(", "))
+      .eq("organization_id", orgId);
+
+    if (columns.includes("created_at")) {
+      query = query.order("created_at", { ascending: false });
+    }
+
+    const { data, error } = await query;
+    if (!error) {
+      return (data ?? []).map((row) => normalizeMediaFile(row as Partial<MediaFile>));
+    }
+
+    const missing = getMissingSchemaColumn(error);
+    if (missing && columns.includes(missing)) {
+      columns = columns.filter((column) => column !== missing);
+      continue;
+    }
+
+    throw error;
+  }
+
+  return [];
+}
+
+async function insertMediaFileWithSchemaFallback(payload: Record<string, unknown>) {
+  const optionalColumns = new Set([
+    "mime_type",
+    "size",
+    "width",
+    "height",
+    "duration",
+    "thumbnail_path",
+    "uploaded_by",
+  ]);
+  const body = { ...payload };
+
+  for (let attempt = 0; attempt < optionalColumns.size + 1; attempt += 1) {
+    const { error } = await supabase.from("media_files").insert(body);
+    if (!error) return;
+
+    const missing = getMissingSchemaColumn(error);
+    if (missing && optionalColumns.has(missing) && missing in body) {
+      delete body[missing];
+      continue;
+    }
+
+    throw error;
+  }
+}
 
 function useSignedUrl(path: string | null | undefined) {
   const [url, setUrl] = useState<string | null>(null);
@@ -123,17 +230,7 @@ function BibliotecaPage() {
   const filesQ = useQuery({
     queryKey: ["media_files", orgId],
     enabled: !!orgId,
-    queryFn: async (): Promise<MediaFile[]> => {
-      const { data, error } = await supabase
-        .from("media_files")
-        .select(
-          "id, organization_id, name, folder, type, mime_type, width, height, duration, storage_path, thumbnail_path, created_at",
-        )
-        .eq("organization_id", orgId!)
-        .order("created_at", { ascending: false });
-      if (error) throw error;
-      return (data ?? []) as MediaFile[];
-    },
+    queryFn: () => fetchMediaFiles(orgId!),
   });
 
   const files = filesQ.data ?? [];
@@ -324,6 +421,7 @@ function MediaCard({
           </p>
           <p className="text-xs text-muted-foreground">
             {file.width && file.height ? `${file.width}×${file.height}` : "Dimensões indisponíveis"}
+            {file.size ? ` · ${formatBytes(file.size)}` : ""}
             {isVideo && file.duration ? ` · ${formatDuration(file.duration)}` : ""}
           </p>
         </div>
@@ -551,20 +649,22 @@ function Uploader({ orgId, onUploaded }: { orgId: string; onUploaded: () => void
       }
       setProgress(85);
 
-      const { error: insErr } = await supabase.from("media_files").insert({
-        organization_id: orgId,
-        name: file.name,
-        folder: folder.trim() || null,
-        type: kind,
-        mime_type: file.type,
-        width,
-        height,
-        duration,
-        storage_path: storagePath,
-        thumbnail_path: thumbnailPath,
-        uploaded_by: user?.id ?? null,
-      });
-      if (insErr) {
+      try {
+        await insertMediaFileWithSchemaFallback({
+          organization_id: orgId,
+          name: file.name,
+          folder: folder.trim() || null,
+          type: kind,
+          mime_type: file.type,
+          size: file.size,
+          width,
+          height,
+          duration,
+          storage_path: storagePath,
+          thumbnail_path: thumbnailPath,
+          uploaded_by: user?.id ?? null,
+        });
+      } catch (insErr) {
         await supabase.storage
           .from(BUCKET)
           .remove([storagePath, thumbnailPath].filter((p): p is string => !!p));
@@ -620,7 +720,7 @@ function Uploader({ orgId, onUploaded }: { orgId: string; onUploaded: () => void
           <div>
             <p className="text-sm font-medium">Arraste arquivos aqui</p>
             <p className="text-xs text-muted-foreground">
-              JPG/PNG/WEBP até 10 MB · MP4/WEBM até 500 MB
+              Imagens até 20 MB · vídeos até 500 MB
             </p>
           </div>
         </div>
