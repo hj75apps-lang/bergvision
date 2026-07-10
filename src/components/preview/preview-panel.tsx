@@ -45,6 +45,64 @@ const RESOLUTIONS: Resolution[] = [
   { id: "p-4k", label: "4K retrato (2160×3840)", width: 2160, height: 3840, orientation: "portrait" },
 ];
 
+const EDGE_ERROR_LABELS: Record<string, string> = {
+  missing_env: "Variável ausente na Edge Function",
+  missing_authorization: "Sessão não enviada para a Edge Function",
+  invalid_token: "Sessão inválida ou expirada",
+  user_not_found: "Usuário não encontrado na tabela users",
+  no_organization: "Usuário sem organização vinculada",
+  forbidden_role: "Seu perfil não tem permissão para preview",
+  invalid_scope: "Tipo de preview inválido",
+  invalid_target_id: "ID do item inválido",
+  target_not_found: "Item não encontrado no Supabase",
+  forbidden_target: "Item pertence a outra organização",
+  profile_lookup_failed: "Falha ao consultar o usuário",
+  target_lookup_failed: "Falha ao consultar o item",
+  insert_failed: "Falha ao criar a sessão de preview",
+};
+
+async function formatEdgeFunctionError(error: unknown, functionName: string) {
+  const err = error as { message?: string; context?: Response };
+  const response = err?.context;
+
+  if (response instanceof Response) {
+    let rawBody = "";
+    try {
+      rawBody = await response.clone().text();
+    } catch {
+      rawBody = "";
+    }
+
+    let payload: Record<string, unknown> | null = null;
+    try {
+      payload = rawBody ? (JSON.parse(rawBody) as Record<string, unknown>) : null;
+    } catch {
+      payload = null;
+    }
+
+    const code = typeof payload?.error === "string" ? payload.error : null;
+    const friendly = code ? EDGE_ERROR_LABELS[code] ?? code : err.message;
+    const detail =
+      typeof payload?.detail === "string"
+        ? payload.detail
+        : Array.isArray(payload?.missing)
+          ? `Faltando: ${payload.missing.join(", ")}`
+          : rawBody || null;
+
+    return new Error(
+      [
+        `${functionName} retornou HTTP ${response.status}.`,
+        friendly,
+        detail,
+      ]
+        .filter(Boolean)
+        .join("\n"),
+    );
+  }
+
+  return error instanceof Error ? error : new Error("Falha ao gerar preview");
+}
+
 // ---------------------------------------------------------------------------
 // PostMessage protocolo
 // ---------------------------------------------------------------------------
@@ -114,7 +172,7 @@ function usePreviewController({
         "create-preview-token",
         { body: { scope, target_id: targetId } },
       );
-      if (error) throw error;
+      if (error) throw await formatEdgeFunctionError(error, "create-preview-token");
       const t = (data as { token?: string })?.token;
       if (!t) throw new Error("Resposta sem token");
       return t;
@@ -390,7 +448,9 @@ function StatusOverlay({
         {spinner && <Loader2 className="h-5 w-5 animate-spin text-white/80" />}
         <p className="text-sm font-medium">{title}</p>
         {detail && (
-          <p className="max-w-xs text-xs text-white/70">{detail}</p>
+          <p className="max-w-lg whitespace-pre-wrap break-words text-xs text-white/70">
+            {detail}
+          </p>
         )}
       </div>
     </div>
