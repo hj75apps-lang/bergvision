@@ -9,9 +9,24 @@
 alter table public.media_files
   add column if not exists file_size bigint;
 
-update public.media_files
-   set file_size = coalesce(file_size, size, 0)
- where file_size is null;
+do $$
+begin
+  if exists (
+    select 1
+      from information_schema.columns
+     where table_schema = 'public'
+       and table_name = 'media_files'
+       and column_name = 'size'
+  ) then
+    update public.media_files
+       set file_size = coalesce(file_size, size, 0)
+     where file_size is null;
+  else
+    update public.media_files
+       set file_size = coalesce(file_size, 0)
+     where file_size is null;
+  end if;
+end $$;
 
 alter table public.media_files
   alter column file_size set default 0,
