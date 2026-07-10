@@ -28,6 +28,68 @@ import {
 
 const BUCKET = "media";
 
+const OPTIONAL_MEDIA_INSERT_COLUMNS = new Set([
+  "mime_type",
+  "size",
+  "file_size",
+  "width",
+  "height",
+  "duration",
+  "thumbnail_path",
+  "uploaded_by",
+]);
+
+function getMissingSchemaColumn(error: unknown): string | null {
+  const text = [
+    (error as any)?.message,
+    (error as any)?.details,
+    (error as any)?.hint,
+  ]
+    .filter(Boolean)
+    .join(" ");
+  return (
+    text.match(/Could not find the '([^']+)' column/)?.[1] ??
+    text.match(/column\s+(?:\w+\.)?"?([a-zA-Z_][\w]*)"?\s+does not exist/)?.[1] ??
+    null
+  );
+}
+
+function getSupabaseErrorMessage(error: unknown, fallback: string): string {
+  if (error instanceof Error) return error.message;
+  const parts = [
+    (error as any)?.message,
+    (error as any)?.details,
+    (error as any)?.hint,
+  ].filter(Boolean);
+  return parts.length ? parts.join(" ") : fallback;
+}
+
+async function insertMediaFileWithSchemaFallback(
+  payload: Record<string, unknown>,
+): Promise<PickerMediaFile> {
+  const body = { ...payload };
+
+  for (let attempt = 0; attempt < OPTIONAL_MEDIA_INSERT_COLUMNS.size + 1; attempt += 1) {
+    const { data, error } = await supabase
+      .from("media_files")
+      .insert(body)
+      .select("id, name, type, storage_path, thumbnail_path, width, height")
+      .single();
+
+    if (!error) return data as PickerMediaFile;
+
+    const missing = getMissingSchemaColumn(error);
+    if (missing && OPTIONAL_MEDIA_INSERT_COLUMNS.has(missing) && missing in body) {
+      delete body[missing];
+      continue;
+    }
+
+    throw new Error(getSupabaseErrorMessage(error, "Falha ao salvar mídia."));
+  }
+
+  throw new Error("Falha ao salvar mídia.");
+}
+
 export type PickerMediaFile = {
   id: string;
   name: string;
@@ -159,12 +221,10 @@ export function MediaPickerDialog({
         thumbnail_path: thumbnailPath,
         uploaded_by: user?.id ?? null,
       };
-      const { data: inserted, error: insErr } = await supabase
-        .from("media_files")
-        .insert(payload)
-        .select("id, name, type, storage_path, thumbnail_path, width, height")
-        .single();
-      if (insErr) {
+      let inserted: PickerMediaFile;
+      try {
+        inserted = await insertMediaFileWithSchemaFallback(payload);
+      } catch (insErr) {
         await supabase.storage
           .from(BUCKET)
           .remove([storagePath, thumbnailPath].filter((p): p is string => !!p));
@@ -174,12 +234,10 @@ export function MediaPickerDialog({
       toast.success(`${file.name} enviado.`);
       await qc.invalidateQueries({ queryKey: ["studio_media_picker"] });
       await qc.invalidateQueries({ queryKey: ["media_files"] });
-      if (inserted) {
-        onPick(inserted as PickerMediaFile);
-        onOpenChange(false);
-      }
+      onPick(inserted);
+      onOpenChange(false);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Falha no upload.";
+      const msg = getSupabaseErrorMessage(err, "Falha no upload.");
       toast.error(msg);
     } finally {
       setTimeout(() => {

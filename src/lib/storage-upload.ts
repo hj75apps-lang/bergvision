@@ -1,6 +1,35 @@
 import * as tus from "tus-js-client";
 import { supabase } from "@/integrations/supabase/client";
 
+function getTusErrorMessage(error: unknown): string {
+  const detailed = error as {
+    message?: string;
+    causingError?: { message?: string };
+    originalResponse?: {
+      getStatus?: () => number;
+      getBody?: () => string;
+    };
+  };
+
+  const status = detailed.originalResponse?.getStatus?.();
+  const body = detailed.originalResponse?.getBody?.();
+  let serverMessage = body;
+
+  if (body) {
+    try {
+      const parsed = JSON.parse(body) as { message?: string; error?: string };
+      serverMessage = parsed.message ?? parsed.error ?? body;
+    } catch {
+      serverMessage = body;
+    }
+  }
+
+  const message =
+    serverMessage || detailed.causingError?.message || detailed.message || "Falha no upload.";
+
+  return status ? `Falha no upload (${status}): ${message}` : message;
+}
+
 /**
  * Upload retomável (TUS) para o Supabase Storage.
  * Método oficial recomendado para arquivos grandes (>6MB) — suporta até 5GB,
@@ -41,7 +70,7 @@ export async function uploadToStorage(
         cacheControl: "3600",
       },
       chunkSize: 6 * 1024 * 1024, // 6MB — exigido pelo endpoint do Supabase
-      onError: (err) => reject(err),
+      onError: (err) => reject(new Error(getTusErrorMessage(err))),
       onProgress: (bytesSent, bytesTotal) => {
         if (opts.onProgress && bytesTotal > 0) {
           opts.onProgress(Math.round((bytesSent / bytesTotal) * 100));
