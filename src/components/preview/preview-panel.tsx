@@ -34,10 +34,7 @@ function getOrigin(value: string) {
 }
 
 const PLAYER_PREVIEW_ORIGIN = getOrigin(PLAYER_PREVIEW_URL);
-
-type PlayerAvailability =
-  | { status: "idle" | "checking" | "available"; error: null }
-  | { status: "unavailable"; error: string };
+const PLAYER_CONFIGURED = Boolean(PLAYER_PREVIEW_URL);
 
 // ---------------------------------------------------------------------------
 // Resoluções simuladas
@@ -177,51 +174,7 @@ function usePreviewController({
   const [token, setToken] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [playerAvailability, setPlayerAvailability] =
-    useState<PlayerAvailability>({ status: "idle", error: null });
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
-
-  useEffect(() => {
-    if (!active || !PLAYER_PREVIEW_URL) {
-      setPlayerAvailability({ status: "idle", error: null });
-      return;
-    }
-
-    let cancelled = false;
-    const controller = new AbortController();
-    const timeout = window.setTimeout(() => controller.abort(), 7000);
-
-    setPlayerAvailability({ status: "checking", error: null });
-
-    fetch(`${PLAYER_PREVIEW_URL}/preview`, {
-      cache: "no-store",
-      mode: "no-cors",
-      signal: controller.signal,
-    })
-      .then(() => {
-        if (!cancelled) {
-          setPlayerAvailability({ status: "available", error: null });
-        }
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setPlayerAvailability({
-            status: "unavailable",
-            error: [
-              `Não foi possível acessar ${PLAYER_PREVIEW_URL}.`,
-              "Confirme se o app Player está publicado, se o DNS do domínio está ativo e se a rota /preview existe no Player.",
-            ].join("\n"),
-          });
-        }
-      })
-      .finally(() => window.clearTimeout(timeout));
-
-    return () => {
-      cancelled = true;
-      controller.abort();
-      window.clearTimeout(timeout);
-    };
-  }, [active]);
 
   // Cria token via Edge Function quando não é draft.
   const tokenMut = useMutation({
@@ -247,17 +200,16 @@ function usePreviewController({
   useEffect(() => {
     if (!active) return;
     if (isDraft) return;
-    if (playerAvailability.status !== "available") return;
+    if (!PLAYER_CONFIGURED) return;
     setReady(false);
     setToken(null);
     tokenMut.mutate();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [active, isDraft, scope, targetId, playerAvailability.status]);
+  }, [active, isDraft, scope, targetId]);
 
   // URL do iframe
   const iframeSrc = useMemo(() => {
-    if (!PLAYER_PREVIEW_URL) return "";
-    if (playerAvailability.status !== "available") return "";
+    if (!PLAYER_CONFIGURED) return "";
     if (isDraft) return `${PLAYER_PREVIEW_URL}/preview`;
     if (!token) return "";
     const qs = new URLSearchParams({
@@ -266,7 +218,7 @@ function usePreviewController({
       orientation: resolution.orientation,
     });
     return `${PLAYER_PREVIEW_URL}/preview?${qs.toString()}`;
-  }, [isDraft, token, resolution, playerAvailability.status]);
+  }, [isDraft, token, resolution]);
 
   // Recebe PREVIEW_READY do iframe
   useEffect(() => {
@@ -324,12 +276,9 @@ function usePreviewController({
     iframeSrc,
     ready,
     error,
-    playerError: playerAvailability.error,
-    isCheckingPlayer: playerAvailability.status === "checking",
+    playerConfigured: PLAYER_CONFIGURED,
     isTokenLoading:
-      !isDraft &&
-      playerAvailability.status === "available" &&
-      (tokenMut.isPending || (!token && !error)),
+      !isDraft && PLAYER_CONFIGURED && (tokenMut.isPending || (!token && !error)),
     resolutionId,
     setResolutionId,
     resolution,
@@ -356,15 +305,12 @@ function PreviewBody({
     iframeSrc,
     ready,
     error,
-    playerError,
-    isCheckingPlayer,
+    playerConfigured,
     isTokenLoading,
     resolutionId,
     setResolutionId,
     isDraft,
   } = ctrl;
-
-  const envMissing = !PLAYER_PREVIEW_URL;
 
   return (
     <div
@@ -429,13 +375,14 @@ function PreviewBody({
 
       {/* Palco */}
       <div className="relative flex-1 overflow-hidden bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.04),transparent_70%)] bg-black p-4">
-        {envMissing ? (
+        {!playerConfigured ? (
           <StatusOverlay
-            title="VITE_PLAYER_PREVIEW_URL não configurada"
-            detail="Defina a URL do Player publicado para habilitar o preview."
+            title="Preview do Player não configurado"
+            detail={[
+              "Você pode criar e configurar templates normalmente — o preview visual aparecerá aqui assim que o Player for publicado.",
+              "Defina VITE_PLAYER_PREVIEW_URL apontando para o app Player quando estiver disponível.",
+            ].join("\n")}
           />
-        ) : playerError ? (
-          <StatusOverlay title="Player indisponível" detail={playerError} />
         ) : error ? (
           <StatusOverlay title="Falha ao gerar preview" detail={error} />
         ) : (
@@ -456,16 +403,10 @@ function PreviewBody({
                 onLoad={ctrl.handleIframeLoad}
               />
             )}
-            {(isCheckingPlayer || isTokenLoading || !ready) && (
+            {(isTokenLoading || !ready) && (
               <StatusOverlay
                 spinner
-                title={
-                  isCheckingPlayer
-                    ? "Verificando Player…"
-                    : isTokenLoading
-                    ? "Preparando preview…"
-                    : "Carregando conteúdo…"
-                }
+                title={isTokenLoading ? "Preparando preview…" : "Carregando conteúdo…"}
               />
             )}
           </ResolutionStage>
