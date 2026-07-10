@@ -353,25 +353,20 @@ function ResolutionStage({
   children: React.ReactNode;
 }) {
   const ratio = `${width} / ${height}`;
+  const isPortrait = height > width;
   return (
     <div className="grid h-full w-full place-items-center">
       <div
-        className="relative max-h-full max-w-full overflow-hidden rounded-lg bg-black shadow-[0_10px_40px_-10px_rgba(0,0,0,0.9)] ring-1 ring-white/10"
-        style={{ aspectRatio: ratio, width: "100%", height: "100%" }}
+        className="relative overflow-hidden rounded-lg bg-black shadow-[0_10px_40px_-10px_rgba(0,0,0,0.9)] ring-1 ring-white/10"
+        style={{
+          aspectRatio: ratio,
+          maxWidth: "100%",
+          maxHeight: "100%",
+          width: isPortrait ? "auto" : "100%",
+          height: isPortrait ? "100%" : "auto",
+        }}
       >
-        {/* Wrapper interno respeita o aspect ratio sem estourar o container */}
-        <div
-          className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"
-          style={{
-            aspectRatio: ratio,
-            maxWidth: "100%",
-            maxHeight: "100%",
-            width: width >= height ? "100%" : "auto",
-            height: height > width ? "100%" : "auto",
-          }}
-        >
-          <div className="relative h-full w-full">{children}</div>
-        </div>
+        {children}
         <div className="pointer-events-none absolute bottom-2 right-2 rounded-md bg-black/70 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-white/80 ring-1 ring-white/10">
           {label}
         </div>
