@@ -226,6 +226,12 @@ function usePreviewController({
     setReady(false);
   }, [iframeSrc]);
 
+  // Fallback: se o Player não enviar PREVIEW_READY em 2.5s após o iframe
+  // terminar de carregar, consideramos pronto para não travar a UI.
+  const handleIframeLoad = () => {
+    window.setTimeout(() => setReady(true), 2500);
+  };
+
   // ---- Draft: envia PREVIEW_DRAFT_UPDATE ao iframe ----
   const postDraft = (payload: unknown) => {
     const win = iframeRef.current?.contentWindow;
@@ -262,6 +268,7 @@ function usePreviewController({
     setResolutionId,
     resolution,
     isDraft,
+    handleIframeLoad,
   };
 }
 
@@ -376,6 +383,7 @@ function PreviewBody({
                 className="h-full w-full border-0"
                 sandbox="allow-scripts allow-same-origin"
                 allow="autoplay; fullscreen"
+                onLoad={ctrl.handleIframeLoad}
               />
             )}
             {(isTokenLoading || !ready) && (
