@@ -48,6 +48,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { GridSkeleton } from "@/components/layout/grid-skeleton";
+import { uploadToStorage } from "@/lib/storage-upload";
 import {
   extractImageMeta,
   extractVideoMeta,
@@ -646,21 +647,25 @@ function Uploader({ orgId, onUploaded }: { orgId: string; onUploaded: () => void
       const storagePath = `${orgId}/${uid}-${safe}`;
 
       setProgress(15);
-      const { error: upErr } = await supabase.storage
-        .from(BUCKET)
-        .upload(storagePath, file, { contentType: file.type, upsert: false });
-      if (upErr) throw upErr;
-      setProgress(70);
+      await uploadToStorage(BUCKET, storagePath, file, {
+        contentType: file.type,
+        onProgress: (pct) => setProgress(15 + Math.round(pct * 0.7)),
+      });
+      setProgress(85);
 
       let thumbnailPath: string | null = null;
       if (thumbBlob) {
         const tp = `${orgId}/${uid}-thumb.jpg`;
-        const { error: tErr } = await supabase.storage
-          .from(BUCKET)
-          .upload(tp, thumbBlob, { contentType: "image/jpeg", upsert: false });
-        if (!tErr) thumbnailPath = tp;
+        try {
+          await uploadToStorage(BUCKET, tp, thumbBlob, {
+            contentType: "image/jpeg",
+          });
+          thumbnailPath = tp;
+        } catch {
+          thumbnailPath = null;
+        }
       }
-      setProgress(85);
+      setProgress(92);
 
       try {
         await insertMediaFileWithSchemaFallback({

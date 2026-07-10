@@ -17,6 +17,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { useSignedUrl } from "@/lib/studio/use-signed-url";
+import { uploadToStorage } from "@/lib/storage-upload";
 import {
   ACCEPT_ATTR,
   extractImageMeta,
@@ -123,20 +124,27 @@ export function MediaPickerDialog({
       const safe = slugifyFilename(file.name);
       const storagePath = `${orgId}/${uid}-${safe}`;
       setUploadProgress(20);
-      const { error: upErr } = await supabase.storage
-        .from(BUCKET)
-        .upload(storagePath, file, { contentType: file.type, upsert: false });
-      if (upErr) throw upErr;
-      setUploadProgress(70);
+      await uploadToStorage(BUCKET, storagePath, file, {
+        contentType: file.type,
+        onProgress: (pct) => {
+          // Reserva 20% para thumbnail + insert final
+          setUploadProgress(20 + Math.round(pct * 0.65));
+        },
+      });
+      setUploadProgress(85);
       let thumbnailPath: string | null = null;
       if (thumbBlob) {
         const tp = `${orgId}/${uid}-thumb.jpg`;
-        const { error: tErr } = await supabase.storage
-          .from(BUCKET)
-          .upload(tp, thumbBlob, { contentType: "image/jpeg", upsert: false });
-        if (!tErr) thumbnailPath = tp;
+        try {
+          await uploadToStorage(BUCKET, tp, thumbBlob, {
+            contentType: "image/jpeg",
+          });
+          thumbnailPath = tp;
+        } catch {
+          thumbnailPath = null;
+        }
       }
-      setUploadProgress(85);
+      setUploadProgress(92);
       const payload: Record<string, unknown> = {
         organization_id: orgId,
         name: file.name,
