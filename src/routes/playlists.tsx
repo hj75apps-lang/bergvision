@@ -73,6 +73,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { GridSkeleton } from "@/components/layout/grid-skeleton";
 import { PreviewPanel } from "@/components/preview/preview-panel";
+import {
+  usePlaylistDraftPayload,
+  type PlaylistDraftItem,
+  type PlaylistDraftMeta,
+} from "@/lib/playlist/use-playlist-draft-payload";
 
 export const Route = createFileRoute("/playlists")({
   head: () => ({
@@ -366,9 +371,6 @@ function PlaylistEditor({
   const { membership } = useAuth();
   const orgId = membership?.organization_id ?? null;
   const qc = useQueryClient();
-  const role = membership?.role ?? "viewer";
-  const canPreview = role !== "viewer";
-  const [previewOpen, setPreviewOpen] = useState(false);
 
   const [name, setName] = useState(playlist.name);
   const [isActive, setIsActive] = useState(playlist.is_active);
@@ -542,9 +544,47 @@ function PlaylistEditor({
     );
   };
 
+  const draftMeta = useMemo<PlaylistDraftMeta | undefined>(() => {
+    if (!orgId) return undefined;
+    return {
+      id: playlist.id,
+      organization_id: orgId,
+      name: name.trim() || "Sem nome",
+      is_active: isActive,
+      schedule_start: scheduleStart ? `${scheduleStart}:00` : null,
+      schedule_end: scheduleEnd ? `${scheduleEnd}:00` : null,
+      schedule_days: scheduleDays.length > 0 ? scheduleDays : null,
+    };
+  }, [
+    orgId,
+    playlist.id,
+    name,
+    isActive,
+    scheduleStart,
+    scheduleEnd,
+    scheduleDays,
+  ]);
+
+  const draftItems = useMemo<PlaylistDraftItem[]>(
+    () =>
+      items.map((it, idx) => ({
+        id: it.id,
+        playlist_id: it.playlist_id,
+        media_file_id: it.media_file_id,
+        position: idx,
+        duration: it.duration,
+        transition: it.transition,
+      })),
+    [items],
+  );
+
+  const draftPayload = usePlaylistDraftPayload(draftMeta, draftItems, open);
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl rounded-2xl">
+      <DialogContent className="max-h-[92vh] w-[96vw] max-w-6xl overflow-hidden rounded-2xl p-0">
+        <div className="grid max-h-[92vh] gap-0 lg:grid-cols-[minmax(0,1fr)_460px]">
+          <div className="flex max-h-[92vh] flex-col overflow-y-auto p-6">
         <DialogHeader>
           <DialogTitle>Editar playlist</DialogTitle>
           <DialogDescription>
@@ -552,7 +592,7 @@ function PlaylistEditor({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-5">
+        <div className="mt-4 space-y-5">
           {/* Metadados */}
           <div className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
             <div className="space-y-1.5">
@@ -712,19 +752,9 @@ function PlaylistEditor({
           </div>
         </div>
 
-        <DialogFooter>
+        <DialogFooter className="mt-6">
           <Button variant="ghost" onClick={() => onOpenChange(false)} className="rounded-xl">
             Fechar
-          </Button>
-          <Button
-            variant="outline"
-            onClick={() => setPreviewOpen(true)}
-            disabled={!canPreview}
-            title={canPreview ? "Preview da sequência" : "Sem permissão para gerar preview"}
-            className="rounded-xl"
-          >
-            <Play className="mr-2 h-4 w-4" />
-            Preview da Sequência
           </Button>
           {canManage && (
             <Button
@@ -737,14 +767,20 @@ function PlaylistEditor({
             </Button>
           )}
         </DialogFooter>
+          </div>
+          <div className="hidden max-h-[92vh] border-l border-border/60 bg-neutral-950/40 p-4 lg:block">
+            <div className="h-full min-h-[520px]">
+              <PreviewPanel
+                mode="inline"
+                scope="playlist"
+                targetId={playlist.id}
+                draftData={draftPayload}
+                className="h-full"
+              />
+            </div>
+          </div>
+        </div>
       </DialogContent>
-      <PreviewPanel
-        mode="modal"
-        scope="playlist"
-        targetId={playlist.id}
-        open={previewOpen}
-        onOpenChange={setPreviewOpen}
-      />
     </Dialog>
   );
 }
