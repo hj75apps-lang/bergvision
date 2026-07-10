@@ -75,7 +75,7 @@ function AuthPage() {
     <div className="flex min-h-svh items-center justify-center px-4 py-10">
       <div className="w-full max-w-md">
         <div className="mb-8 flex flex-col items-center text-center">
-          <Logo className="h-30 max-w-[360px]" />
+          <Logo className="h-[120px] max-w-[360px]" />
           <p className="mt-3 text-sm text-muted-foreground">
             Painel de mídia indoor
           </p>
