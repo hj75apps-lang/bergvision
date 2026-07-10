@@ -473,6 +473,7 @@ function CreateTemplateDialog({
           canvas_width: w,
           canvas_height: h,
           allow_overlap: false,
+          layout_css: "{}",
         })
         .select("id")
         .single();
