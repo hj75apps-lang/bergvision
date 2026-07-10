@@ -1,14 +1,35 @@
-export const IMAGE_MIME = ["image/jpeg", "image/png", "image/webp"] as const;
-export const VIDEO_MIME = ["video/mp4", "video/webm"] as const;
-export const IMAGE_MAX = 10 * 1024 * 1024; // 10 MB
+export const IMAGE_MIME = [
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "image/gif",
+  "image/avif",
+  "image/svg+xml",
+] as const;
+export const VIDEO_MIME = [
+  "video/mp4",
+  "video/webm",
+  "video/quicktime",
+  "video/ogg",
+] as const;
+export const IMAGE_MAX = 20 * 1024 * 1024; // 20 MB
 export const VIDEO_MAX = 500 * 1024 * 1024; // 500 MB
+
+export const ACCEPT_ATTR = [...IMAGE_MIME, ...VIDEO_MIME].join(",");
 
 export type MediaKind = "image" | "video";
 
 export function detectKind(file: File): MediaKind | null {
-  const t = file.type.toLowerCase();
+  const t = (file.type || "").toLowerCase();
   if ((IMAGE_MIME as readonly string[]).includes(t)) return "image";
   if ((VIDEO_MIME as readonly string[]).includes(t)) return "video";
+  // Fallback por extensão (alguns navegadores não populam file.type — ex.: .mov, .avif)
+  const name = file.name.toLowerCase();
+  const ext = name.slice(name.lastIndexOf(".") + 1);
+  if (["jpg", "jpeg", "png", "webp", "gif", "avif", "svg"].includes(ext)) return "image";
+  if (["mp4", "webm", "mov", "ogv", "ogg"].includes(ext)) return "video";
+  if (t.startsWith("image/")) return "image";
+  if (t.startsWith("video/")) return "video";
   return null;
 }
 
@@ -17,11 +38,11 @@ export function validateFile(file: File): { kind: MediaKind } | { error: string 
   if (!kind) {
     return {
       error:
-        "Formato não suportado. Use imagens JPG, PNG ou WEBP; vídeos MP4 ou WEBM.",
+        "Formato não suportado. Use imagens (JPG, PNG, WEBP, GIF, AVIF, SVG) ou vídeos (MP4, WEBM, MOV, OGG).",
     };
   }
   if (kind === "image" && file.size > IMAGE_MAX) {
-    return { error: "Imagem excede o limite de 10 MB." };
+    return { error: "Imagem excede o limite de 20 MB." };
   }
   if (kind === "video" && file.size > VIDEO_MAX) {
     return { error: "Vídeo excede o limite de 500 MB." };
@@ -70,12 +91,12 @@ export async function extractImageMeta(
   const url = URL.createObjectURL(file);
   try {
     const img = new Image();
-    await new Promise<void>((resolve, reject) => {
+    await new Promise<void>((resolve) => {
       img.onload = () => resolve();
-      img.onerror = () => reject(new Error("Não foi possível ler a imagem."));
+      img.onerror = () => resolve();
       img.src = url;
     });
-    return { width: img.naturalWidth, height: img.naturalHeight };
+    return { width: img.naturalWidth || 0, height: img.naturalHeight || 0 };
   } finally {
     URL.revokeObjectURL(url);
   }
@@ -96,14 +117,15 @@ export async function extractVideoMeta(file: File): Promise<{
     video.crossOrigin = "anonymous";
     video.src = url;
 
-    await new Promise<void>((resolve, reject) => {
+    await new Promise<void>((resolve) => {
       video.onloadedmetadata = () => resolve();
-      video.onerror = () => reject(new Error("Não foi possível ler o vídeo."));
+      video.onerror = () => resolve();
+      setTimeout(() => resolve(), 3000);
     });
 
-    const width = video.videoWidth;
-    const height = video.videoHeight;
-    const duration = video.duration;
+    const width = video.videoWidth || 0;
+    const height = video.videoHeight || 0;
+    const duration = isFinite(video.duration) ? video.duration : 0;
 
     // Seek para 0.1s para capturar o primeiro frame renderizado
     await new Promise<void>((resolve) => {

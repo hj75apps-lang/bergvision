@@ -54,6 +54,7 @@ import {
   formatDuration,
   slugifyFilename,
   validateFile,
+  ACCEPT_ATTR,
   type MediaKind,
 } from "@/lib/media-utils";
 
@@ -641,7 +642,7 @@ function Uploader({ orgId, onUploaded }: { orgId: string; onUploaded: () => void
             ref={inputRef}
             type="file"
             multiple
-            accept="image/jpeg,image/png,image/webp,video/mp4,video/webm"
+            accept={ACCEPT_ATTR}
             className="hidden"
             onChange={(e) => {
               if (e.target.files?.length) uploadMany(e.target.files);
