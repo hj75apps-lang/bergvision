@@ -59,7 +59,6 @@ const ROLES: { value: AppRole; label: string; desc: string }[] = [
 
 type Member = {
   id: string;
-  email: string | null;
   full_name: string | null;
   role: AppRole;
   created_at?: string;
@@ -391,7 +390,6 @@ function MemberRow({
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
           <span className="truncate text-sm font-medium">
-            {member.full_name || member.email}
             {member.full_name || sessionEmail || "Usuário"}
           </span>
           {isMe && (
