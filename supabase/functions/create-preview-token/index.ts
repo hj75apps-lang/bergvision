@@ -16,11 +16,9 @@
 // deno-lint-ignore-file no-explicit-any
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
 
-const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-// Supabase bloqueia secrets com prefixo SUPABASE_; usamos ANON_KEY,
-// com fallback para SUPABASE_ANON_KEY caso já esteja cadastrado.
-const ANON_KEY = Deno.env.get("ANON_KEY") ?? Deno.env.get("SUPABASE_ANON_KEY")!;
+// Supabase bloqueia a criação manual de secrets com prefixo SUPABASE_;
+// por isso ANON_KEY é aceito, com fallback para SUPABASE_ANON_KEY quando
+// o runtime disponibilizar automaticamente esse nome.
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -36,6 +34,12 @@ const SCOPE_TO_TABLE: Record<string, string> = {
   playlist: "playlists",
 };
 
+const SCOPE_TO_SELECT: Record<string, string> = {
+  template: "id, organization_id, is_system",
+  player: "id, organization_id",
+  playlist: "id, organization_id",
+};
+
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
@@ -43,9 +47,29 @@ function json(body: unknown, status = 200) {
   });
 }
 
+function readEnv() {
+  const supabaseUrl = Deno.env.get("SUPABASE_URL");
+  const serviceRole = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  const anonKey = Deno.env.get("ANON_KEY") ?? Deno.env.get("SUPABASE_ANON_KEY");
+
+  const missing = [
+    !supabaseUrl ? "SUPABASE_URL" : null,
+    !serviceRole ? "SUPABASE_SERVICE_ROLE_KEY" : null,
+    !anonKey ? "ANON_KEY" : null,
+  ].filter(Boolean);
+
+  if (missing.length > 0) return { missing } as const;
+  return { supabaseUrl: supabaseUrl!, serviceRole: serviceRole!, anonKey: anonKey! } as const;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS });
   if (req.method !== "POST") return json({ error: "method_not_allowed" }, 405);
+
+  const env = readEnv();
+  if ("missing" in env) {
+    return json({ error: "missing_env", missing: env.missing }, 500);
+  }
 
   // ---- Auth: valida o JWT do chamador ----
   const authHeader = req.headers.get("Authorization") ?? "";
@@ -53,12 +77,13 @@ Deno.serve(async (req) => {
   if (!token) return json({ error: "missing_authorization" }, 401);
 
   // Cliente escoped ao usuário só para extrair auth.uid via getUser.
-  const userClient = createClient(SUPABASE_URL, ANON_KEY, {
+  const userClient = createClient(env.supabaseUrl, env.anonKey, {
     global: { headers: { Authorization: `Bearer ${token}` } },
     auth: { persistSession: false, autoRefreshToken: false },
   });
   const { data: userData, error: userErr } = await userClient.auth.getUser();
-  if (userErr || !userData?.user) return json({ error: "invalid_token" }, 401);
+  if (userErr || !userData?.user)
+    return json({ error: "invalid_token", detail: userErr?.message ?? null }, 401);
   const userId = userData.user.id;
 
   // ---- Body ----
@@ -76,7 +101,7 @@ Deno.serve(async (req) => {
     return json({ error: "invalid_target_id" }, 400);
 
   // ---- Admin client (bypassa RLS para checagens confiáveis) ----
-  const admin = createClient(SUPABASE_URL, SERVICE_ROLE, {
+  const admin = createClient(env.supabaseUrl, env.serviceRole, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
 
@@ -87,22 +112,26 @@ Deno.serve(async (req) => {
     .eq("id", userId)
     .maybeSingle();
 
-  if (profileErr) return json({ error: "profile_lookup_failed" }, 500);
+  if (profileErr)
+    return json({ error: "profile_lookup_failed", detail: profileErr.message }, 500);
   if (!profile) return json({ error: "user_not_found" }, 404);
   if (!profile.organization_id) return json({ error: "no_organization" }, 403);
   if (!ALLOWED_ROLES.has(String(profile.role)))
     return json({ error: "forbidden_role" }, 403);
 
-  // Target pertence à mesma org?
+  // Target pertence à mesma org? Templates de sistema são globais e podem
+  // ter organization_id nulo; eles também precisam gerar preview.
   const { data: target, error: targetErr } = await admin
     .from(table)
-    .select("id, organization_id")
+    .select(SCOPE_TO_SELECT[scope])
     .eq("id", targetId)
     .maybeSingle();
 
-  if (targetErr) return json({ error: "target_lookup_failed" }, 500);
+  if (targetErr)
+    return json({ error: "target_lookup_failed", detail: targetErr.message }, 500);
   if (!target) return json({ error: "target_not_found" }, 404);
-  if (target.organization_id !== profile.organization_id)
+  const isSystemTemplate = scope === "template" && Boolean((target as any).is_system);
+  if (!isSystemTemplate && target.organization_id !== profile.organization_id)
     return json({ error: "forbidden_target" }, 403);
 
   // ---- Insere a sessão de preview (expires_at usa o default de 15 min) ----
