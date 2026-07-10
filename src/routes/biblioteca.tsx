@@ -51,7 +51,6 @@ import { GridSkeleton } from "@/components/layout/grid-skeleton";
 import {
   extractImageMeta,
   extractVideoMeta,
-  formatBytes,
   formatDuration,
   slugifyFilename,
   validateFile,
