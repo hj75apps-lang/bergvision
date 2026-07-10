@@ -138,12 +138,12 @@ Deno.serve(async (req) => {
   const { data: session, error: insertErr } = await admin
     .from("preview_sessions")
     .insert({
-      id_da_organizacao: profile.organization_id,
-      escopo: scope,
-      id_alvo: targetId,
-      criado_por: userId,
+      organization_id: profile.organization_id,
+      scope,
+      target_id: targetId,
+      created_by: userId,
     })
-    .select("token, expira_em")
+    .select("token, expires_at")
     .single();
 
   if (insertErr || !session)
@@ -152,5 +152,5 @@ Deno.serve(async (req) => {
       500,
     );
 
-  return json({ token: (session as any).token, expires_at: (session as any).expira_em });
+  return json({ token: (session as any).token, expires_at: (session as any).expires_at });
 });
