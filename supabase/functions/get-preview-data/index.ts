@@ -263,21 +263,21 @@ Deno.serve(async (req) => {
 
   const { data: session, error: sErr } = await admin
     .from("preview_sessions")
-    .select("token, id_da_organizacao, escopo, id_alvo, expira_em, criado_por")
+    .select("token, organization_id, scope, target_id, expires_at, created_by")
     .eq("token", token)
     .maybeSingle();
 
   if (sErr) return json({ error: "session_lookup_failed" }, 500);
   if (!session) return json({ error: "not_found" }, 404);
 
-  const expiresAt = new Date((session as any).expira_em);
+  const expiresAt = new Date((session as any).expires_at);
   if (!isFinite(expiresAt.getTime()) || expiresAt.getTime() < Date.now())
     return json({ error: "preview_expired" }, 410);
 
   try {
-    const scope = (session as any).escopo as string;
-    const targetId = (session as any).id_alvo as string;
-    const expiresIso = (session as any).expira_em as string;
+    const scope = (session as any).scope as string;
+    const targetId = (session as any).target_id as string;
+    const expiresIso = (session as any).expires_at as string;
 
     if (scope === "template") {
       const payload = await loadTemplate(targetId);
