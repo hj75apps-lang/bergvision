@@ -79,17 +79,30 @@ function StudioPage() {
   const templatesQ = useQuery({
     queryKey: ["studio_templates", orgId],
     enabled: !!orgId,
-    queryFn: async (): Promise<CanvasTemplate[]> => {
-      const { data, error } = await supabase
+      queryFn: async (): Promise<CanvasTemplate[]> => {
+      let query = supabase
         .from("templates")
         .select(
-          "id, name, orientation, canvas_width, canvas_height, background_color, thumbnail_url",
+          "id, name, orientation, canvas_width, canvas_height, background_color, thumbnail_url, type",
         )
-        .eq("type", "canvas")
         .eq("organization_id", orgId!)
         .order("created_at", { ascending: false });
+      let { data, error } = await query;
+      if (error && /column .*type/i.test(error.message)) {
+        // Coluna 'type' ainda não existe no schema — lista todos os templates da org.
+        const retry = await supabase
+          .from("templates")
+          .select(
+            "id, name, orientation, canvas_width, canvas_height, background_color, thumbnail_url",
+          )
+          .eq("organization_id", orgId!)
+          .order("created_at", { ascending: false });
+        if (retry.error) throw retry.error;
+        return (retry.data ?? []) as CanvasTemplate[];
+      }
       if (error) throw error;
-      return (data ?? []) as CanvasTemplate[];
+      const rows = (data ?? []) as (CanvasTemplate & { type?: string | null })[];
+      return rows.filter((r) => !r.type || r.type === "canvas");
     },
   });
 
@@ -116,6 +129,7 @@ function StudioPage() {
 
       // Retry stripping optional columns that may not exist in this schema.
       const optionalKeys = [
+        "type",
         "aspect_ratio",
         "scaling_mode",
         "zone_count",
@@ -230,12 +244,7 @@ function StudioPage() {
                 Crie seu primeiro template personalizado para começar.
               </p>
             </div>
-            {canManage ? (
-              <Button onClick={() => setCreating(true)} className="rounded-xl">
-                <Plus className="mr-2 h-4 w-4" />
-                Criar novo template
-              </Button>
-            ) : (
+            {!canManage && (
               <div className="mt-2 max-w-md rounded-xl border border-amber-500/30 bg-amber-500/5 px-4 py-3 text-xs text-amber-200">
                 Seu papel atual é <strong>{role}</strong>. Apenas{" "}
                 <strong>owner</strong> ou <strong>admin</strong> podem criar
