@@ -37,11 +37,14 @@ type AuthContextValue = {
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
-async function loadMembership(userId: string): Promise<Membership | null> {
+async function loadMembership(
+  userId: string,
+  userEmail?: string | null,
+): Promise<Membership | null> {
   const { data, error } = await supabase
     .from("users")
     .select(
-      "id, organization_id, role, full_name, email, organization:organizations(id, name, slug)",
+      "id, organization_id, role, full_name, organization:organizations(id, name, slug)",
     )
     .eq("id", userId)
     .maybeSingle();
@@ -53,7 +56,11 @@ async function loadMembership(userId: string): Promise<Membership | null> {
   const org = Array.isArray((data as any).organization)
     ? (data as any).organization[0]
     : (data as any).organization;
-  return { ...(data as any), organization: org ?? null } as Membership;
+  return {
+    ...(data as any),
+    email: userEmail ?? null,
+    organization: org ?? null,
+  } as Membership;
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -65,7 +72,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { data } = await supabase.auth.getSession();
     setSession(data.session);
     if (data.session?.user) {
-      setMembership(await loadMembership(data.session.user.id));
+      setMembership(
+        await loadMembership(data.session.user.id, data.session.user.email),
+      );
     } else {
       setMembership(null);
     }
@@ -80,7 +89,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (s?.user) {
         // Defer to avoid deadlock inside the callback.
         setTimeout(() => {
-          loadMembership(s.user.id).then((m) => {
+          loadMembership(s.user.id, s.user.email).then((m) => {
             if (mounted) setMembership(m);
           });
         }, 0);
@@ -93,7 +102,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!mounted) return;
       setSession(data.session);
       if (data.session?.user) {
-        setMembership(await loadMembership(data.session.user.id));
+        setMembership(
+          await loadMembership(data.session.user.id, data.session.user.email),
+        );
       }
       setLoading(false);
     });

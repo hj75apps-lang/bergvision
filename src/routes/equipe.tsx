@@ -59,7 +59,6 @@ const ROLES: { value: AppRole; label: string; desc: string }[] = [
 
 type Member = {
   id: string;
-  email: string | null;
   full_name: string | null;
   role: AppRole;
   created_at?: string;
@@ -89,7 +88,7 @@ function EquipePage() {
     queryFn: async (): Promise<Member[]> => {
       const { data, error } = await supabase
         .from("users")
-        .select("id, email, full_name, role, created_at")
+        .select("id, full_name, role, created_at")
         .eq("organization_id", orgId!)
         .order("created_at", { ascending: true });
       if (error) throw error;
@@ -177,6 +176,7 @@ function EquipePage() {
                 <MemberRow
                   key={m.id}
                   member={m}
+                  sessionEmail={m.id === user?.id ? user?.email ?? null : null}
                   isMe={m.id === user?.id}
                   ownerCount={ownerCount}
                   canManage={canManage}
@@ -320,6 +320,7 @@ function InviteCard({ orgId, onCreated }: { orgId: string; onCreated: () => void
 
 function MemberRow({
   member,
+  sessionEmail,
   isMe,
   ownerCount,
   canManage,
@@ -327,6 +328,7 @@ function MemberRow({
   onChanged,
 }: {
   member: Member;
+  sessionEmail: string | null;
   isMe: boolean;
   ownerCount: number;
   canManage: boolean;
@@ -367,7 +369,7 @@ function MemberRow({
   });
 
   const initials =
-    (member.full_name || member.email || "?")
+    (member.full_name || sessionEmail || "?")
       .split(/\s+/)
       .map((w) => w[0])
       .filter(Boolean)
@@ -388,7 +390,7 @@ function MemberRow({
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
           <span className="truncate text-sm font-medium">
-            {member.full_name || member.email}
+            {member.full_name || sessionEmail || "Usuário"}
           </span>
           {isMe && (
             <Badge variant="secondary" className="rounded-full text-[10px]">
@@ -396,7 +398,9 @@ function MemberRow({
             </Badge>
           )}
         </div>
-        <p className="truncate text-xs text-muted-foreground">{member.email}</p>
+        <p className="truncate text-xs text-muted-foreground">
+          {sessionEmail || member.id}
+        </p>
       </div>
 
       {canEditRole ? (
@@ -443,7 +447,7 @@ function MemberRow({
             <AlertDialogHeader>
               <AlertDialogTitle>Remover membro?</AlertDialogTitle>
               <AlertDialogDescription>
-                {member.full_name || member.email} perderá acesso à organização.
+                {member.full_name || sessionEmail || "Este usuário"} perderá acesso à organização.
                 Esta ação não pode ser desfeita.
               </AlertDialogDescription>
             </AlertDialogHeader>
