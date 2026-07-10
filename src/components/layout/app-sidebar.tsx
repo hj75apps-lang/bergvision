@@ -1,4 +1,5 @@
 import { Link, useRouterState } from "@tanstack/react-router";
+import { Logo } from "@/components/brand/logo";
 import {
   LayoutDashboard,
   MonitorPlay,
