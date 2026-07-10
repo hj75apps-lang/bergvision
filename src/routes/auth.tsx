@@ -56,7 +56,6 @@ async function ensureBootstrap(userId: string, email: string, fullName: string, 
     id: userId,
     organization_id: org.id,
     role: "owner",
-    email,
     full_name: fullName || null,
   });
   if (userErr) throw userErr;

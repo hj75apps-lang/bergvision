@@ -93,7 +93,6 @@ function InvitePage() {
         id: userId,
         organization_id: invite.organization_id,
         role: invite.role,
-        email: invite.email,
         full_name: fullName || null,
       });
       if (userErr) throw userErr;
