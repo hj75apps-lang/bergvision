@@ -91,12 +91,12 @@ export async function extractImageMeta(
   const url = URL.createObjectURL(file);
   try {
     const img = new Image();
-    await new Promise<void>((resolve, reject) => {
+    await new Promise<void>((resolve) => {
       img.onload = () => resolve();
-      img.onerror = () => reject(new Error("Não foi possível ler a imagem."));
+      img.onerror = () => resolve();
       img.src = url;
     });
-    return { width: img.naturalWidth, height: img.naturalHeight };
+    return { width: img.naturalWidth || 0, height: img.naturalHeight || 0 };
   } finally {
     URL.revokeObjectURL(url);
   }
@@ -117,14 +117,15 @@ export async function extractVideoMeta(file: File): Promise<{
     video.crossOrigin = "anonymous";
     video.src = url;
 
-    await new Promise<void>((resolve, reject) => {
+    await new Promise<void>((resolve) => {
       video.onloadedmetadata = () => resolve();
-      video.onerror = () => reject(new Error("Não foi possível ler o vídeo."));
+      video.onerror = () => resolve();
+      setTimeout(() => resolve(), 3000);
     });
 
-    const width = video.videoWidth;
-    const height = video.videoHeight;
-    const duration = video.duration;
+    const width = video.videoWidth || 0;
+    const height = video.videoHeight || 0;
+    const duration = isFinite(video.duration) ? video.duration : 0;
 
     // Seek para 0.1s para capturar o primeiro frame renderizado
     await new Promise<void>((resolve) => {
