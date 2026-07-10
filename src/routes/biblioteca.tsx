@@ -154,7 +154,9 @@ async function fetchMediaFiles(orgId: string): Promise<MediaFile[]> {
     }
 
     const { data, error } = await query;
-    if (!error) return (data ?? []).map((row) => normalizeMediaFile(row));
+    if (!error) {
+      return (data ?? []).map((row) => normalizeMediaFile(row as Partial<MediaFile>));
+    }
 
     const missing = getMissingSchemaColumn(error);
     if (missing && columns.includes(missing)) {
@@ -647,20 +649,27 @@ function Uploader({ orgId, onUploaded }: { orgId: string; onUploaded: () => void
       }
       setProgress(85);
 
-      await insertMediaFileWithSchemaFallback({
-        organization_id: orgId,
-        name: file.name,
-        folder: folder.trim() || null,
-        type: kind,
-        mime_type: file.type,
-        size: file.size,
-        width,
-        height,
-        duration,
-        storage_path: storagePath,
-        thumbnail_path: thumbnailPath,
-        uploaded_by: user?.id ?? null,
-      });
+      try {
+        await insertMediaFileWithSchemaFallback({
+          organization_id: orgId,
+          name: file.name,
+          folder: folder.trim() || null,
+          type: kind,
+          mime_type: file.type,
+          size: file.size,
+          width,
+          height,
+          duration,
+          storage_path: storagePath,
+          thumbnail_path: thumbnailPath,
+          uploaded_by: user?.id ?? null,
+        });
+      } catch (insErr) {
+        await supabase.storage
+          .from(BUCKET)
+          .remove([storagePath, thumbnailPath].filter((p): p is string => !!p));
+        throw insErr;
+      }
 
       setProgress(100);
       toast.success(`${file.name} enviado.`);
