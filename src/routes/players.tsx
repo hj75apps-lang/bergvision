@@ -1,14 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import {
-  Loader2,
-  MonitorPlay,
-  Play,
-  Plus,
-  RadioTower,
-  Trash2,
-} from "lucide-react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { ChevronRight, Loader2, MonitorPlay, Plus } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -16,19 +9,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectLabel,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
   Card,
   CardContent,
   CardDescription,
-  CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
@@ -41,17 +24,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
-import {
   InputOTP,
   InputOTPGroup,
   InputOTPSlot,
@@ -60,7 +32,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { GridSkeleton } from "@/components/layout/grid-skeleton";
-import { PreviewPanel } from "@/components/preview/preview-panel";
+import { PlayerDetailSheet } from "@/components/players/player-detail-sheet";
 
 export const Route = createFileRoute("/players")({
   head: () => ({
@@ -278,333 +250,84 @@ function PlayerCard({
   onChanged: () => void;
 }) {
   const online = isOnline(player, nowMs);
-  const [identifying, setIdentifying] = useState(false);
-  const [savingTpl, setSavingTpl] = useState(false);
-  const [previewOpen, setPreviewOpen] = useState(false);
-
-  const changeTemplate = async (tplId: string) => {
-    setSavingTpl(true);
-    try {
-      // Descobre o tipo do template alvo para escolher o payload correto.
-      const tpl = templates.find((t) => t.id === tplId);
-      const tplType = tpl?.type ?? "grid";
-
-      const { error } = await supabase
-        .from("players")
-        .update({ current_template_id: tplId })
-        .eq("id", player.id);
-      if (error) throw error;
-
-      // Prepara payload conforme o tipo do template.
-      let payload: Record<string, unknown>;
-      if (tplType === "canvas") {
-        const [{ data: tData, error: tErr }, { data: els, error: eErr }] =
-          await Promise.all([
-            supabase
-              .from("templates")
-              .select(
-                "id, canvas_width, canvas_height, background_color, background_media_id, scaling_mode, orientation",
-              )
-              .eq("id", tplId)
-              .single(),
-            supabase
-              .from("template_elements")
-              .select(
-                "id, element_type, x, y, width, height, rotation, z_index, opacity, locked, visible, content",
-              )
-              .eq("template_id", tplId)
-              .order("z_index"),
-          ]);
-        if (tErr) throw tErr;
-        if (eErr) throw eErr;
-        payload = {
-          event: "config_updated",
-          template_id: tplId,
-          template_type: "canvas",
-          template: tData,
-          elements: els ?? [],
-          updated_at: new Date().toISOString(),
-          updated_by: null,
-        };
-      } else {
-        const { data: zones, error: zErr } = await supabase
-          .from("template_zones")
-          .select(
-            "id, zone_name, pos_x, pos_y, width_pct, height_pct, z_index, content_type, media_file_id, playlist_id, widget_type, widget_config",
-          )
-          .eq("template_id", tplId)
-          .order("zone_index");
-        if (zErr) throw zErr;
-        payload = {
-          event: "config_updated",
-          template_id: tplId,
-          template_type: "grid",
-          zones: (zones ?? []).map((z: any) => ({
-            zone_id: z.id,
-            zone_name: z.zone_name,
-            pos_x: z.pos_x,
-            pos_y: z.pos_y,
-            width_pct: z.width_pct,
-            height_pct: z.height_pct,
-            z_index: z.z_index,
-            content_type: z.content_type,
-            media_file_id: z.media_file_id,
-            playlist_id: z.playlist_id,
-            widget_type: z.widget_type,
-            widget_config: z.widget_config,
-          })),
-          updated_at: new Date().toISOString(),
-          updated_by: null,
-        };
-      }
-
-      const channel = supabase.channel(`player:${player.id}`);
-      await new Promise<void>((resolve, reject) => {
-        const timer = setTimeout(() => reject(new Error("timeout")), 5000);
-        channel.subscribe((status) => {
-          if (status === "SUBSCRIBED") {
-            clearTimeout(timer);
-            resolve();
-          } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
-            clearTimeout(timer);
-            reject(new Error(status));
-          }
-        });
-      });
-      await channel.send({
-        type: "broadcast",
-        event: "config_updated",
-        payload,
-      });
-      supabase.removeChannel(channel);
-
-      toast.success("Template atualizado.");
-      onChanged();
-    } catch (err: any) {
-      toast.error(err?.message || "Falha ao atualizar template.");
-    } finally {
-      setSavingTpl(false);
-    }
-  };
-
-  const identify = async () => {
-    setIdentifying(true);
-    try {
-      const channel = supabase.channel(`player:${player.id}`);
-      await new Promise<void>((resolve, reject) => {
-        const timer = setTimeout(() => reject(new Error("timeout")), 5000);
-        channel.subscribe((status) => {
-          if (status === "SUBSCRIBED") {
-            clearTimeout(timer);
-            resolve();
-          } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
-            clearTimeout(timer);
-            reject(new Error(status));
-          }
-        });
-      });
-      const res = await channel.send({
-        type: "broadcast",
-        event: "command",
-        payload: { action: "identify" },
-      });
-      supabase.removeChannel(channel);
-      if (res !== "ok") throw new Error(String(res));
-      toast.success(`Sinal enviado para ${player.name}`);
-    } catch (err: any) {
-      toast.error("Falha ao identificar: " + (err?.message || err));
-    } finally {
-      setIdentifying(false);
-    }
-  };
-
-  const remove = useMutation({
-    mutationFn: async () => {
-      const { error } = await supabase.from("players").delete().eq("id", player.id);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      toast.success("Player removido.");
-      onChanged();
-    },
-    onError: (err: any) => toast.error(err?.message || "Falha ao remover."),
-  });
+  const [detailOpen, setDetailOpen] = useState(false);
+  const currentTpl = templates.find((t) => t.id === player.current_template_id);
+  const lastLabel = formatRelative(player.last_heartbeat);
 
   return (
-    <Card className="group relative overflow-hidden rounded-2xl border-border/60 bg-card/60 backdrop-blur-xl transition-colors hover:border-border">
-      <CardHeader className="pb-3">
-        <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0">
-            <CardTitle className="truncate text-base">{player.name}</CardTitle>
-            <CardDescription className="mt-1 flex items-center gap-1.5">
-              <span
-                className={`inline-block h-2 w-2 rounded-full ${
-                  online
-                    ? "bg-emerald-500 shadow-[0_0_8px] shadow-emerald-500/60"
-                    : "bg-red-500"
-                }`}
-              />
-              {online ? "Online" : "Offline"} · {formatRelative(player.last_heartbeat)}
-            </CardDescription>
+    <>
+      <Card
+        role="button"
+        tabIndex={0}
+        onClick={() => setDetailOpen(true)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            setDetailOpen(true);
+          }
+        }}
+        className="group relative cursor-pointer overflow-hidden rounded-2xl border-border/60 bg-card/60 backdrop-blur-xl transition-all hover:border-border hover:bg-card/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      >
+        <CardHeader className="pb-3">
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0">
+              <CardTitle className="truncate text-base">{player.name}</CardTitle>
+              <CardDescription className="mt-1 flex items-center gap-1.5">
+                <span
+                  className={`inline-block h-2 w-2 rounded-full ${
+                    online
+                      ? "bg-emerald-500 shadow-[0_0_8px] shadow-emerald-500/60"
+                      : "bg-red-500"
+                  }`}
+                />
+                {online ? "Online" : "Offline"} · {lastLabel}
+              </CardDescription>
+            </div>
+            <Badge
+              variant="secondary"
+              className={`rounded-full text-[10px] ${
+                online
+                  ? "bg-emerald-500/15 text-emerald-500 hover:bg-emerald-500/15"
+                  : "bg-red-500/15 text-red-500 hover:bg-red-500/15"
+              }`}
+            >
+              {online ? "ONLINE" : "OFFLINE"}
+            </Badge>
           </div>
-          <Badge
-            variant="secondary"
-            className={`rounded-full text-[10px] ${
-              online
-                ? "bg-emerald-500/15 text-emerald-500 hover:bg-emerald-500/15"
-                : "bg-red-500/15 text-red-500 hover:bg-red-500/15"
-            }`}
-          >
-            {online ? "ONLINE" : "OFFLINE"}
-          </Badge>
-        </div>
-      </CardHeader>
-      <CardContent className="grid grid-cols-2 gap-3 pb-4 text-xs">
-        <div>
-          <div className="text-muted-foreground">Resolução</div>
-          <div className="mt-0.5 font-medium">{player.resolution || "—"}</div>
-        </div>
-        <div>
-          <div className="text-muted-foreground">Orientação</div>
-          <div className="mt-0.5 font-medium">
-            {formatOrientation(player.orientation)}
+        </CardHeader>
+        <CardContent className="grid grid-cols-2 gap-3 pb-5 text-xs">
+          <div>
+            <div className="text-muted-foreground">Resolução</div>
+            <div className="mt-0.5 font-medium">{player.resolution || "—"}</div>
           </div>
-        </div>
-        <div className="col-span-2 space-y-1.5">
-          <div className="text-muted-foreground">Template ativo</div>
-          <Select
-            value={player.current_template_id ?? ""}
-            onValueChange={changeTemplate}
-            disabled={!canManage || savingTpl}
-          >
-            <SelectTrigger className="h-9 rounded-xl text-xs">
-              <SelectValue placeholder="Selecione um template" />
-            </SelectTrigger>
-            <SelectContent>
-              {(() => {
-                const system = templates.filter((t) => t.is_system);
-                const custom = templates.filter((t) => !t.is_system);
-                return (
-                  <>
-                    {system.length > 0 && (
-                      <SelectGroup>
-                        <SelectLabel className="text-[10px] uppercase tracking-wider text-muted-foreground">
-                          Sistema
-                        </SelectLabel>
-                        {system.map((t) => (
-                          <SelectItem key={t.id} value={t.id}>
-                            <span className="flex items-center gap-2">
-                              <span>{t.name}</span>
-                              <Badge
-                                variant="secondary"
-                                className="rounded-full bg-primary/15 px-1.5 py-0 text-[9px] font-medium text-primary"
-                              >
-                                Sistema
-                              </Badge>
-                            </span>
-                          </SelectItem>
-                        ))}
-                      </SelectGroup>
-                    )}
-                    {custom.length > 0 && (
-                      <SelectGroup>
-                        <SelectLabel className="text-[10px] uppercase tracking-wider text-muted-foreground">
-                          Personalizado (Studio)
-                        </SelectLabel>
-                        {custom.map((t) => (
-                          <SelectItem key={t.id} value={t.id}>
-                            <span className="flex items-center gap-2">
-                              <span>{t.name}</span>
-                              <Badge
-                                variant="secondary"
-                                className="rounded-full bg-emerald-500/15 px-1.5 py-0 text-[9px] font-medium text-emerald-500"
-                              >
-                                Personalizado
-                              </Badge>
-                            </span>
-                          </SelectItem>
-                        ))}
-                      </SelectGroup>
-                    )}
-                  </>
-                );
-              })()}
-            </SelectContent>
-          </Select>
-        </div>
-      </CardContent>
-      <CardFooter className="flex justify-between gap-2 pt-0">
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={identify}
-            disabled={identifying}
-            className="h-9 rounded-xl"
-          >
-            {identifying ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              <RadioTower className="mr-2 h-4 w-4" />
-            )}
-            Identificar
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setPreviewOpen(true)}
-            disabled={!player.current_template_id}
-            className="h-9 rounded-xl"
-            title={
-              player.current_template_id
-                ? "Ver o que este player está exibindo agora"
-                : "Sem template ativo"
-            }
-          >
-            <Play className="mr-2 h-4 w-4" />
-            Visualização atual
-          </Button>
-        </div>
-        {canManage && (
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-9 w-9 rounded-xl text-muted-foreground hover:text-destructive"
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Remover player?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  {player.name} será desvinculado da sua organização. Você pode
-                  parear novamente a qualquer momento.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                <AlertDialogAction
-                  onClick={() => remove.mutate()}
-                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                >
-                  Remover
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-        )}
-      </CardFooter>
-      <PreviewPanel
-        mode="modal"
-        scope="player"
-        targetId={player.id}
-        open={previewOpen}
-        onOpenChange={setPreviewOpen}
+          <div>
+            <div className="text-muted-foreground">Orientação</div>
+            <div className="mt-0.5 font-medium">
+              {formatOrientation(player.orientation)}
+            </div>
+          </div>
+          <div className="col-span-2 flex items-center justify-between gap-2 border-t border-border/40 pt-3">
+            <div className="min-w-0">
+              <div className="text-muted-foreground">Template ativo</div>
+              <div className="mt-0.5 truncate font-medium">
+                {currentTpl?.name ?? "—"}
+              </div>
+            </div>
+            <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
+          </div>
+        </CardContent>
+      </Card>
+      <PlayerDetailSheet
+        open={detailOpen}
+        onOpenChange={setDetailOpen}
+        player={player}
+        online={online}
+        lastHeartbeatLabel={lastLabel}
+        templates={templates}
+        canManage={canManage}
+        onChanged={onChanged}
       />
-    </Card>
+    </>
   );
 }
 
