@@ -64,7 +64,7 @@ export function AppSidebar() {
             <Logo className="h-12 w-12" alt="Berg Vision" />
           ) : (
             <Logo
-              className="ml-3 h-28 w-auto max-w-none object-contain object-left"
+              className="ml-3 h-[168px] w-auto max-w-none object-contain object-left"
               alt="Berg Vision"
             />
           )}
