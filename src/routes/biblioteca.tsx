@@ -177,7 +177,6 @@ async function insertMediaFileWithSchemaFallback(payload: Record<string, unknown
   const optionalColumns = new Set([
     "mime_type",
     "size",
-    "file_size",
     "width",
     "height",
     "duration",
@@ -191,6 +190,11 @@ async function insertMediaFileWithSchemaFallback(payload: Record<string, unknown
     if (!error) return;
 
     const missing = getMissingSchemaColumn(error);
+    if (missing === "file_size") {
+      throw new Error(
+        "O Supabase ainda não reconheceu a coluna obrigatória file_size no cache do schema. Rode notify pgrst, 'reload schema'; no SQL Editor e tente novamente.",
+      );
+    }
     if (missing && optionalColumns.has(missing) && missing in body) {
       delete body[missing];
       continue;
