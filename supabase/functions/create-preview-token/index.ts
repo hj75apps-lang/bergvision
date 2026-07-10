@@ -18,7 +18,9 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
+// Supabase bloqueia secrets com prefixo SUPABASE_; usamos ANON_KEY,
+// com fallback para SUPABASE_ANON_KEY caso já esteja cadastrado.
+const ANON_KEY = Deno.env.get("ANON_KEY") ?? Deno.env.get("SUPABASE_ANON_KEY")!;
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
