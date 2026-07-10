@@ -98,27 +98,65 @@ function StudioPage() {
       if (!orgId) throw new Error("Organização ausente.");
       const width = input.orientation === "landscape" ? 1920 : 1080;
       const height = input.orientation === "landscape" ? 1080 : 1920;
-      const { data, error } = await supabase
-        .from("templates")
-        .insert({
-          name: input.name.trim(),
-          slug: `${slugify(input.name)}-${Math.random().toString(36).slice(2, 6)}`,
-          type: "canvas",
-          orientation: input.orientation,
-          canvas_width: width,
-          canvas_height: height,
-          aspect_ratio: input.orientation === "landscape" ? "16:9" : "9:16",
-          background_color: "#0F172A",
-          scaling_mode: "fit",
-          is_system: false,
-          organization_id: orgId,
-          created_by: user?.id ?? null,
-          zone_count: 0,
-        })
-        .select("id")
-        .single();
-      if (error) throw error;
-      return data.id as string;
+      const basePayload: Record<string, unknown> = {
+        name: input.name.trim(),
+        slug: `${slugify(input.name)}-${Math.random().toString(36).slice(2, 6)}`,
+        type: "canvas",
+        orientation: input.orientation,
+        canvas_width: width,
+        canvas_height: height,
+        aspect_ratio: input.orientation === "landscape" ? "16:9" : "9:16",
+        background_color: "#0F172A",
+        scaling_mode: "fit",
+        is_system: false,
+        organization_id: orgId,
+        created_by: user?.id ?? null,
+        zone_count: 0,
+      };
+
+      // Retry stripping optional columns that may not exist in this schema.
+      const optionalKeys = [
+        "aspect_ratio",
+        "scaling_mode",
+        "zone_count",
+        "background_color",
+        "canvas_width",
+        "canvas_height",
+      ];
+      let payload = { ...basePayload };
+      let lastError: { message: string; details?: string; hint?: string; code?: string } | null = null;
+      for (let attempt = 0; attempt <= optionalKeys.length; attempt++) {
+        const { data, error } = await supabase
+          .from("templates")
+          .insert(payload as never)
+          .select("id")
+          .single();
+        if (!error) return (data as { id: string }).id;
+        lastError = {
+          message: error.message,
+          details: error.details ?? undefined,
+          hint: error.hint ?? undefined,
+          code: error.code ?? undefined,
+        };
+        // If the error is about a missing column, strip it and retry.
+        const msg = `${error.message} ${error.details ?? ""}`.toLowerCase();
+        const missingCol = optionalKeys.find(
+          (k) => msg.includes(`"${k}"`) || msg.includes(` ${k} `) || msg.includes(`'${k}'`),
+        );
+        if (missingCol && missingCol in payload) {
+          const next = { ...payload };
+          delete (next as Record<string, unknown>)[missingCol];
+          payload = next;
+          continue;
+        }
+        break;
+      }
+      const err = new Error(
+        [lastError?.message, lastError?.details, lastError?.hint, lastError?.code]
+          .filter(Boolean)
+          .join(" · ") || "Falha desconhecida ao criar template",
+      );
+      throw err;
     },
     onSuccess: (id) => {
       qc.invalidateQueries({ queryKey: ["studio_templates"] });
@@ -127,7 +165,10 @@ function StudioPage() {
       navigate({ to: "/studio/$templateId", params: { templateId: id } });
     },
     onError: (e: unknown) => {
-      toast.error(e instanceof Error ? e.message : "Falha ao criar template.");
+      const msg = e instanceof Error ? e.message : "Falha ao criar template.";
+      // eslint-disable-next-line no-console
+      console.error("[studio] createTemplate error:", e);
+      toast.error(msg, { duration: 8000 });
     },
   });
 
@@ -363,7 +404,8 @@ function CreateDialog({
             >
               <label
                 htmlFor="orient-landscape"
-                className="flex cursor-pointer flex-col items-center gap-2 rounded-xl border border-border/60 p-3 transition hover:border-primary/40 has-[input:checked]:border-primary has-[input:checked]:bg-primary/5"
+                data-selected={orientation === "landscape"}
+                className="flex cursor-pointer flex-col items-center gap-2 rounded-xl border border-border/60 p-3 transition hover:border-primary/40 data-[selected=true]:border-primary data-[selected=true]:bg-primary/5"
               >
                 <RadioGroupItem
                   id="orient-landscape"
@@ -378,7 +420,8 @@ function CreateDialog({
               </label>
               <label
                 htmlFor="orient-portrait"
-                className="flex cursor-pointer flex-col items-center gap-2 rounded-xl border border-border/60 p-3 transition hover:border-primary/40 has-[input:checked]:border-primary has-[input:checked]:bg-primary/5"
+                data-selected={orientation === "portrait"}
+                className="flex cursor-pointer flex-col items-center gap-2 rounded-xl border border-border/60 p-3 transition hover:border-primary/40 data-[selected=true]:border-primary data-[selected=true]:bg-primary/5"
               >
                 <RadioGroupItem
                   id="orient-portrait"
