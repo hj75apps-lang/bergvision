@@ -240,6 +240,8 @@ function LogoSection({
         folder: LOGO_FOLDER,
         type: "image",
         mime_type: file.type,
+        size: file.size,
+        file_size: file.size,
         storage_path: path,
       });
       if (dbErr) {

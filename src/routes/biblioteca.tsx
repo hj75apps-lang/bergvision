@@ -83,6 +83,7 @@ type MediaFile = {
   type: MediaKind | string;
   mime_type: string | null;
   size: number | null;
+  file_size: number | null;
   width: number | null;
   height: number | null;
   duration: number | null;
@@ -99,6 +100,7 @@ const MEDIA_FILE_COLUMNS = [
   "type",
   "mime_type",
   "size",
+  "file_size",
   "width",
   "height",
   "duration",
@@ -130,7 +132,8 @@ function normalizeMediaFile(row: Partial<MediaFile>): MediaFile {
     folder: row.folder ?? null,
     type: row.type ?? "image",
     mime_type: row.mime_type ?? null,
-    size: row.size ?? null,
+    size: row.size ?? row.file_size ?? null,
+    file_size: row.file_size ?? row.size ?? null,
     width: row.width ?? null,
     height: row.height ?? null,
     duration: row.duration ?? null,
@@ -174,6 +177,7 @@ async function insertMediaFileWithSchemaFallback(payload: Record<string, unknown
   const optionalColumns = new Set([
     "mime_type",
     "size",
+    "file_size",
     "width",
     "height",
     "duration",
@@ -657,6 +661,7 @@ function Uploader({ orgId, onUploaded }: { orgId: string; onUploaded: () => void
           type: kind,
           mime_type: file.type,
           size: file.size,
+          file_size: file.size,
           width,
           height,
           duration,
