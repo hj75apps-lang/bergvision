@@ -58,12 +58,15 @@ export function AppSidebar() {
       collapsible="icon"
       className="border-r border-sidebar-border/60 bg-sidebar/70 backdrop-blur-2xl supports-[backdrop-filter]:bg-sidebar/50"
     >
-      <SidebarHeader className="px-2 pt-3 pb-2">
-        <Link to="/" className="flex items-center justify-center px-1">
+      <SidebarHeader className="px-2 pt-2 pb-1">
+        <Link to="/" className="flex items-center justify-start">
           {collapsed ? (
-            <Logo className="h-10 w-10" alt="Berg Vision" />
+            <Logo className="h-12 w-12" alt="Berg Vision" />
           ) : (
-            <Logo className="h-20 w-full max-w-[220px]" alt="Berg Vision" />
+            <Logo
+              className="-ml-3 h-36 w-auto max-w-none object-contain object-left"
+              alt="Berg Vision"
+            />
           )}
         </Link>
       </SidebarHeader>
