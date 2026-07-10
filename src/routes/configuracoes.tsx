@@ -38,6 +38,7 @@ const LOGO_NAME = "organization-logo";
 type LogoRow = {
   id: string;
   storage_path: string;
+  thumbnail_path: string | null;
   mime_type: string | null;
 };
 
