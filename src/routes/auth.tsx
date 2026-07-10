@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth, slugify } from "@/hooks/use-auth";
+import { Logo } from "@/components/brand/logo";
 
 export const Route = createFileRoute("/auth")({
   head: () => ({
