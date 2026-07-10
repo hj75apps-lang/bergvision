@@ -22,7 +22,6 @@ import {
   ImageIcon,
   ListMusic,
   Loader2,
-  Play,
   Plus,
   Trash2,
   Video,
