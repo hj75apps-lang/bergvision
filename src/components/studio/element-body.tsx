@@ -2,8 +2,6 @@ import { Loader2 } from "lucide-react";
 import { useSignedUrl } from "@/lib/studio/use-signed-url";
 import { ELEMENT_LABELS, type TemplateElement } from "@/lib/studio/types";
 import { useEffect, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
 
 export function ElementBody({ el }: { el: TemplateElement }) {
   const c = (el.content ?? {}) as Record<string, unknown>;
