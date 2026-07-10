@@ -19,6 +19,7 @@ import { Route as ConfiguracoesRouteImport } from './routes/configuracoes'
 import { Route as BibliotecaRouteImport } from './routes/biblioteca'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as StudioIndexRouteImport } from './routes/studio.index'
 import { Route as StudioTemplateIdRouteImport } from './routes/studio.$templateId'
 import { Route as InviteTokenRouteImport } from './routes/invite.$token'
 
@@ -72,6 +73,11 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const StudioIndexRoute = StudioIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => StudioRoute,
+} as any)
 const StudioTemplateIdRoute = StudioTemplateIdRouteImport.update({
   id: '/$templateId',
   path: '/$templateId',
@@ -96,6 +102,7 @@ export interface FileRoutesByFullPath {
   '/templates': typeof TemplatesRoute
   '/invite/$token': typeof InviteTokenRoute
   '/studio/$templateId': typeof StudioTemplateIdRoute
+  '/studio/': typeof StudioIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -106,10 +113,10 @@ export interface FileRoutesByTo {
   '/players': typeof PlayersRoute
   '/playlists': typeof PlaylistsRoute
   '/reset-password': typeof ResetPasswordRoute
-  '/studio': typeof StudioRouteWithChildren
   '/templates': typeof TemplatesRoute
   '/invite/$token': typeof InviteTokenRoute
   '/studio/$templateId': typeof StudioTemplateIdRoute
+  '/studio': typeof StudioIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -125,6 +132,7 @@ export interface FileRoutesById {
   '/templates': typeof TemplatesRoute
   '/invite/$token': typeof InviteTokenRoute
   '/studio/$templateId': typeof StudioTemplateIdRoute
+  '/studio/': typeof StudioIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -141,6 +149,7 @@ export interface FileRouteTypes {
     | '/templates'
     | '/invite/$token'
     | '/studio/$templateId'
+    | '/studio/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -151,10 +160,10 @@ export interface FileRouteTypes {
     | '/players'
     | '/playlists'
     | '/reset-password'
-    | '/studio'
     | '/templates'
     | '/invite/$token'
     | '/studio/$templateId'
+    | '/studio'
   id:
     | '__root__'
     | '/'
@@ -169,6 +178,7 @@ export interface FileRouteTypes {
     | '/templates'
     | '/invite/$token'
     | '/studio/$templateId'
+    | '/studio/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -257,6 +267,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/studio/': {
+      id: '/studio/'
+      path: '/'
+      fullPath: '/studio/'
+      preLoaderRoute: typeof StudioIndexRouteImport
+      parentRoute: typeof StudioRoute
+    }
     '/studio/$templateId': {
       id: '/studio/$templateId'
       path: '/$templateId'
@@ -276,10 +293,12 @@ declare module '@tanstack/react-router' {
 
 interface StudioRouteChildren {
   StudioTemplateIdRoute: typeof StudioTemplateIdRoute
+  StudioIndexRoute: typeof StudioIndexRoute
 }
 
 const StudioRouteChildren: StudioRouteChildren = {
   StudioTemplateIdRoute: StudioTemplateIdRoute,
+  StudioIndexRoute: StudioIndexRoute,
 }
 
 const StudioRouteWithChildren =
