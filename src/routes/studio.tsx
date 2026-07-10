@@ -404,7 +404,8 @@ function CreateDialog({
             >
               <label
                 htmlFor="orient-landscape"
-                className="flex cursor-pointer flex-col items-center gap-2 rounded-xl border border-border/60 p-3 transition hover:border-primary/40 has-[input:checked]:border-primary has-[input:checked]:bg-primary/5"
+                data-selected={orientation === "landscape"}
+                className="flex cursor-pointer flex-col items-center gap-2 rounded-xl border border-border/60 p-3 transition hover:border-primary/40 data-[selected=true]:border-primary data-[selected=true]:bg-primary/5"
               >
                 <RadioGroupItem
                   id="orient-landscape"
@@ -419,7 +420,8 @@ function CreateDialog({
               </label>
               <label
                 htmlFor="orient-portrait"
-                className="flex cursor-pointer flex-col items-center gap-2 rounded-xl border border-border/60 p-3 transition hover:border-primary/40 has-[input:checked]:border-primary has-[input:checked]:bg-primary/5"
+                data-selected={orientation === "portrait"}
+                className="flex cursor-pointer flex-col items-center gap-2 rounded-xl border border-border/60 p-3 transition hover:border-primary/40 data-[selected=true]:border-primary data-[selected=true]:bg-primary/5"
               >
                 <RadioGroupItem
                   id="orient-portrait"
