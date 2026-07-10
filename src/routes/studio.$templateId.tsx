@@ -680,6 +680,11 @@ function EditorPage() {
           aspect_ratio:
             template.canvas_width >= template.canvas_height ? "16:9" : "9:16",
           background_color: template.background_color ?? "#0F172A",
+          layout_css: JSON.stringify({
+            kind: "canvas",
+            version: 1,
+            elements: [],
+          }),
           background_media_id: template.background_media_id ?? null,
           scaling_mode: template.scaling_mode ?? "letterbox",
           is_system: false,

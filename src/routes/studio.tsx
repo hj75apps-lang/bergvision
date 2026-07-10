@@ -67,6 +67,12 @@ type CanvasTemplate = {
 
 type Orientation = "landscape" | "portrait";
 
+const DEFAULT_CANVAS_LAYOUT_CSS = JSON.stringify({
+  kind: "canvas",
+  version: 1,
+  elements: [],
+});
+
 function StudioPage() {
   const { membership, user } = useAuth();
   const orgId = membership?.organization_id ?? null;
@@ -120,6 +126,7 @@ function StudioPage() {
         canvas_height: height,
         aspect_ratio: input.orientation === "landscape" ? "16:9" : "9:16",
         background_color: "#0F172A",
+        layout_css: DEFAULT_CANVAS_LAYOUT_CSS,
         scaling_mode: "fit",
         is_system: false,
         organization_id: orgId,
