@@ -365,17 +365,22 @@ function MediaCard({
       const paths = [file.storage_path, file.thumbnail_path].filter(
         (p): p is string => !!p,
       );
-      const { error: sErr } = await supabase.storage.from(BUCKET).remove(paths);
-      if (sErr) throw new Error("Falha ao remover do Storage: " + sErr.message);
+      // 1) Remove o registro do banco (fonte da verdade + RLS decide permissão).
       const { error: dErr } = await supabase
         .from("media_files")
         .delete()
         .eq("id", file.id);
-      if (dErr) {
-        throw new Error(
-          "Arquivo removido do Storage, mas o registro no banco falhou: " +
-            dErr.message,
-        );
+      if (dErr) throw new Error("Falha ao remover do banco: " + dErr.message);
+
+      // 2) Sempre limpa os binários do Storage para não inflar o armazenamento.
+      if (paths.length) {
+        const { error: sErr } = await supabase.storage.from(BUCKET).remove(paths);
+        if (sErr) {
+          throw new Error(
+            "Registro removido, mas o arquivo permaneceu no Storage: " +
+              sErr.message,
+          );
+        }
       }
     },
     onSuccess: () => {
