@@ -264,7 +264,16 @@ function EditorPage() {
         )
         .eq("template_id", templateId)
         .order("z_index");
-      if (error) throw error;
+      if (error) {
+        // Se a tabela ainda não foi provisionada, dá mensagem clara em vez
+        // de quebrar o editor com erro genérico.
+        if (error.code === "PGRST205" || /template_elements/i.test(error.message)) {
+          throw new Error(
+            "Schema do Studio não aplicado no Supabase. Rode docs/sql/20260710_studio_canvas_schema.sql no SQL Editor.",
+          );
+        }
+        throw error;
+      }
       return (data ?? []) as TemplateElement[];
     },
   });
