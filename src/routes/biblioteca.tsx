@@ -81,7 +81,6 @@ type MediaFile = {
   folder: string | null;
   type: MediaKind | string;
   mime_type: string | null;
-  size: number | null;
   width: number | null;
   height: number | null;
   duration: number | null;
@@ -128,7 +127,7 @@ function BibliotecaPage() {
       const { data, error } = await supabase
         .from("media_files")
         .select(
-          "id, organization_id, name, folder, type, mime_type, size, width, height, duration, storage_path, thumbnail_path, created_at",
+          "id, organization_id, name, folder, type, mime_type, width, height, duration, storage_path, thumbnail_path, created_at",
         )
         .eq("organization_id", orgId!)
         .order("created_at", { ascending: false });
@@ -324,8 +323,7 @@ function MediaCard({
             {file.name}
           </p>
           <p className="text-xs text-muted-foreground">
-            {formatBytes(file.size ?? 0)}
-            {file.width && file.height ? ` · ${file.width}×${file.height}` : ""}
+            {file.width && file.height ? `${file.width}×${file.height}` : "Dimensões indisponíveis"}
             {isVideo && file.duration ? ` · ${formatDuration(file.duration)}` : ""}
           </p>
         </div>
@@ -471,9 +469,9 @@ function PreviewDialog({
           <DialogTitle className="truncate">{file?.name}</DialogTitle>
           <DialogDescription>
             {file
-              ? `${formatBytes(file.size ?? 0)}${
-                  file.width && file.height ? ` · ${file.width}×${file.height}` : ""
-                }${isVideo && file.duration ? ` · ${formatDuration(file.duration)}` : ""}`
+              ? `${file.width && file.height ? `${file.width}×${file.height}` : "Dimensões indisponíveis"}${
+                  isVideo && file.duration ? ` · ${formatDuration(file.duration)}` : ""
+                }`
               : ""}
           </DialogDescription>
         </DialogHeader>
@@ -559,7 +557,6 @@ function Uploader({ orgId, onUploaded }: { orgId: string; onUploaded: () => void
         folder: folder.trim() || null,
         type: kind,
         mime_type: file.type,
-        size: file.size,
         width,
         height,
         duration,
