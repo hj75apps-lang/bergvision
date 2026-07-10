@@ -189,11 +189,18 @@ function StudioPage() {
                 Crie seu primeiro template personalizado para começar.
               </p>
             </div>
-            {canManage && (
+            {canManage ? (
               <Button onClick={() => setCreating(true)} className="rounded-xl">
                 <Plus className="mr-2 h-4 w-4" />
                 Criar novo template
               </Button>
+            ) : (
+              <div className="mt-2 max-w-md rounded-xl border border-amber-500/30 bg-amber-500/5 px-4 py-3 text-xs text-amber-200">
+                Seu papel atual é <strong>{role}</strong>. Apenas{" "}
+                <strong>owner</strong> ou <strong>admin</strong> podem criar
+                templates no Studio. Peça a um administrador para elevar seu
+                papel em <em>Equipe</em>.
+              </div>
             )}
           </CardContent>
         </Card>
