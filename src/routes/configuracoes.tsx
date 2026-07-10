@@ -179,7 +179,7 @@ function LogoSection({
     queryFn: async (): Promise<LogoRow | null> => {
       const { data, error } = await supabase
         .from("media_files")
-        .select("id, storage_path, mime_type")
+        .select("id, storage_path, thumbnail_path, mime_type")
         .eq("organization_id", orgId!)
         .eq("folder", LOGO_FOLDER)
         .eq("name", LOGO_NAME)
@@ -230,8 +230,21 @@ function LogoSection({
       // Substitui o registro anterior (se houver) e o arquivo antigo do Storage.
       const previous = logoQ.data;
       if (previous) {
-        await supabase.from("media_files").delete().eq("id", previous.id);
-        await supabase.storage.from(BUCKET).remove([previous.storage_path]);
+        const { error: delErr } = await supabase
+          .from("media_files")
+          .delete()
+          .eq("id", previous.id);
+        if (delErr) {
+          // rollback do upload novo para não deixar dois arquivos no Storage
+          await supabase.storage.from(BUCKET).remove([path]);
+          throw delErr;
+        }
+        const previousPaths = [previous.storage_path, previous.thumbnail_path].filter(
+          (p): p is string => !!p,
+        );
+        if (previousPaths.length) {
+          await supabase.storage.from(BUCKET).remove(previousPaths);
+        }
       }
 
       const { error: dbErr } = await supabase.from("media_files").insert({
