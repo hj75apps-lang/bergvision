@@ -258,25 +258,26 @@ Deno.serve(async (req) => {
 
   const url = new URL(req.url);
   const token = url.searchParams.get("token")?.trim();
-  if (!token || !/^[0-9a-f-]{36}$/i.test(token))
+  if (!token || token.length < 16 || token.length > 128)
     return json({ error: "invalid_token" }, 400);
 
   const { data: session, error: sErr } = await admin
     .from("preview_sessions")
-    .select("id, organization_id, scope, target_id, expires_at, created_by")
-    .eq("id", token)
+    .select("token, id_da_organizacao, escopo, id_alvo, expira_em, criado_por")
+    .eq("token", token)
     .maybeSingle();
 
   if (sErr) return json({ error: "session_lookup_failed" }, 500);
   if (!session) return json({ error: "not_found" }, 404);
 
-  const expiresAt = new Date((session as any).expires_at);
+  const expiresAt = new Date((session as any).expira_em);
   if (!isFinite(expiresAt.getTime()) || expiresAt.getTime() < Date.now())
     return json({ error: "preview_expired" }, 410);
 
   try {
-    const scope = (session as any).scope as string;
-    const targetId = (session as any).target_id as string;
+    const scope = (session as any).escopo as string;
+    const targetId = (session as any).id_alvo as string;
+    const expiresIso = (session as any).expira_em as string;
 
     if (scope === "template") {
       const payload = await loadTemplate(targetId);
@@ -284,7 +285,7 @@ Deno.serve(async (req) => {
       return json({
         mode: "live",
         scope,
-        session: { expires_at: (session as any).expires_at },
+        session: { expires_at: expiresIso },
         ...payload,
       });
     }
@@ -302,7 +303,7 @@ Deno.serve(async (req) => {
         return json({
           mode: "live",
           scope,
-          session: { expires_at: (session as any).expires_at },
+          session: { expires_at: expiresIso },
           player,
           template: null,
           background_media: null,
@@ -314,7 +315,7 @@ Deno.serve(async (req) => {
       return json({
         mode: "live",
         scope,
-        session: { expires_at: (session as any).expires_at },
+        session: { expires_at: expiresIso },
         player,
         ...payload,
       });
@@ -326,7 +327,7 @@ Deno.serve(async (req) => {
       return json({
         mode: "live",
         scope,
-        session: { expires_at: (session as any).expires_at },
+        session: { expires_at: expiresIso },
         playlist,
       });
     }
