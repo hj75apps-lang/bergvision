@@ -54,6 +54,7 @@ import {
   formatDuration,
   slugifyFilename,
   validateFile,
+  ACCEPT_ATTR,
   type MediaKind,
 } from "@/lib/media-utils";
 
