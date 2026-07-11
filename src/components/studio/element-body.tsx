@@ -118,7 +118,7 @@ export function ElementBody({ el }: { el: TemplateElement }) {
 function ClockWidget({ config }: { config: Record<string, unknown> }) {
   const format = (config.format as string) ?? "24h";
   const timezone = (config.timezone as string) ?? "America/Sao_Paulo";
-  const scale = ((config.sizePercent as number) ?? 100) / 100;
+  const sizeCqh = (config.sizePercent as number) ?? 28;
   const [now, setNow] = useState(() => new Date());
   useEffect(() => {
     const id = setInterval(() => setNow(new Date()), 1000);
@@ -143,7 +143,7 @@ function ClockWidget({ config }: { config: Record<string, unknown> }) {
         fontFamily: "Inter, system-ui, sans-serif",
         fontVariantNumeric: "tabular-nums",
         fontWeight: 600,
-        fontSize: `${28 * scale}cqh`,
+        fontSize: `${sizeCqh}cqh`,
         containerType: "size",
         letterSpacing: "0.02em",
       }}
@@ -157,7 +157,7 @@ function WeatherWidget({ config }: { config: Record<string, unknown> }) {
   const city = ((config.city as string) ?? "").trim();
   const units =
     (config.units as string) === "imperial" ? "imperial" : "metric";
-  const scale = ((config.sizePercent as number) ?? 100) / 100;
+  const sizeCqh = (config.sizePercent as number) ?? 28;
   const q = useQuery({
     queryKey: ["widget-weather", city, units],
     enabled: city.length > 0,
@@ -190,18 +190,18 @@ function WeatherWidget({ config }: { config: Record<string, unknown> }) {
         <span className="text-[10cqh] opacity-70">Clima indisponível</span>
       ) : (
         <>
-          <span style={{ fontSize: `${36 * scale}cqh`, fontWeight: 600 }}>
+          <span style={{ fontSize: `${sizeCqh}cqh`, fontWeight: 600 }}>
             {q.data.temp}
             {q.data.unit}
           </span>
           <span
-            style={{ fontSize: `${12 * scale}cqh`, opacity: 0.9 }}
+            style={{ fontSize: `${sizeCqh * 0.35}cqh`, opacity: 0.9 }}
             className="truncate"
           >
             {q.data.description}
           </span>
           <span
-            style={{ fontSize: `${10 * scale}cqh`, opacity: 0.7 }}
+            style={{ fontSize: `${sizeCqh * 0.28}cqh`, opacity: 0.7 }}
             className="truncate"
           >
             {q.data.city}
@@ -216,7 +216,7 @@ function WeatherWidget({ config }: { config: Record<string, unknown> }) {
 function RssWidget({ config }: { config: Record<string, unknown> }) {
   const url = ((config.feedUrl as string) ?? "").trim();
   const max = (config.maxItems as number) ?? 5;
-  const scale = ((config.sizePercent as number) ?? 100) / 100;
+  const sizeCqh = (config.sizePercent as number) ?? 14;
   const motion = ((config.motion as string) ?? "fade") as
     | "none"
     | "fade"
@@ -302,7 +302,7 @@ function RssWidget({ config }: { config: Record<string, unknown> }) {
           style={{
             animation: `bv-marquee-x ${speed}s linear infinite`,
             animationDirection: dir,
-            fontSize: `${18 * scale}cqh`,
+            fontSize: `${sizeCqh}cqh`,
             fontWeight: 600,
             paddingLeft: "2rem",
           }}
@@ -334,7 +334,7 @@ function RssWidget({ config }: { config: Record<string, unknown> }) {
             <span
               key={i}
               style={{
-                fontSize: `${14 * scale}cqh`,
+                fontSize: `${sizeCqh}cqh`,
                 fontWeight: 600,
                 lineHeight: 1.3,
               }}
@@ -354,7 +354,7 @@ function RssWidget({ config }: { config: Record<string, unknown> }) {
       style={wrapperStyle}
     >
       <span
-        style={{ fontSize: `${9 * scale}cqh`, opacity: 0.6 }}
+        style={{ fontSize: `${sizeCqh * 0.55}cqh`, opacity: 0.6 }}
         className="uppercase tracking-wider"
       >
         Notícia {idx + 1}/{items.length}
@@ -362,7 +362,7 @@ function RssWidget({ config }: { config: Record<string, unknown> }) {
       <span
         key={motion === "fade" ? idx : "static"}
         style={{
-          fontSize: `${14 * scale}cqh`,
+          fontSize: `${sizeCqh}cqh`,
           fontWeight: 600,
           lineHeight: 1.2,
           animation: motion === "fade" ? "bv-fade 0.6s ease-out" : undefined,
