@@ -66,6 +66,12 @@ import { useAuth } from "@/hooks/use-auth";
 import { LayersPanel } from "@/components/studio/layers-panel";
 import { PropertiesPanel } from "@/components/studio/properties-panel";
 import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu";
+import {
   clampPct,
   commonGroupPrefix,
   getGroupPath,
