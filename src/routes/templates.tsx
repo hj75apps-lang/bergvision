@@ -106,7 +106,7 @@ function TemplatesPage() {
       const { data, error } = await supabase
         .from("templates")
         .select(
-          "id, name, slug, orientation, zone_count, is_system, organization_id, aspect_ratio, canvas_width, canvas_height, allow_overlap, thumbnail_url",
+          "id, name, slug, orientation, zone_count, is_system, organization_id, aspect_ratio, canvas_width, canvas_height, allow_overlap, thumbnail_url, type, background_color",
         )
         .order("is_system", { ascending: false })
         .order("name");
@@ -143,6 +143,50 @@ function TemplatesPage() {
     }
     return map;
   }, [zonesAllQ.data]);
+
+  // Canvas-type templates (Studio) don't use template_zones; fetch their
+  // template_elements so the gallery card renders the real layout instead of
+  // an empty placeholder.
+  const canvasTemplateIds = (templatesQ.data ?? [])
+    .filter((t: any) => t.type === "canvas")
+    .map((t) => t.id);
+  const elementsAllQ = useQuery({
+    queryKey: ["template_elements_all", canvasTemplateIds.join(",")],
+    enabled: canvasTemplateIds.length > 0,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("template_elements")
+        .select(
+          "id, template_id, element_type, x, y, width, height, rotation, z_index, opacity, visible, content",
+        )
+        .in("template_id", canvasTemplateIds)
+        .order("z_index");
+      if (error) throw error;
+      return (data ?? []) as Array<{
+        id: string;
+        template_id: string;
+        element_type: string;
+        x: number;
+        y: number;
+        width: number;
+        height: number;
+        rotation: number;
+        z_index: number;
+        opacity: number;
+        visible: boolean;
+        content: Record<string, unknown> | null;
+      }>;
+    },
+  });
+  const elementsByTemplate = useMemo(() => {
+    const map = new Map<string, typeof elementsAllQ.data extends undefined ? never : NonNullable<typeof elementsAllQ.data>>();
+    for (const el of elementsAllQ.data ?? []) {
+      const arr = (map.get(el.template_id) as any) ?? [];
+      arr.push(el);
+      map.set(el.template_id, arr as any);
+    }
+    return map;
+  }, [elementsAllQ.data]);
 
   // Count how many players use each template — for the "usado por N" badge
   // and to block deletion when > 0.
@@ -252,6 +296,10 @@ function TemplatesPage() {
           {(templatesQ.data ?? []).map((t) => {
             const zones = zonesByTemplate.get(t.id) ?? [];
             const usage = usageQ.data?.[t.id] ?? 0;
+            const isCanvas = (t as any).type === "canvas";
+            const elements = elementsByTemplate.get(t.id) ?? [];
+            const contentCount = isCanvas ? elements.length : zones.length;
+            const contentLabel = isCanvas ? "elemento" : "zona";
             return (
               <Card
                 key={t.id}
@@ -262,8 +310,8 @@ function TemplatesPage() {
                     <div className="min-w-0">
                       <CardTitle className="truncate text-base">{t.name}</CardTitle>
                       <CardDescription className="mt-0.5 text-xs">
-                        {aspectRatioLabel(t)} · {zones.length} zona
-                        {zones.length !== 1 ? "s" : ""}
+                        {aspectRatioLabel(t)} · {contentCount} {contentLabel}
+                        {contentCount !== 1 ? "s" : ""}
                         {usage > 0 && ` · usado por ${usage} player${usage !== 1 ? "s" : ""}`}
                       </CardDescription>
                     </div>
@@ -279,7 +327,11 @@ function TemplatesPage() {
                   </div>
                 </CardHeader>
                 <CardContent className="pb-3">
-                  <TemplateCanvas template={t} zones={zones} mode="preview" showLabels={false} />
+                  {isCanvas ? (
+                    <CanvasElementsPreview template={t} elements={elements} />
+                  ) : (
+                    <TemplateCanvas template={t} zones={zones} mode="preview" showLabels={false} />
+                  )}
                 </CardContent>
                 <CardFooter className="flex-wrap gap-2 pt-0">
                   <Button
