@@ -254,6 +254,7 @@ export function PlaylistLocalPreview({
 }
 
 function ThumbForItem({ item }: { item: Item }) {
+  // unchanged below
   if (item.item_type === "template") {
     return (
       <div className="grid h-full w-full place-items-center bg-gradient-to-br from-fuchsia-500/20 to-indigo-500/20">
