@@ -42,8 +42,8 @@ function elementDisplayName(el: TemplateElement): string {
   const cname = typeof c.name === "string" ? c.name.trim() : "";
   if (cname) return cname;
   if (el.element_type === "widget") {
-    const wt = (c.widgetType ?? c.widget_type) as string | undefined;
-    if (wt && WIDGET_LABELS[wt]) return WIDGET_LABELS[wt];
+    const wt = ((c.widgetType ?? c.widget_type) as string | undefined) ?? "clock";
+    if (WIDGET_LABELS[wt]) return WIDGET_LABELS[wt];
   }
   return ELEMENT_LABELS[el.element_type];
 }

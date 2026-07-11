@@ -118,7 +118,7 @@ export function ElementBody({ el }: { el: TemplateElement }) {
 function ClockWidget({ config }: { config: Record<string, unknown> }) {
   const format = (config.format as string) ?? "24h";
   const timezone = (config.timezone as string) ?? "America/Sao_Paulo";
-  const sizeCqh = (config.sizePercent as number) ?? 28;
+  const sizeCqh = Math.max(3, Math.min(90, (config.sizePercent as number) ?? 28));
   const [now, setNow] = useState(() => new Date());
   useEffect(() => {
     const id = setInterval(() => setNow(new Date()), 1000);
@@ -157,7 +157,7 @@ function WeatherWidget({ config }: { config: Record<string, unknown> }) {
   const city = ((config.city as string) ?? "").trim();
   const units =
     (config.units as string) === "imperial" ? "imperial" : "metric";
-  const sizeCqh = (config.sizePercent as number) ?? 28;
+  const sizeCqh = Math.max(3, Math.min(90, (config.sizePercent as number) ?? 28));
   const q = useQuery({
     queryKey: ["widget-weather", city, units],
     enabled: city.length > 0,
@@ -216,7 +216,7 @@ function WeatherWidget({ config }: { config: Record<string, unknown> }) {
 function RssWidget({ config }: { config: Record<string, unknown> }) {
   const url = ((config.feedUrl as string) ?? "").trim();
   const max = (config.maxItems as number) ?? 5;
-  const sizeCqh = (config.sizePercent as number) ?? 14;
+  const sizeCqh = Math.max(3, Math.min(90, (config.sizePercent as number) ?? 14));
   const motion = ((config.motion as string) ?? "fade") as
     | "none"
     | "fade"
