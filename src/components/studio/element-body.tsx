@@ -152,14 +152,28 @@ export function ElementBody({ el }: { el: TemplateElement }) {
     case "widget": {
       const widgetType = getWidgetType(c);
       const cfg = getWidgetConfig(c);
-      if (widgetType === "clock") return <ClockWidget config={cfg} />;
-      if (widgetType === "weather") return <WeatherWidget config={cfg} />;
-      if (widgetType === "rss" || widgetType === "news")
-        return <RssWidget config={cfg} />;
-      if (widgetType === "ticker") return <TickerWidget config={cfg} />;
-      if (widgetType === "lowerthirds")
-        return <LowerThirdsWidget config={cfg} />;
-      return <PlaceholderBadge label="Widget" />;
+      const appearance = getAppearanceStyle(c);
+      let inner: React.ReactNode;
+      if (widgetType === "clock") inner = <ClockWidget config={cfg} />;
+      else if (widgetType === "weather") inner = <WeatherWidget config={cfg} />;
+      else if (widgetType === "rss" || widgetType === "news")
+        inner = <RssWidget config={cfg} />;
+      else if (widgetType === "ticker") inner = <TickerWidget config={cfg} />;
+      else if (widgetType === "lowerthirds")
+        inner = <LowerThirdsWidget config={cfg} />;
+      else inner = <PlaceholderBadge label="Widget" />;
+      const hasAppearance =
+        (appearance.borderRadius as string | undefined) !== undefined ||
+        (appearance.maskImage as string | undefined) !== undefined;
+      if (!hasAppearance) return <>{inner}</>;
+      return (
+        <div
+          className="h-full w-full"
+          style={{ ...appearance, overflow: "hidden" }}
+        >
+          {inner}
+        </div>
+      );
     }
     case "playlist": {
       if (c.source === "inline") return <InlineMediaGroup c={c} />;
