@@ -312,6 +312,8 @@ function PreviewBody({
     isDraft,
   } = ctrl;
 
+  const [toolbarCollapsed, setToolbarCollapsed] = useState(false);
+
   return (
     <div
       className={cn(
@@ -320,6 +322,7 @@ function PreviewBody({
       )}
     >
       {/* Toolbar */}
+      {!toolbarCollapsed && (
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 bg-black/40 px-3 py-2">
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-2 rounded-lg bg-white/10 px-2.5 py-1 text-white">
@@ -360,7 +363,17 @@ function PreviewBody({
             </SelectContent>
           </Select>
         </div>
-        {onClose && (
+        <div className="flex items-center gap-1">
+          <Button
+            variant="secondary"
+            size="sm"
+            className="h-8 rounded-lg bg-white/10 px-2 text-white hover:bg-white/20"
+            onClick={() => setToolbarCollapsed(true)}
+            title="Ocultar cabeçalho"
+          >
+            <ChevronUp className="h-3.5 w-3.5" />
+          </Button>
+          {onClose && (
           <Button
             variant="secondary"
             size="sm"
@@ -370,11 +383,24 @@ function PreviewBody({
             <X className="mr-1.5 h-3.5 w-3.5" />
             Fechar
           </Button>
-        )}
+          )}
+        </div>
       </div>
+      )}
 
       {/* Palco */}
       <div className="relative flex-1 overflow-hidden bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.04),transparent_70%)] bg-black p-4">
+        {toolbarCollapsed && (
+          <Button
+            variant="secondary"
+            size="icon"
+            className="absolute right-2 top-2 z-10 h-7 w-7 rounded-md bg-black/60 text-white/80 hover:bg-black/80"
+            onClick={() => setToolbarCollapsed(false)}
+            title="Mostrar cabeçalho"
+          >
+            <ChevronDown className="h-3.5 w-3.5" />
+          </Button>
+        )}
         {!playerConfigured ? (
           <StatusOverlay
             title="Preview do Player não configurado"
