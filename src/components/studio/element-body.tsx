@@ -5,6 +5,7 @@ import { Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useSignedUrl } from "@/lib/studio/use-signed-url";
 import { ELEMENT_LABELS, type TemplateElement } from "@/lib/studio/types";
+import { getAppearanceStyle } from "@/lib/studio/appearance";
 
 function getWidgetType(c: Record<string, unknown>) {
   return ((c.widgetType ?? c.widget_type) as string | undefined) ?? "clock";
@@ -127,13 +128,14 @@ export function ElementBody({ el }: { el: TemplateElement }) {
     case "image":
     case "logo": {
       if (el.element_type === "image" && c.imageSubtype === "sequence") {
-        return <ImageSequenceBody c={c} />;
+        return <ImageSequenceBody c={c} appearance={getAppearanceStyle(c)} />;
       }
       return (
         <MediaImage
           path={(c.mediaStoragePath as string) ?? null}
           fit={(c.fit as string) ?? "cover"}
           label={ELEMENT_LABELS[el.element_type]}
+          appearance={getAppearanceStyle(c)}
         />
       );
     }
@@ -144,6 +146,7 @@ export function ElementBody({ el }: { el: TemplateElement }) {
           fit={(c.fit as string) ?? "cover"}
           loop={(c.loop as boolean) ?? true}
           muted={(c.muted as boolean) ?? true}
+          appearance={getAppearanceStyle(c)}
         />
       );
     case "widget": {
@@ -1234,10 +1237,12 @@ function MediaImage({
   path,
   fit,
   label,
+  appearance,
 }: {
   path: string | null;
   fit: string;
   label: string;
+  appearance?: React.CSSProperties;
 }) {
   const url = useSignedUrl(path);
   if (!path) return <PlaceholderBadge label={label} />;
@@ -1255,6 +1260,7 @@ function MediaImage({
       className="h-full w-full"
       style={{
         objectFit: (fit as React.CSSProperties["objectFit"]) ?? "cover",
+        ...appearance,
       }}
     />
   );
@@ -1262,7 +1268,13 @@ function MediaImage({
 
 // ---------- Image Sequence (frame-by-frame) ----------
 
-function ImageSequenceBody({ c }: { c: Record<string, unknown> }) {
+function ImageSequenceBody({
+  c,
+  appearance,
+}: {
+  c: Record<string, unknown>;
+  appearance?: React.CSSProperties;
+}) {
   const rawFrames = Array.isArray(c.frames) ? (c.frames as unknown[]) : [];
   const frames = useMemo(
     () =>
@@ -1297,7 +1309,7 @@ function ImageSequenceBody({ c }: { c: Record<string, unknown> }) {
   if (frames.length === 0) return <PlaceholderBadge label="Sequência" />;
 
   return (
-    <div className="relative h-full w-full">
+    <div className="relative h-full w-full" style={appearance}>
       {frames.map((f, i) => (
         <SequenceFrame
           key={i}
@@ -2729,12 +2741,14 @@ function MediaVideo({
   loop,
   muted,
   onEnded,
+  appearance,
 }: {
   path: string | null;
   fit: string;
   loop: boolean;
   muted: boolean;
   onEnded?: () => void;
+  appearance?: React.CSSProperties;
 }) {
   const url = useSignedUrl(path);
   if (!path) return <PlaceholderBadge label="Vídeo" />;
@@ -2750,6 +2764,7 @@ function MediaVideo({
       className="h-full w-full"
       style={{
         objectFit: (fit as React.CSSProperties["objectFit"]) ?? "cover",
+        ...appearance,
       }}
       autoPlay
       loop={loop}

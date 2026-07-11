@@ -45,6 +45,7 @@ import {
   isLowRes,
   type PickerMediaFile,
 } from "./media-picker-dialog";
+import { MASK_PRESETS, getAppearanceConfig } from "@/lib/studio/appearance";
 
 const FONT_OPTIONS = [
   "Inter",
@@ -1487,6 +1488,8 @@ function MediaContent({
           })
         }
       />
+
+      <AppearanceFields c={c} patch={patch} disabled={disabled} />
     </div>
   );
 }
@@ -1665,6 +1668,8 @@ function ImageSequenceContent({
           ]);
         }}
       />
+
+      <AppearanceFields c={c} patch={patch} disabled={disabled} />
     </div>
   );
 }
@@ -1709,6 +1714,106 @@ function VideoContent({
           onCheckedChange={(v) => patch({ muted: v })}
         />
       </div>
+    </div>
+  );
+}
+
+function AppearanceFields({
+  c,
+  patch,
+  disabled,
+}: {
+  c: Record<string, unknown>;
+  patch: (p: Record<string, unknown>) => void;
+  disabled: boolean;
+}) {
+  const { borderRadiusPercent, mask, maskUrl } = getAppearanceConfig(c);
+  const isCustom = mask === "custom";
+  const invalidCustom =
+    isCustom && maskUrl.trim().length > 0 && !/^https?:\/\//i.test(maskUrl.trim());
+
+  return (
+    <div className="flex flex-col gap-3 rounded-lg border border-border/60 bg-card/40 p-2.5">
+      <div className="flex items-center justify-between">
+        <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+          Aparência
+        </span>
+        {(borderRadiusPercent > 0 || mask !== "none") && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            disabled={disabled}
+            className="h-6 px-2 text-[10px]"
+            onClick={() =>
+              patch({ borderRadiusPercent: 0, mask: "none", maskUrl: "" })
+            }
+          >
+            <RotateCcw className="mr-1 h-3 w-3" /> Redefinir
+          </Button>
+        )}
+      </div>
+
+      <label className="flex flex-col gap-1">
+        <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+          Arredondar cantos ({borderRadiusPercent}%)
+        </span>
+        <Slider
+          value={[borderRadiusPercent]}
+          min={0}
+          max={50}
+          step={1}
+          disabled={disabled}
+          onValueChange={(v) => patch({ borderRadiusPercent: v[0] })}
+        />
+      </label>
+
+      <label className="flex flex-col gap-1">
+        <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+          Máscara
+        </span>
+        <Select
+          value={mask}
+          onValueChange={(v) => patch({ mask: v })}
+          disabled={disabled}
+        >
+          <SelectTrigger className="h-8 text-xs">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {MASK_PRESETS.map((p) => (
+              <SelectItem key={p.id} value={p.id} className="text-xs">
+                {p.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </label>
+
+      {isCustom && (
+        <label className="flex flex-col gap-1">
+          <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+            URL do SVG/PNG (fundo transparente, área branca = visível)
+          </span>
+          <Input
+            type="url"
+            inputMode="url"
+            placeholder="https://exemplo.com/mascara.svg"
+            value={maskUrl}
+            disabled={disabled}
+            onChange={(e) => patch({ maskUrl: e.target.value })}
+            className={cn(
+              "h-8 text-xs",
+              invalidCustom && "border-destructive focus-visible:ring-destructive",
+            )}
+          />
+          {invalidCustom && (
+            <span className="text-[10px] text-destructive">
+              Use uma URL absoluta iniciando com https://
+            </span>
+          )}
+        </label>
+      )}
     </div>
   );
 }
