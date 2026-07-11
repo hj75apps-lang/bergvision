@@ -994,8 +994,13 @@ function SortableItem({
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="fade">Fade</SelectItem>
-            <SelectItem value="slide">Slide</SelectItem>
             <SelectItem value="cut">Cut</SelectItem>
+            <SelectItem value="slide-left">Slide ←</SelectItem>
+            <SelectItem value="slide-right">Slide →</SelectItem>
+            <SelectItem value="slide-up">Slide ↑</SelectItem>
+            <SelectItem value="slide-down">Slide ↓</SelectItem>
+            <SelectItem value="zoom-in">Zoom in</SelectItem>
+            <SelectItem value="zoom-out">Zoom out</SelectItem>
           </SelectContent>
         </Select>
         {canManage && (
