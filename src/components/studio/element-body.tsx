@@ -280,12 +280,13 @@ function RssWidget({ config }: { config: Record<string, unknown> }) {
   const wrapperStyle: React.CSSProperties = {
     containerType: "size",
     fontFamily: "Inter, system-ui",
+    ...widgetBgStyle(config, 0.4),
   };
 
   if (!url) {
     return (
       <div
-        className="flex h-full w-full flex-col justify-center gap-1 overflow-hidden bg-black/40 p-2 text-white"
+        className="flex h-full w-full flex-col justify-center gap-1 overflow-hidden p-2 text-white"
         style={wrapperStyle}
       >
         <span className="text-[10cqh] opacity-70">Configure a URL do feed</span>
@@ -295,7 +296,7 @@ function RssWidget({ config }: { config: Record<string, unknown> }) {
   if (q.isLoading) {
     return (
       <div
-        className="flex h-full w-full items-center justify-center overflow-hidden bg-black/40 p-2 text-white"
+        className="flex h-full w-full items-center justify-center overflow-hidden p-2 text-white"
         style={wrapperStyle}
       >
         <Loader2 className="h-4 w-4 animate-spin opacity-70" />
@@ -305,7 +306,7 @@ function RssWidget({ config }: { config: Record<string, unknown> }) {
   if (q.isError || items.length === 0) {
     return (
       <div
-        className="flex h-full w-full items-center justify-center overflow-hidden bg-black/40 p-2 text-white"
+        className="flex h-full w-full items-center justify-center overflow-hidden p-2 text-white"
         style={wrapperStyle}
       >
         <span className="text-[10cqh] opacity-70">Feed indisponível</span>
@@ -319,7 +320,7 @@ function RssWidget({ config }: { config: Record<string, unknown> }) {
     const dir = motion === "marquee-left" ? "normal" : "reverse";
     return (
       <div
-        className="flex h-full w-full items-center overflow-hidden bg-black/40 text-white"
+        className="flex h-full w-full items-center overflow-hidden text-white"
         style={wrapperStyle}
       >
         <style>{`@keyframes bv-marquee-x{from{transform:translateX(0)}to{transform:translateX(-50%)}}`}</style>
@@ -345,7 +346,7 @@ function RssWidget({ config }: { config: Record<string, unknown> }) {
     const dir = motion === "vertical-up" ? "normal" : "reverse";
     return (
       <div
-        className="flex h-full w-full flex-col overflow-hidden bg-black/40 p-2 text-white"
+        className="flex h-full w-full flex-col overflow-hidden p-2 text-white"
         style={wrapperStyle}
       >
         <style>{`@keyframes bv-marquee-y{from{transform:translateY(0)}to{transform:translateY(-50%)}}`}</style>
@@ -376,7 +377,7 @@ function RssWidget({ config }: { config: Record<string, unknown> }) {
   // Fade / none (comportamento anterior)
   return (
     <div
-      className="flex h-full w-full flex-col justify-center gap-1 overflow-hidden bg-black/40 p-2 text-white"
+      className="flex h-full w-full flex-col justify-center gap-1 overflow-hidden p-2 text-white"
       style={wrapperStyle}
     >
       <span
