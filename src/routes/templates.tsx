@@ -535,16 +535,20 @@ const ELEMENT_COLORS: Record<string, string> = {
 function CanvasElementsPreview({
   template,
   elements,
+  className,
+  style,
 }: {
   template: Template;
   elements: CanvasElementPreview[];
+  className?: string;
+  style?: React.CSSProperties;
 }) {
   const bg = (template as any).background_color ?? "#0F172A";
   const visible = elements.filter((e) => e.visible !== false);
   return (
     <div
-      className="relative w-full overflow-hidden rounded-xl border border-border/60"
-      style={{ aspectRatio: aspectRatioCss(template), background: bg }}
+      className={cn("relative w-full overflow-hidden rounded-xl border border-border/60", className)}
+      style={{ aspectRatio: aspectRatioCss(template), background: bg, ...style }}
     >
       {visible.length === 0 ? (
         <div className="pointer-events-none absolute inset-0 p-3">
