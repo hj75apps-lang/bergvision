@@ -174,15 +174,16 @@ export function PlaylistLocalPreview({
             {showTimeline ? <ChevronsDownUp className="h-3.5 w-3.5" /> : <ChevronsUpDown className="h-3.5 w-3.5" />}
           </Button>
         </div>
-        <div className="absolute inset-0 grid place-items-center">
+        <div
+          className="absolute inset-0 grid place-items-center"
+          style={{ containerType: "size" }}
+        >
           <div
             className="relative overflow-hidden rounded-md bg-black ring-1 ring-white/10"
             style={{
               aspectRatio: "16 / 9",
-              maxWidth: "100%",
-              maxHeight: "100%",
-              width: "100%",
-              height: "auto",
+              width: "min(100cqw, calc(100cqh * 16 / 9))",
+              height: "min(100cqh, calc(100cqw * 9 / 16))",
             }}
           >
             {current && (
