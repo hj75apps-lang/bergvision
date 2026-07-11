@@ -538,16 +538,44 @@ function PlaylistEditor({
         schedule_start: scheduleStart || null,
         schedule_end: scheduleEnd || null,
         schedule_days: scheduleDays.length > 0 ? scheduleDays : null,
+        schedule_date_start: dateStart ? format(dateStart, "yyyy-MM-dd") : null,
+        schedule_date_end: dateEnd ? format(dateEnd, "yyyy-MM-dd") : null,
       };
       const { error } = await supabase
         .from("playlists")
         .update(payload)
         .eq("id", playlist.id);
       if (error) throw error;
+
+      // Sincroniza vínculos com players (diff)
+      const current = new Set(assignedPlayersQ.data ?? []);
+      const next = new Set(selectedPlayerIds);
+      const toAdd = [...next].filter((id) => !current.has(id));
+      const toRemove = [...current].filter((id) => !next.has(id));
+      if (toRemove.length > 0) {
+        const { error: delErr } = await supabase
+          .from("playlist_players")
+          .delete()
+          .eq("playlist_id", playlist.id)
+          .in("player_id", toRemove);
+        if (delErr) throw delErr;
+      }
+      if (toAdd.length > 0 && orgId) {
+        const rows = toAdd.map((pid) => ({
+          playlist_id: playlist.id,
+          player_id: pid,
+          organization_id: orgId,
+        }));
+        const { error: insErr } = await supabase
+          .from("playlist_players")
+          .insert(rows);
+        if (insErr) throw insErr;
+      }
     },
     onSuccess: () => {
       toast.success("Playlist salva.");
       qc.invalidateQueries({ queryKey: ["playlists-list", orgId] });
+      qc.invalidateQueries({ queryKey: ["playlist_players", playlist.id] });
     },
     onError: (err: any) => toast.error(err?.message || "Falha ao salvar."),
   });
