@@ -55,8 +55,12 @@ import { LayersPanel } from "@/components/studio/layers-panel";
 import { PropertiesPanel } from "@/components/studio/properties-panel";
 import {
   clampPct,
+  commonGroupPrefix,
+  getGroupPath,
+  makeGroupId,
   type CanvasTemplate,
   type ElementType,
+  type GroupSeg,
   type TemplateElement,
 } from "@/lib/studio/types";
 import {
