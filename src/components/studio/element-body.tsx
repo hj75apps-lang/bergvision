@@ -1903,12 +1903,7 @@ function BroadcastLayout(props: BroadcastLayoutProps) {
       className="relative flex h-full w-full flex-col overflow-hidden"
       style={containerStyle}
     >
-      <style>{`
-        @keyframes bv-lt-slide-l{from{transform:translateX(-100%);opacity:0}to{transform:translateX(0);opacity:1}}
-        @keyframes bv-lt-slide-r{from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}}
-        @keyframes bv-lt-fade{from{opacity:0}to{opacity:1}}
-        @keyframes bv-lt-reveal{from{clip-path:inset(0 100% 0 0)}to{clip-path:inset(0 0 0 0)}}
-      `}</style>
+      <style>{LT_KEYFRAMES_CSS}</style>
 
       {(layout === "angled" || layout === "notched") && (
         <div
