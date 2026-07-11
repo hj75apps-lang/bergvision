@@ -109,9 +109,27 @@ export const NewsWidgetConfigSchema = z.object({
   rotationSeconds: z.number().int().min(3).max(120).default(10),
 });
 
+export const IframeWidgetConfigSchema = z.object({
+  // Apenas https para evitar mixed-content no player e reduzir superfície de risco.
+  url: z
+    .string()
+    .url()
+    .refine((u) => u.startsWith('https://'), {
+      message: 'A URL do iframe precisa começar com https://',
+    }),
+  // Zoom visual (percentual) — útil para encaixar widgets externos no elemento.
+  zoomPercent: z.number().min(25).max(400).default(100),
+  // Recarregar automaticamente a cada N segundos (0 = nunca).
+  refreshSeconds: z.number().int().min(0).max(3600).default(0),
+  // Permitir scripts no iframe (necessário para widgets de clima/mapas).
+  allowScripts: z.boolean().default(true),
+  // Permitir chamadas same-origin (raramente necessário; desligado por padrão).
+  allowSameOrigin: z.boolean().default(false),
+});
+
 export const WidgetElementSchema = z.object({
   element_type: z.literal('widget'),
-  widgetType: z.enum(['clock', 'weather', 'rss', 'news']),
+  widgetType: z.enum(['clock', 'weather', 'rss', 'news', 'iframe']),
   widgetConfig: z.record(z.any()),
 });
 
@@ -120,6 +138,7 @@ const widgetConfigByType = {
   weather: WeatherWidgetConfigSchema,
   rss: RssWidgetConfigSchema,
   news: NewsWidgetConfigSchema,
+  iframe: IframeWidgetConfigSchema,
 } as const;
 
 export const ShapeElementSchema = z.object({

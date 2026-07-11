@@ -2557,6 +2557,7 @@ function WidgetContent({
             <SelectItem value="news">Notícias</SelectItem>
             <SelectItem value="ticker">News Ticker</SelectItem>
             <SelectItem value="lowerthirds">Lower Thirds</SelectItem>
+            <SelectItem value="iframe">Iframe (HTML externo)</SelectItem>
           </SelectContent>
         </Select>
       </label>
@@ -2999,6 +3000,10 @@ function WidgetContent({
         <LowerThirdsConfig config={config} setCfg={setCfg} disabled={disabled} />
       )}
 
+      {widgetType === "iframe" && (
+        <IframeConfig config={config} setCfg={setCfg} disabled={disabled} />
+      )}
+
       <AppearanceFields c={c} patch={patch} disabled={disabled} />
     </div>
   );
@@ -3036,9 +3041,130 @@ function defaultWidgetConfig(type: string): Record<string, unknown> {
         titleSize: 26,
         subtitleSize: 14,
       };
+    case "iframe":
+      return {
+        url: "",
+        zoomPercent: 100,
+        refreshSeconds: 0,
+        allowScripts: true,
+        allowSameOrigin: false,
+      };
     default:
       return {};
   }
+}
+
+function IframeConfig({
+  config,
+  setCfg,
+  disabled,
+}: {
+  config: Record<string, unknown>;
+  setCfg: (p: Record<string, unknown>) => void;
+  disabled: boolean;
+}) {
+  const url = (config.url as string) ?? "";
+  const zoom =
+    typeof config.zoomPercent === "number"
+      ? Math.max(25, Math.min(400, config.zoomPercent))
+      : 100;
+  const refresh =
+    typeof config.refreshSeconds === "number"
+      ? Math.max(0, Math.min(3600, Math.round(config.refreshSeconds)))
+      : 0;
+  const allowScripts = config.allowScripts !== false;
+  const allowSameOrigin = config.allowSameOrigin === true;
+  const isValid = /^https:\/\//i.test(url);
+  return (
+    <div className="flex flex-col gap-3">
+      <Separator />
+      <label className="flex flex-col gap-1">
+        <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+          URL (https)
+        </span>
+        <Input
+          type="url"
+          inputMode="url"
+          placeholder="https://exemplo.com/widget-clima"
+          value={url}
+          disabled={disabled}
+          onChange={(e) => setCfg({ url: e.target.value.trim() })}
+          className="h-8 text-xs"
+        />
+        {!isValid && url.length > 0 && (
+          <span className="text-[10px] text-destructive">
+            A URL precisa começar com https://
+          </span>
+        )}
+        <span className="text-[10px] text-muted-foreground">
+          Use serviços de embed (clima, mapas, câmeras, cotações) que permitam
+          iframe. Sites que bloqueiam via X-Frame-Options não serão exibidos.
+        </span>
+      </label>
+
+      <div className="flex flex-col gap-1">
+        <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+          Zoom ({zoom}%)
+        </span>
+        <Slider
+          value={[zoom]}
+          min={25}
+          max={400}
+          step={5}
+          disabled={disabled}
+          onValueChange={([v]) => setCfg({ zoomPercent: v })}
+        />
+        <span className="text-[10px] text-muted-foreground">
+          Ajuste o zoom para encaixar o conteúdo externo no tamanho do elemento.
+        </span>
+      </div>
+
+      <div className="flex flex-col gap-1">
+        <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+          Recarregar a cada ({refresh === 0 ? "desligado" : `${refresh}s`})
+        </span>
+        <Slider
+          value={[refresh]}
+          min={0}
+          max={3600}
+          step={30}
+          disabled={disabled}
+          onValueChange={([v]) => setCfg({ refreshSeconds: v })}
+        />
+        <span className="text-[10px] text-muted-foreground">
+          0 = nunca recarrega. Útil para dashboards e widgets de clima.
+        </span>
+      </div>
+
+      <div className="flex items-center justify-between rounded-md border border-border/60 bg-muted/30 px-3 py-2">
+        <div className="flex flex-col">
+          <span className="text-xs font-medium">Permitir scripts</span>
+          <span className="text-[10px] text-muted-foreground">
+            Necessário para a maioria dos widgets externos.
+          </span>
+        </div>
+        <Switch
+          checked={allowScripts}
+          disabled={disabled}
+          onCheckedChange={(v) => setCfg({ allowScripts: v })}
+        />
+      </div>
+
+      <div className="flex items-center justify-between rounded-md border border-border/60 bg-muted/30 px-3 py-2">
+        <div className="flex flex-col">
+          <span className="text-xs font-medium">Permitir same-origin</span>
+          <span className="text-[10px] text-muted-foreground">
+            Deixe desligado a menos que o provedor exija.
+          </span>
+        </div>
+        <Switch
+          checked={allowSameOrigin}
+          disabled={disabled}
+          onCheckedChange={(v) => setCfg({ allowSameOrigin: v })}
+        />
+      </div>
+    </div>
+  );
 }
 
 function ShapeContent({

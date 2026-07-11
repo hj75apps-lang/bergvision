@@ -235,6 +235,7 @@ export function ElementBody({ el }: { el: TemplateElement }) {
       else if (widgetType === "ticker") inner = <TickerWidget config={cfg} />;
       else if (widgetType === "lowerthirds")
         inner = <LowerThirdsWidget config={cfg} />;
+      else if (widgetType === "iframe") inner = <IframeWidget config={cfg} />;
       else inner = <PlaceholderBadge label="Widget" />;
       const hasAppearance =
         (appearance.borderRadius as string | undefined) !== undefined ||
@@ -359,6 +360,66 @@ function InlineMediaGroup({ c }: { c: Record<string, unknown> }) {
           <MediaImage path={cur.storagePath} fit={fit} label="Imagem" />
         </div>
       )}
+    </div>
+  );
+}
+
+function IframeWidget({ config }: { config: Record<string, unknown> }) {
+  const url = typeof config.url === "string" ? config.url : "";
+  const zoom =
+    typeof config.zoomPercent === "number"
+      ? Math.max(25, Math.min(400, config.zoomPercent))
+      : 100;
+  const refresh =
+    typeof config.refreshSeconds === "number"
+      ? Math.max(0, Math.min(3600, Math.round(config.refreshSeconds)))
+      : 0;
+  const allowScripts = config.allowScripts !== false;
+  const allowSameOrigin = config.allowSameOrigin === true;
+  const [nonce, setNonce] = useState(0);
+  useEffect(() => {
+    if (refresh <= 0) return;
+    const id = window.setInterval(() => setNonce((n) => n + 1), refresh * 1000);
+    return () => window.clearInterval(id);
+  }, [refresh]);
+  const isValid = /^https:\/\//i.test(url);
+  if (!isValid) {
+    return (
+      <div className="flex h-full w-full items-center justify-center rounded-md border border-dashed border-white/30 bg-black/40 p-3 text-center text-[11px] text-white/70">
+        Configure uma URL https:// para o iframe.
+      </div>
+    );
+  }
+  const sandboxTokens = [
+    allowScripts ? "allow-scripts" : "",
+    allowSameOrigin ? "allow-same-origin" : "",
+    "allow-popups",
+    "allow-forms",
+  ]
+    .filter(Boolean)
+    .join(" ");
+  const scale = zoom / 100;
+  const inverse = `${(100 / scale).toFixed(4)}%`;
+  const src = refresh > 0 ? `${url}${url.includes("#") ? "&" : "#"}_r=${nonce}` : url;
+  return (
+    <div className="relative h-full w-full overflow-hidden bg-black">
+      <iframe
+        key={nonce}
+        src={src}
+        title="Iframe widget"
+        loading="lazy"
+        referrerPolicy="no-referrer"
+        sandbox={sandboxTokens}
+        allow="autoplay; fullscreen; geolocation"
+        style={{
+          border: 0,
+          width: inverse,
+          height: inverse,
+          transform: `scale(${scale})`,
+          transformOrigin: "top left",
+          display: "block",
+        }}
+      />
     </div>
   );
 }
