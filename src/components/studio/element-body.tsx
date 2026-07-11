@@ -1724,6 +1724,310 @@ function LowerThirdsWidget({ config }: { config: Record<string, unknown> }) {
   );
 }
 
+type BroadcastLayoutProps = {
+  preset: LowerThirdsPreset;
+  layout: "angled" | "notched" | "stacked" | "dual";
+  title: string;
+  subtitle: string;
+  showSubtitle: boolean;
+  showKicker: boolean;
+  kickerText: string;
+  titleColor: string;
+  subtitleColor: string;
+  accentColor: string;
+  titleUppercase: boolean;
+  subtitleUppercase: boolean;
+  titleItalic: boolean;
+  titleSize: number;
+  subtitleSize: number;
+  align: "left" | "right";
+  animName: string | undefined;
+};
+
+function BroadcastLayout(props: BroadcastLayoutProps) {
+  const {
+    preset,
+    layout,
+    title,
+    subtitle,
+    showSubtitle,
+    showKicker,
+    kickerText,
+    titleColor,
+    subtitleColor,
+    accentColor,
+    titleUppercase,
+    subtitleUppercase,
+    titleItalic,
+    titleSize,
+    subtitleSize,
+    align,
+    animName,
+  } = props;
+
+  const skew = preset.skew ?? "-12deg";
+  const titleBg = preset.bg;
+  const kickerBg = preset.kickerBg ?? accentColor;
+  const kickerColor = preset.kickerColor ?? "#FFFFFF";
+  const subtitleBg = preset.subtitleBg ?? accentColor;
+  const rightBadgeBg = preset.rightBadgeBg ?? accentColor;
+  const rightBadgeColor = preset.rightBadgeColor ?? "#FFFFFF";
+  const rightBadgeText = preset.rightBadgeText ?? "24\nNews";
+
+  const commonTitleStyle: React.CSSProperties = {
+    color: titleColor,
+    fontSize: `${titleSize}cqh`,
+    fontFamily: preset.fontFamily,
+    fontWeight: preset.titleWeight as number,
+    letterSpacing: preset.letterSpacing,
+    textTransform: titleUppercase ? "uppercase" : undefined,
+    fontStyle: titleItalic ? "italic" : undefined,
+    lineHeight: 1.05,
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+  };
+  const commonSubtitleStyle: React.CSSProperties = {
+    color: subtitleColor,
+    fontSize: `${subtitleSize}cqh`,
+    fontFamily: preset.fontFamily,
+    fontWeight: preset.subtitleWeight as number,
+    letterSpacing: preset.letterSpacing,
+    textTransform: subtitleUppercase ? "uppercase" : undefined,
+    lineHeight: 1.2,
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+  };
+  const kickerStyle: React.CSSProperties = {
+    background: kickerBg,
+    color: kickerColor,
+    fontSize: `${Math.max(subtitleSize * 1.1, 8)}cqh`,
+    fontFamily: preset.fontFamily,
+    fontWeight: 800,
+    letterSpacing: "0.06em",
+    padding: "0.35em 1.1em",
+    lineHeight: 1,
+  };
+
+  const rowGap = "0.4cqh";
+  const isRight = align === "right";
+
+  const containerStyle: React.CSSProperties = {
+    containerType: "size",
+    animation: animName
+      ? `${animName} 0.7s cubic-bezier(0.22,1,0.36,1)`
+      : undefined,
+    justifyContent: isRight ? "flex-end" : "flex-start",
+  };
+
+  return (
+    <div
+      className="relative flex h-full w-full flex-col overflow-hidden"
+      style={containerStyle}
+    >
+      <style>{`
+        @keyframes bv-lt-slide-l{from{transform:translateX(-100%);opacity:0}to{transform:translateX(0);opacity:1}}
+        @keyframes bv-lt-slide-r{from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}}
+        @keyframes bv-lt-fade{from{opacity:0}to{opacity:1}}
+        @keyframes bv-lt-reveal{from{clip-path:inset(0 100% 0 0)}to{clip-path:inset(0 0 0 0)}}
+      `}</style>
+
+      {(layout === "angled" || layout === "notched") && (
+        <div
+          className="flex h-full w-full flex-col justify-end"
+          style={{ gap: rowGap, alignItems: isRight ? "flex-end" : "flex-start" }}
+        >
+          {showKicker && (
+            <div
+              style={{
+                transform: `skewX(${skew})`,
+                marginLeft: isRight ? 0 : "2%",
+                marginRight: isRight ? "2%" : 0,
+              }}
+            >
+              <span
+                className="inline-block"
+                style={{
+                  ...kickerStyle,
+                  display: "inline-block",
+                  transform: `skewX(calc(-1 * ${skew}))`,
+                }}
+              >
+                {kickerText}
+              </span>
+            </div>
+          )}
+          <div
+            style={{
+              background: titleBg,
+              transform: `skewX(${skew})`,
+              padding: "0.6em 1.4em",
+              maxWidth: "96%",
+              boxShadow:
+                layout === "notched"
+                  ? "0 4px 12px rgba(0,0,0,0.35)"
+                  : undefined,
+            }}
+          >
+            <span
+              className="block"
+              style={{
+                ...commonTitleStyle,
+                transform: `skewX(calc(-1 * ${skew}))`,
+                display: "inline-block",
+              }}
+            >
+              {title}
+            </span>
+          </div>
+          {showSubtitle && subtitle && (
+            <div
+              style={{
+                background: subtitleBg,
+                padding: "0.35em 1.2em",
+                maxWidth: "94%",
+              }}
+            >
+              <span className="block" style={commonSubtitleStyle}>
+                {subtitle}
+              </span>
+            </div>
+          )}
+        </div>
+      )}
+
+      {layout === "stacked" && (
+        <div
+          className="flex h-full w-full flex-col justify-end"
+          style={{ gap: rowGap, alignItems: isRight ? "flex-end" : "flex-start" }}
+        >
+          <div
+            className="flex items-center"
+            style={{ gap: "0.5em", marginLeft: isRight ? 0 : "2%" }}
+          >
+            {showKicker && (
+              <div style={{ transform: `skewX(${skew})` }}>
+                <span
+                  style={{
+                    ...kickerStyle,
+                    display: "inline-block",
+                    transform: `skewX(calc(-1 * ${skew}))`,
+                  }}
+                >
+                  {kickerText}
+                </span>
+              </div>
+            )}
+          </div>
+          <div
+            style={{
+              background: titleBg,
+              transform: `skewX(${skew})`,
+              padding: "0.55em 1.4em",
+              maxWidth: "96%",
+              boxShadow: "0 6px 14px rgba(0,0,0,0.25)",
+            }}
+          >
+            <span
+              className="block"
+              style={{
+                ...commonTitleStyle,
+                transform: `skewX(calc(-1 * ${skew}))`,
+                display: "inline-block",
+              }}
+            >
+              {title}
+            </span>
+          </div>
+          {showSubtitle && subtitle && (
+            <div
+              style={{
+                background: subtitleBg,
+                transform: `skewX(${skew})`,
+                padding: "0.3em 1.2em",
+                maxWidth: "90%",
+              }}
+            >
+              <span
+                className="block"
+                style={{
+                  ...commonSubtitleStyle,
+                  transform: `skewX(calc(-1 * ${skew}))`,
+                  display: "inline-block",
+                }}
+              >
+                {subtitle}
+              </span>
+            </div>
+          )}
+        </div>
+      )}
+
+      {layout === "dual" && (
+        <div
+          className="flex h-full w-full flex-col justify-end"
+          style={{ gap: rowGap }}
+        >
+          <div className="flex w-full items-stretch" style={{ gap: "0.5cqh" }}>
+            {showKicker && (
+              <div
+                className="flex items-center"
+                style={{
+                  ...kickerStyle,
+                  padding: "0.5em 1em",
+                }}
+              >
+                {kickerText}
+              </div>
+            )}
+            <div
+              className="flex flex-1 items-center"
+              style={{
+                background: titleBg,
+                padding: "0.55em 1.4em",
+                boxShadow: "0 4px 10px rgba(0,0,0,0.25)",
+              }}
+            >
+              <span className="block" style={commonTitleStyle}>
+                {title}
+              </span>
+            </div>
+            <div
+              className="flex items-center justify-center text-center"
+              style={{
+                background: rightBadgeBg,
+                color: rightBadgeColor,
+                fontFamily: preset.fontFamily,
+                fontWeight: 800,
+                fontSize: `${Math.max(subtitleSize * 1.2, 9)}cqh`,
+                lineHeight: 1.05,
+                padding: "0.4em 0.9em",
+                whiteSpace: "pre-line",
+              }}
+            >
+              {rightBadgeText}
+            </div>
+          </div>
+          {showSubtitle && subtitle && (
+            <div
+              style={{
+                background: subtitleBg,
+                padding: "0.35em 1.2em",
+                width: "100%",
+              }}
+            >
+              <span className="block" style={commonSubtitleStyle}>
+                {subtitle}
+              </span>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function MediaVideo({
   path,
   fit,
