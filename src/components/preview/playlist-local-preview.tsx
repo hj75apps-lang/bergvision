@@ -136,21 +136,22 @@ export function PlaylistLocalPreview({
   // aconteça POR CIMA do antigo (evita "tela preta" entre trocas).
   const [prev, setPrev] = useState<{ item: Item; tick: number } | null>(null);
   const prevRef = useRef<{ item: Item; tick: number } | null>(null);
-  const lastKeyRef = useRef<string | null>(null);
+  const lastItemIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     const cur = items[index];
     if (!cur) return;
-    const key = `${cur.id}-${tick}`;
-    if (lastKeyRef.current && lastKeyRef.current !== key) {
-      // marca o item que estava em cena como "saindo"
+    // Só marca "saindo" quando o ITEM muda de fato — não a cada bump de tick,
+    // senão o overlay de prev era sobrescrito com o item novo e a transição
+    // parecia um corte seco.
+    if (lastItemIdRef.current && lastItemIdRef.current !== cur.id) {
       setPrev(prevRef.current);
       const t = window.setTimeout(() => setPrev(null), 650);
-      lastKeyRef.current = key;
+      lastItemIdRef.current = cur.id;
       prevRef.current = { item: cur, tick };
       return () => window.clearTimeout(t);
     }
-    lastKeyRef.current = key;
+    lastItemIdRef.current = cur.id;
     prevRef.current = { item: cur, tick };
   }, [index, tick, items]);
 
