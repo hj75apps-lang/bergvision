@@ -261,14 +261,6 @@ function InlineMediaGroup({ c }: { c: Record<string, unknown> }) {
           <MediaImage path={cur.storagePath} fit={fit} label="Imagem" />
         </div>
       )}
-      {items.length > 1 && (
-        <div className="pointer-events-none absolute bottom-1 right-1 rounded-md bg-black/60 px-1.5 py-0.5 text-white/85 backdrop-blur">
-          <span style={{ fontSize: "8cqh" }}>
-            {safeIdx + 1}/{items.length}
-            {loop ? " ↻" : ""}
-          </span>
-        </div>
-      )}
     </div>
   );
 }
