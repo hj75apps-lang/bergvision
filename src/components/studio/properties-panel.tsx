@@ -34,6 +34,7 @@ import {
 import { cn } from "@/lib/utils";
 import type { TemplateElement } from "@/lib/studio/types";
 import { ELEMENT_LABELS } from "@/lib/studio/types";
+import { TICKER_PRESETS, type TickerPresetId } from "./element-body";
 import {
   MediaPickerDialog,
   isLowRes,
