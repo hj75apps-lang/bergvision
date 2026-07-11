@@ -407,6 +407,17 @@ function PlaylistEditor({
   const [scheduleDays, setScheduleDays] = useState<number[]>(
     playlist.schedule_days ?? [],
   );
+  const [dateStart, setDateStart] = useState<Date | undefined>(
+    playlist.schedule_date_start
+      ? new Date(`${playlist.schedule_date_start}T00:00:00`)
+      : undefined,
+  );
+  const [dateEnd, setDateEnd] = useState<Date | undefined>(
+    playlist.schedule_date_end
+      ? new Date(`${playlist.schedule_date_end}T00:00:00`)
+      : undefined,
+  );
+  const [selectedPlayerIds, setSelectedPlayerIds] = useState<string[]>([]);
 
   useEffect(() => {
     setName(playlist.name);
@@ -414,6 +425,16 @@ function PlaylistEditor({
     setScheduleStart(playlist.schedule_start?.slice(0, 5) ?? "");
     setScheduleEnd(playlist.schedule_end?.slice(0, 5) ?? "");
     setScheduleDays(playlist.schedule_days ?? []);
+    setDateStart(
+      playlist.schedule_date_start
+        ? new Date(`${playlist.schedule_date_start}T00:00:00`)
+        : undefined,
+    );
+    setDateEnd(
+      playlist.schedule_date_end
+        ? new Date(`${playlist.schedule_date_end}T00:00:00`)
+        : undefined,
+    );
   }, [playlist.id]);
 
   const itemsQ = useQuery({
