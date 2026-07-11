@@ -235,6 +235,7 @@ export function ElementBody({ el }: { el: TemplateElement }) {
       else if (widgetType === "ticker") inner = <TickerWidget config={cfg} />;
       else if (widgetType === "lowerthirds")
         inner = <LowerThirdsWidget config={cfg} />;
+      else if (widgetType === "iframe") inner = <IframeWidget config={cfg} />;
       else inner = <PlaceholderBadge label="Widget" />;
       const hasAppearance =
         (appearance.borderRadius as string | undefined) !== undefined ||
