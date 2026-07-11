@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ChevronLeft,
   ChevronRight,
+  ChevronsDownUp,
+  ChevronsUpDown,
   ImageIcon,
   LayoutTemplate,
   ListMusic,
@@ -82,6 +84,8 @@ export function PlaylistLocalPreview({
   const [index, setIndex] = useState(0);
   const [playing, setPlaying] = useState(true);
   const [tick, setTick] = useState(0); // força restart de mídia/timer
+  const [showControls, setShowControls] = useState(true);
+  const [showTimeline, setShowTimeline] = useState(true);
   const videoRef = useRef<HTMLVideoElement | null>(null);
 
   // Se a lista mudar drasticamente, volta para o começo.
@@ -149,6 +153,27 @@ export function PlaylistLocalPreview({
     >
       {/* Palco 16:9 */}
       <div className="relative flex-1 overflow-hidden bg-black">
+        {/* Toggles de minimização */}
+        <div className="pointer-events-auto absolute right-2 top-2 z-10 flex gap-1">
+          <Button
+            variant="secondary"
+            size="icon"
+            className="h-7 w-7 rounded-md bg-black/60 text-white/80 hover:bg-black/80"
+            onClick={() => setShowControls((v) => !v)}
+            title={showControls ? "Ocultar controles" : "Mostrar controles"}
+          >
+            {showControls ? <Pause className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5" />}
+          </Button>
+          <Button
+            variant="secondary"
+            size="icon"
+            className="h-7 w-7 rounded-md bg-black/60 text-white/80 hover:bg-black/80"
+            onClick={() => setShowTimeline((v) => !v)}
+            title={showTimeline ? "Ocultar pistas" : "Mostrar pistas"}
+          >
+            {showTimeline ? <ChevronsDownUp className="h-3.5 w-3.5" /> : <ChevronsUpDown className="h-3.5 w-3.5" />}
+          </Button>
+        </div>
         <div className="absolute inset-0 grid place-items-center">
           <div
             className="relative overflow-hidden rounded-md bg-black ring-1 ring-white/10"
@@ -179,6 +204,7 @@ export function PlaylistLocalPreview({
       </div>
 
       {/* Controles */}
+      {showControls && (
       <div className="flex items-center justify-between gap-2 border-t border-white/10 bg-black/40 px-3 py-2">
         <div className="flex items-center gap-1">
           <Button
@@ -216,8 +242,10 @@ export function PlaylistLocalPreview({
           )}
         </div>
       </div>
+      )}
 
       {/* Timeline */}
+      {showTimeline && (
       <div className="flex gap-1.5 overflow-x-auto border-t border-white/10 bg-black/40 px-3 py-2">
         {items.map((it, i) => {
           const active = i === index;
@@ -242,6 +270,7 @@ export function PlaylistLocalPreview({
           );
         })}
       </div>
+      )}
     </div>
   );
 }
