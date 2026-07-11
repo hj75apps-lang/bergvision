@@ -1298,6 +1298,15 @@ function ElementBody({ el }: { el: TemplateElement }) {
           muted={(c.muted as boolean) ?? true}
         />
       );
+    case "widget": {
+      const widgetType = (c.widgetType as string) ?? "clock";
+      const cfg = (c.widgetConfig as Record<string, unknown>) ?? {};
+      if (widgetType === "clock") return <ClockWidget config={cfg} />;
+      if (widgetType === "weather") return <WeatherWidget config={cfg} />;
+      if (widgetType === "rss" || widgetType === "news")
+        return <RssWidget config={cfg} />;
+      return <PlaceholderBadge label="Widget" />;
+    }
     default: {
       return (
         <div className="flex h-full w-full items-center justify-center rounded-md border border-dashed border-white/40 bg-white/5 text-[10px] font-medium uppercase tracking-wider text-white/80 backdrop-blur">
