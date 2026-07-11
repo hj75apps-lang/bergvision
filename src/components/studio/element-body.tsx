@@ -149,6 +149,7 @@ export function ElementBody({ el }: { el: TemplateElement }) {
       if (widgetType === "weather") return <WeatherWidget config={cfg} />;
       if (widgetType === "rss" || widgetType === "news")
         return <RssWidget config={cfg} />;
+      if (widgetType === "ticker") return <TickerWidget config={cfg} />;
       return <PlaceholderBadge label="Widget" />;
     }
     case "playlist": {
