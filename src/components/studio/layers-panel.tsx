@@ -286,6 +286,8 @@ export function LayersPanel({
       const isDropTarget = overKey === key && dropMode === "group";
       return (
         <Fragment key={key}>
+          <ContextMenu>
+          <ContextMenuTrigger asChild>
           <li
             onDragOver={(e) => {
               if (!dragIds) return;
@@ -399,6 +401,65 @@ export function LayersPanel({
               <FolderMinus className="h-3.5 w-3.5" />
             </button>
           </li>
+          </ContextMenuTrigger>
+          <ContextMenuContent className="w-56">
+            <ContextMenuItem
+              onSelect={() => onSelectMany(leafIds, false)}
+            >
+              <Layers className="mr-2 h-3.5 w-3.5" /> Selecionar elementos
+            </ContextMenuItem>
+            <ContextMenuItem
+              disabled={disabled}
+              onSelect={() => setEditingGroup(node.id)}
+            >
+              <Pencil className="mr-2 h-3.5 w-3.5" /> Renomear grupo
+            </ContextMenuItem>
+            <ContextMenuSeparator />
+            <ContextMenuItem
+              disabled={disabled}
+              onSelect={() => onToggleGroupVisible(node.id)}
+            >
+              {anyHidden ? (
+                <EyeOff className="mr-2 h-3.5 w-3.5" />
+              ) : (
+                <Eye className="mr-2 h-3.5 w-3.5" />
+              )}
+              {anyHidden ? "Mostrar grupo" : "Ocultar grupo"}
+            </ContextMenuItem>
+            <ContextMenuItem
+              disabled={disabled}
+              onSelect={() => onToggleGroupLocked(node.id)}
+            >
+              {anyLocked ? (
+                <Unlock className="mr-2 h-3.5 w-3.5" />
+              ) : (
+                <Lock className="mr-2 h-3.5 w-3.5" />
+              )}
+              {anyLocked ? "Desbloquear grupo" : "Bloquear grupo"}
+            </ContextMenuItem>
+            <ContextMenuSeparator />
+            <ContextMenuItem
+              disabled={disabled}
+              onSelect={() => onDuplicate(leafIds)}
+            >
+              <Copy className="mr-2 h-3.5 w-3.5" /> Duplicar elementos
+            </ContextMenuItem>
+            <ContextMenuItem
+              disabled={disabled}
+              onSelect={() => onUngroup(node.id)}
+            >
+              <FolderMinus className="mr-2 h-3.5 w-3.5" /> Desagrupar
+            </ContextMenuItem>
+            <ContextMenuSeparator />
+            <ContextMenuItem
+              disabled={disabled}
+              className="text-destructive focus:text-destructive"
+              onSelect={() => onDeleteGroup(node.id)}
+            >
+              <Trash2 className="mr-2 h-3.5 w-3.5" /> Excluir grupo
+            </ContextMenuItem>
+          </ContextMenuContent>
+          </ContextMenu>
           {!isCollapsed &&
             node.children.map((c) => renderNode(c, depth + 1, key))}
         </Fragment>
