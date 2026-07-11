@@ -489,6 +489,42 @@ function PlaylistEditor({
     },
   });
 
+  const playersQ = useQuery({
+    queryKey: ["players-for-playlist", orgId],
+    enabled: open && !!orgId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("players")
+        .select("id, name, status, orientation")
+        .eq("organization_id", orgId!)
+        .order("name");
+      if (error) throw error;
+      return (data ?? []) as Array<{
+        id: string;
+        name: string;
+        status: string | null;
+        orientation: string | null;
+      }>;
+    },
+  });
+
+  const assignedPlayersQ = useQuery({
+    queryKey: ["playlist_players", playlist.id],
+    enabled: open,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("playlist_players")
+        .select("player_id")
+        .eq("playlist_id", playlist.id);
+      if (error) throw error;
+      return (data ?? []).map((r: { player_id: string }) => r.player_id);
+    },
+  });
+
+  useEffect(() => {
+    if (assignedPlayersQ.data) setSelectedPlayerIds(assignedPlayersQ.data);
+  }, [assignedPlayersQ.data]);
+
   const [items, setItems] = useState<PlaylistItem[]>([]);
   useEffect(() => {
     setItems(itemsQ.data ?? []);
