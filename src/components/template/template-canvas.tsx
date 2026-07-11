@@ -33,6 +33,7 @@ type Props = {
   onCommit?: (zones: Zone[]) => void; // fires on pointer-up after drag/resize
   snap?: number;
   className?: string;
+  style?: React.CSSProperties;
   showLabels?: boolean;
 };
 
@@ -111,6 +112,7 @@ export function TemplateCanvas({
   onCommit,
   snap = 1,
   className,
+  style,
   showLabels,
 }: Props) {
   const canvasRef = useRef<HTMLDivElement | null>(null);
@@ -231,7 +233,7 @@ export function TemplateCanvas({
         isEdit && "cursor-crosshair",
         className,
       )}
-      style={{ aspectRatio: aspectRatioCss(template) }}
+      style={{ aspectRatio: aspectRatioCss(template), ...style }}
       onPointerDown={(e) => {
         if (isEdit && e.target === e.currentTarget) onSelect?.(null);
       }}
