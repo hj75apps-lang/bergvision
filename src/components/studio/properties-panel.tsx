@@ -1041,6 +1041,109 @@ function LowerThirdsConfig({
         </label>
       </div>
 
+      <div className="grid grid-cols-2 gap-2">
+        <label className="flex flex-col gap-1">
+          <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+            Animação (RSS)
+          </span>
+          <Select
+            value={((config.rssAnimation as string) ?? "fade")}
+            onValueChange={(v) => setCfg({ rssAnimation: v })}
+            disabled={disabled}
+          >
+            <SelectTrigger className="h-8 text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="fade">Fade</SelectItem>
+              <SelectItem value="slide">Deslizar</SelectItem>
+              <SelectItem value="reveal">Revelar</SelectItem>
+              <SelectItem value="zoom">Zoom</SelectItem>
+              <SelectItem value="flip">Flip</SelectItem>
+              <SelectItem value="same">Igual à entrada</SelectItem>
+              <SelectItem value="none">Nenhuma</SelectItem>
+            </SelectContent>
+          </Select>
+        </label>
+        <label className="flex flex-col gap-1">
+          <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+            Duração (ms)
+          </span>
+          <Input
+            type="number"
+            min={150}
+            max={3000}
+            step={50}
+            value={(config.rssAnimationDuration as number) ?? 600}
+            disabled={disabled}
+            onChange={(e) =>
+              setCfg({
+                rssAnimationDuration: Math.max(
+                  150,
+                  Math.min(3000, Number(e.target.value) || 600),
+                ),
+              })
+            }
+            className="h-8 text-xs"
+          />
+        </label>
+      </div>
+
+      <label className="flex flex-col gap-1">
+        <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+          Origem do título (com RSS)
+        </span>
+        <Select
+          value={((config.titleSource as string) ?? "feed")}
+          onValueChange={(v) => setCfg({ titleSource: v })}
+          disabled={disabled}
+        >
+          <SelectTrigger className="h-8 text-xs">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="feed">Do feed RSS</SelectItem>
+            <SelectItem value="custom">Texto personalizado</SelectItem>
+            <SelectItem value="prefix">Prefixo + feed</SelectItem>
+          </SelectContent>
+        </Select>
+      </label>
+      {((config.titleSource as string) ?? "feed") === "prefix" && (
+        <label className="flex flex-col gap-1">
+          <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+            Prefixo do título
+          </span>
+          <Input
+            value={(config.titlePrefix as string) ?? ""}
+            disabled={disabled}
+            maxLength={40}
+            placeholder="Ex.: ÚLTIMAS |"
+            onChange={(e) => setCfg({ titlePrefix: e.target.value })}
+            className="h-8 text-xs"
+          />
+        </label>
+      )}
+
+      <label className="flex flex-col gap-1">
+        <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+          Origem da legenda (com RSS)
+        </span>
+        <Select
+          value={((config.subtitleSource as string) ?? "auto")}
+          onValueChange={(v) => setCfg({ subtitleSource: v })}
+          disabled={disabled}
+        >
+          <SelectTrigger className="h-8 text-xs">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="auto">Data de publicação</SelectItem>
+            <SelectItem value="custom">Texto personalizado</SelectItem>
+            <SelectItem value="none">Ocultar durante RSS</SelectItem>
+          </SelectContent>
+        </Select>
+      </label>
+
       <div className="flex items-center justify-between rounded-md border border-border/50 bg-muted/30 px-2 py-1.5">
         <span className="text-[11px] font-medium">Mostrar legenda</span>
         <Switch
