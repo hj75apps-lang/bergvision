@@ -1122,6 +1122,18 @@ function TickerWidget({ config }: { config: Record<string, unknown> }) {
 
 // ---------- News Lower Thirds Widget ----------
 
+// Keyframes compartilhados por LowerThirdsWidget e BroadcastLayout.
+// Mantidos em um único lugar para que animações de entrada e de rotação RSS
+// usem exatamente o mesmo timing/curva.
+const LT_KEYFRAMES_CSS = `
+@keyframes bv-lt-slide-l{from{transform:translateX(-100%);opacity:0}to{transform:translateX(0);opacity:1}}
+@keyframes bv-lt-slide-r{from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}}
+@keyframes bv-lt-fade{from{opacity:0}to{opacity:1}}
+@keyframes bv-lt-reveal{from{clip-path:inset(0 100% 0 0)}to{clip-path:inset(0 0 0 0)}}
+@keyframes bv-lt-zoom{from{transform:scale(0.85);opacity:0}to{transform:scale(1);opacity:1}}
+@keyframes bv-lt-flip{from{transform:perspective(600px) rotateX(90deg);opacity:0;transform-origin:bottom}to{transform:perspective(600px) rotateX(0);opacity:1;transform-origin:bottom}}
+`;
+
 export type LowerThirdsPresetId =
   | "broadcast"
   | "breaking"
@@ -1491,6 +1503,21 @@ function LowerThirdsWidget({ config }: { config: Record<string, unknown> }) {
   );
   const maxItems = Math.max(1, Math.min(20, (config.maxItems as number) ?? 6));
 
+  // Como cada campo textual é usado quando o feed RSS está ativo:
+  //  - feed          → conteúdo vem 100% do item RSS (comportamento clássico)
+  //  - custom        → mantém o texto estático mesmo com feed ativo
+  //  - prefix        → (apenas título) concatena "prefixo + título do item"
+  //  - none          → oculta o campo enquanto o feed está ativo
+  const titleSource = ((config.titleSource as string) ?? "feed") as
+    | "feed"
+    | "custom"
+    | "prefix";
+  const subtitleSource = ((config.subtitleSource as string) ?? "auto") as
+    | "auto"
+    | "custom"
+    | "none";
+  const titlePrefix = ((config.titlePrefix as string) ?? "").slice(0, 40);
+
   const rssQ = useQuery({
     queryKey: ["widget-lowerthirds-rss", feedUrl, maxItems],
     enabled: feedUrl.length > 0,
@@ -1518,10 +1545,25 @@ function LowerThirdsWidget({ config }: { config: Record<string, unknown> }) {
 
   let title = staticTitle;
   let subtitle = staticSubtitle;
+  let subtitleHidden = false;
   if (feedUrl && rssItems.length > 0) {
     const item = rssItems[rssIdx % rssItems.length];
-    title = item.title.slice(0, 200);
-    if (item.pubDate) subtitle = item.pubDate.slice(0, 200);
+    const feedTitle = item.title.slice(0, 200);
+    if (titleSource === "custom") {
+      title = staticTitle;
+    } else if (titleSource === "prefix") {
+      title = `${titlePrefix ? `${titlePrefix} ` : ""}${feedTitle}`.slice(0, 240);
+    } else {
+      title = feedTitle;
+    }
+    if (subtitleSource === "custom") {
+      subtitle = staticSubtitle;
+    } else if (subtitleSource === "none") {
+      subtitle = "";
+      subtitleHidden = true;
+    } else {
+      subtitle = item.pubDate ? item.pubDate.slice(0, 200) : "";
+    }
   } else if (feedUrl && rssQ.isLoading) {
     title = "Carregando feed...";
     subtitle = "";
@@ -1536,16 +1578,29 @@ function LowerThirdsWidget({ config }: { config: Record<string, unknown> }) {
     | "slide"
     | "fade"
     | "reveal";
+  const rssAnim = ((config.rssAnimation as string) ?? "fade") as
+    | "same"
+    | "none"
+    | "slide"
+    | "fade"
+    | "reveal"
+    | "zoom"
+    | "flip";
+  const rssAnimDurationMs = Math.max(
+    150,
+    Math.min(3000, (config.rssAnimationDuration as number) ?? 600),
+  );
   const showKicker =
     typeof config.showKicker === "boolean"
       ? (config.showKicker as boolean)
       : !!preset.kickerText;
   const kickerText =
     ((config.kickerText as string) || preset.kickerText || "AO VIVO").slice(0, 24);
-  const showSubtitle =
+  const showSubtitleRaw =
     typeof config.showSubtitle === "boolean"
       ? (config.showSubtitle as boolean)
       : true;
+  const showSubtitle = showSubtitleRaw && !subtitleHidden;
   const titleUppercase =
     typeof config.titleUppercase === "boolean"
       ? (config.titleUppercase as boolean)
@@ -1581,46 +1636,69 @@ function LowerThirdsWidget({ config }: { config: Record<string, unknown> }) {
       ? { background: "transparent" }
       : { background: preset.bg };
 
-  const animName =
-    anim === "slide"
-      ? align === "right"
-        ? "bv-lt-slide-r"
-        : "bv-lt-slide-l"
-      : anim === "fade"
-        ? "bv-lt-fade"
-        : anim === "reveal"
-          ? "bv-lt-reveal"
-          : undefined;
+  const resolveAnimName = (
+    kind: "none" | "slide" | "fade" | "reveal" | "zoom" | "flip",
+  ): string | undefined => {
+    if (kind === "slide")
+      return align === "right" ? "bv-lt-slide-r" : "bv-lt-slide-l";
+    if (kind === "fade") return "bv-lt-fade";
+    if (kind === "reveal") return "bv-lt-reveal";
+    if (kind === "zoom") return "bv-lt-zoom";
+    if (kind === "flip") return "bv-lt-flip";
+    return undefined;
+  };
+  const animName = resolveAnimName(anim);
+  const rotationAnimName =
+    rssAnim === "same" ? animName : resolveAnimName(rssAnim);
+
+  // Chave que força re-mount do conteúdo a cada troca de item do RSS,
+  // fazendo a animação de rotação disparar de novo. Sem RSS ativo,
+  // a chave é estável e só a animação de entrada roda.
+  const rotationKey =
+    feedUrl && rssItems.length > 1 ? `rss-${rssIdx}` : "static";
+  const rotationStyle: React.CSSProperties = rotationAnimName
+    ? {
+        animation: `${rotationAnimName} ${rssAnimDurationMs}ms cubic-bezier(0.22,1,0.36,1)`,
+      }
+    : {};
 
   const layout = preset.layout ?? "classic";
 
   // Layouts especializados (broadcast estilizado)
   if (layout !== "classic") {
     return (
-      <BroadcastLayout
-        preset={preset}
-        layout={layout}
-        title={title}
-        subtitle={subtitle}
-        showSubtitle={showSubtitle}
-        showKicker={showKicker}
-        kickerText={kickerText}
-        titleColor={titleColor}
-        subtitleColor={subtitleColor}
-        accentColor={accentColor}
-        titleUppercase={titleUppercase}
-        subtitleUppercase={subtitleUppercase}
-        titleItalic={titleItalic}
-        titleSize={titleSize}
-        subtitleSize={subtitleSize}
-        align={align}
-        animName={animName}
-      />
+      <div
+        key={rotationKey}
+        className="relative h-full w-full overflow-hidden"
+        style={rotationStyle}
+      >
+        <style>{LT_KEYFRAMES_CSS}</style>
+        <BroadcastLayout
+          preset={preset}
+          layout={layout}
+          title={title}
+          subtitle={subtitle}
+          showSubtitle={showSubtitle}
+          showKicker={showKicker}
+          kickerText={kickerText}
+          titleColor={titleColor}
+          subtitleColor={subtitleColor}
+          accentColor={accentColor}
+          titleUppercase={titleUppercase}
+          subtitleUppercase={subtitleUppercase}
+          titleItalic={titleItalic}
+          titleSize={titleSize}
+          subtitleSize={subtitleSize}
+          align={align}
+          animName={animName}
+        />
+      </div>
     );
   }
 
   return (
     <div
+      key={rotationKey}
       className="relative flex h-full w-full overflow-hidden"
       style={{
         containerType: "size",
@@ -1630,15 +1708,14 @@ function LowerThirdsWidget({ config }: { config: Record<string, unknown> }) {
         fontFamily: preset.fontFamily,
         justifyContent: align === "right" ? "flex-end" : "flex-start",
         alignItems: "center",
-        animation: animName ? `${animName} 0.7s cubic-bezier(0.22,1,0.36,1)` : undefined,
+        animation: rotationAnimName
+          ? `${rotationAnimName} ${rssAnimDurationMs}ms cubic-bezier(0.22,1,0.36,1)`
+          : animName
+            ? `${animName} 0.7s cubic-bezier(0.22,1,0.36,1)`
+            : undefined,
       }}
     >
-      <style>{`
-        @keyframes bv-lt-slide-l{from{transform:translateX(-100%);opacity:0}to{transform:translateX(0);opacity:1}}
-        @keyframes bv-lt-slide-r{from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}}
-        @keyframes bv-lt-fade{from{opacity:0}to{opacity:1}}
-        @keyframes bv-lt-reveal{from{clip-path:inset(0 100% 0 0)}to{clip-path:inset(0 0 0 0)}}
-      `}</style>
+      <style>{LT_KEYFRAMES_CSS}</style>
 
       {showAccentBar && align === "left" && (
         <div
@@ -1826,12 +1903,7 @@ function BroadcastLayout(props: BroadcastLayoutProps) {
       className="relative flex h-full w-full flex-col overflow-hidden"
       style={containerStyle}
     >
-      <style>{`
-        @keyframes bv-lt-slide-l{from{transform:translateX(-100%);opacity:0}to{transform:translateX(0);opacity:1}}
-        @keyframes bv-lt-slide-r{from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}}
-        @keyframes bv-lt-fade{from{opacity:0}to{opacity:1}}
-        @keyframes bv-lt-reveal{from{clip-path:inset(0 100% 0 0)}to{clip-path:inset(0 0 0 0)}}
-      `}</style>
+      <style>{LT_KEYFRAMES_CSS}</style>
 
       {(layout === "angled" || layout === "notched") && (
         <div
