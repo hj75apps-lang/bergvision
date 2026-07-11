@@ -11,6 +11,7 @@ import {
   Bold,
   Italic,
   ImagePlus,
+  Image as ImageIcon,
   Plus,
   RotateCcw,
   Strikethrough,
@@ -2108,6 +2109,134 @@ function AppearanceFields({
   );
 }
 
+function WeatherBackgroundControls({
+  config,
+  setCfg,
+  disabled,
+}: {
+  config: Record<string, unknown>;
+  setCfg: (p: Record<string, unknown>) => void;
+  disabled: boolean;
+}) {
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const bgPath = (config.backgroundImagePath as string | undefined) ?? "";
+  const bgOpacity =
+    typeof config.backgroundImageOpacity === "number"
+      ? Math.max(0, Math.min(1, config.backgroundImageOpacity as number))
+      : 1;
+  const bgFit = ((config.backgroundImageFit as string) ?? "cover") as
+    | "cover"
+    | "contain"
+    | "fill";
+  const bgBlur =
+    typeof config.backgroundImageBlur === "number"
+      ? Math.max(0, Math.min(40, config.backgroundImageBlur as number))
+      : 0;
+
+  return (
+    <div className="flex flex-col gap-2 rounded-md border border-border/50 bg-muted/20 p-2">
+      <div className="flex items-center justify-between">
+        <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+          Fundo personalizado
+        </span>
+        {bgPath && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-6 px-2 text-[10px] text-destructive hover:text-destructive"
+            disabled={disabled}
+            onClick={() =>
+              setCfg({ backgroundImagePath: undefined })
+            }
+          >
+            Remover
+          </Button>
+        )}
+      </div>
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        disabled={disabled}
+        onClick={() => setPickerOpen(true)}
+        className="justify-start"
+      >
+        <ImageIcon className="mr-2 h-3.5 w-3.5" />
+        {bgPath ? "Trocar imagem" : "Escolher imagem"}
+      </Button>
+      {bgPath && (
+        <>
+          <label className="flex flex-col gap-1">
+            <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+              Opacidade ({Math.round(bgOpacity * 100)}%)
+            </span>
+            <Slider
+              value={[Math.round(bgOpacity * 100)]}
+              min={0}
+              max={100}
+              step={1}
+              disabled={disabled}
+              onValueChange={([v]) =>
+                setCfg({ backgroundImageOpacity: v / 100 })
+              }
+            />
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+              Ajuste
+            </span>
+            <Select
+              value={bgFit}
+              onValueChange={(v) => setCfg({ backgroundImageFit: v })}
+              disabled={disabled}
+            >
+              <SelectTrigger className="h-8 text-xs capitalize">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="cover">Preencher (cover)</SelectItem>
+                <SelectItem value="contain">Caber (contain)</SelectItem>
+                <SelectItem value="fill">Esticar (fill)</SelectItem>
+              </SelectContent>
+            </Select>
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+              Desfoque ({bgBlur}px)
+            </span>
+            <Slider
+              value={[bgBlur]}
+              min={0}
+              max={40}
+              step={1}
+              disabled={disabled}
+              onValueChange={([v]) => setCfg({ backgroundImageBlur: v })}
+            />
+          </label>
+        </>
+      )}
+      <MediaPickerDialog
+        open={pickerOpen}
+        onOpenChange={setPickerOpen}
+        filter="image"
+        onPick={(f: PickerMediaFile) => {
+          setCfg({
+            backgroundImagePath: f.storage_path,
+            backgroundImageOpacity:
+              typeof config.backgroundImageOpacity === "number"
+                ? config.backgroundImageOpacity
+                : 1,
+            backgroundImageFit:
+              (config.backgroundImageFit as string) ?? "cover",
+          });
+          setPickerOpen(false);
+        }}
+      />
+    </div>
+  );
+}
+
 function PlaylistContent({
   c,
   patch,
@@ -2917,6 +3046,11 @@ function WidgetContent({
           <p className="text-[10px] text-muted-foreground">
             Dados via Open-Meteo (gratuito, sem chave de API). Atualiza a cada 15 min.
           </p>
+          <WeatherBackgroundControls
+            config={config}
+            setCfg={setCfg}
+            disabled={disabled}
+          />
         </>
       )}
 

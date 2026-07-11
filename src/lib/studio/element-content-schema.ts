@@ -101,6 +101,11 @@ export const WeatherWidgetConfigSchema = z.object({
     .default('gradient'),
   accentColor: hexColor.optional(),
   showAnimatedIcons: z.boolean().default(true),
+  // Fundo personalizado (opcional): imagem do bucket "media" + opacidade.
+  backgroundImagePath: z.string().max(500).optional(),
+  backgroundImageOpacity: z.number().min(0).max(1).optional(),
+  backgroundImageFit: z.enum(['cover', 'contain', 'fill']).optional(),
+  backgroundImageBlur: z.number().min(0).max(40).optional(),
   // Nunca aceitar apiKey aqui — resolvido em Edge Function.
 });
 

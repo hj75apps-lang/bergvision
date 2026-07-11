@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
 
 import { supabase } from "@/integrations/supabase/client";
+import { useSignedUrl } from "@/lib/studio/use-signed-url";
 import { WeatherIcon, wmoToGradient } from "./weather-icons";
 
 type WeatherData = {
@@ -75,6 +76,46 @@ export function WeatherWidget({ config }: { config: Record<string, unknown> }) {
   const accentColor = config.accentColor as string | undefined;
   const animated = (config.showAnimatedIcons as boolean | undefined) ?? true;
 
+  const bgPath = (config.backgroundImagePath as string | undefined) || null;
+  const bgUrl = useSignedUrl(bgPath, 3600);
+  const bgOpacity =
+    typeof config.backgroundImageOpacity === "number"
+      ? Math.max(0, Math.min(1, config.backgroundImageOpacity as number))
+      : 1;
+  const bgFit = ((config.backgroundImageFit as string) ?? "cover") as
+    | "cover"
+    | "contain"
+    | "fill";
+  const bgBlur =
+    typeof config.backgroundImageBlur === "number"
+      ? Math.max(0, Math.min(40, config.backgroundImageBlur as number))
+      : 0;
+
+  const withBg = (node: React.ReactNode) => {
+    if (!bgUrl) return node;
+    return (
+      <div
+        className="relative h-full w-full"
+        style={{ borderRadius: "3cqmin", overflow: "hidden" }}
+      >
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0"
+          style={{
+            backgroundImage: `url(${bgUrl})`,
+            backgroundSize: bgFit === "fill" ? "100% 100%" : bgFit,
+            backgroundPosition: "center",
+            backgroundRepeat: "no-repeat",
+            opacity: bgOpacity,
+            filter: bgBlur > 0 ? `blur(${bgBlur}px)` : undefined,
+            transform: bgBlur > 0 ? "scale(1.05)" : undefined,
+          }}
+        />
+        <div className="relative h-full w-full">{node}</div>
+      </div>
+    );
+  };
+
   const q = useQuery({
     queryKey: ["widget-weather", city, units],
     enabled: city.length > 0,
@@ -98,32 +139,32 @@ export function WeatherWidget({ config }: { config: Record<string, unknown> }) {
 
   if (!city) {
     return (
-      <div
+      withBg(<div
         className="flex h-full w-full items-center justify-center text-white/70"
         style={{ ...shellBase, background: "#1E293B" }}
       >
         <span style={{ fontSize: "8cqh" }}>Configure a cidade</span>
-      </div>
+      </div>)
     );
   }
   if (q.isLoading) {
     return (
-      <div
+      withBg(<div
         className="flex h-full w-full items-center justify-center text-white/70"
         style={{ ...shellBase, background: "#0F172A" }}
       >
         <Loader2 className="h-4 w-4 animate-spin" />
-      </div>
+      </div>)
     );
   }
   if (q.isError || !q.data) {
     return (
-      <div
+      withBg(<div
         className="flex h-full w-full items-center justify-center text-white/80"
         style={{ ...shellBase, background: "#7F1D1D" }}
       >
         <span style={{ fontSize: "7cqh" }}>Clima indisponível</span>
-      </div>
+      </div>)
     );
   }
 
@@ -143,22 +184,24 @@ export function WeatherWidget({ config }: { config: Record<string, unknown> }) {
     forecast: Array.isArray(raw.forecast) ? (raw.forecast as WeatherData["forecast"]) : [],
   };
   const t = themeStyle(theme, d.code, d.isDay, accentColor);
+  // Quando há imagem de fundo personalizada, o fundo do tema fica transparente
+  // para não sobrepor a imagem — mantemos apenas a cor de texto do tema.
   const shell: React.CSSProperties = {
     ...shellBase,
-    background: t.background,
+    background: bgUrl ? "transparent" : t.background,
     color: t.color,
   };
 
   if (preset === "minimal") {
-    return <PresetMinimal d={d} shell={shell} accent={t.accent} animated={animated} />;
+    return withBg(<PresetMinimal d={d} shell={shell} accent={t.accent} animated={animated} />);
   }
   if (preset === "forecast") {
-    return <PresetForecast d={d} shell={shell} accent={t.accent} animated={animated} />;
+    return withBg(<PresetForecast d={d} shell={shell} accent={t.accent} animated={animated} />);
   }
   if (preset === "vertical") {
-    return <PresetVertical d={d} shell={shell} accent={t.accent} animated={animated} />;
+    return withBg(<PresetVertical d={d} shell={shell} accent={t.accent} animated={animated} />);
   }
-  return <PresetComplete d={d} shell={shell} accent={t.accent} animated={animated} />;
+  return withBg(<PresetComplete d={d} shell={shell} accent={t.accent} animated={animated} />);
 }
 
 function fmtDate(iso: string) {
