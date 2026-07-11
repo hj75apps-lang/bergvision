@@ -2557,6 +2557,7 @@ function WidgetContent({
             <SelectItem value="news">Notícias</SelectItem>
             <SelectItem value="ticker">News Ticker</SelectItem>
             <SelectItem value="lowerthirds">Lower Thirds</SelectItem>
+            <SelectItem value="iframe">Iframe (HTML externo)</SelectItem>
           </SelectContent>
         </Select>
       </label>
