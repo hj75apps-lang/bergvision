@@ -90,6 +90,7 @@ import {
   TemplateBackground,
 } from "@/components/studio/element-body";
 import { TemplateSettingsDialog } from "@/components/studio/template-settings-dialog";
+import { ImageEditorDialog } from "@/components/studio/image-editor/image-editor-dialog";
 import { PreviewPanel } from "@/components/preview/preview-panel";
 import { useStudioDraftPayload } from "@/lib/studio/use-draft-payload";
 import { slugify } from "@/lib/template-utils";
