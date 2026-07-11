@@ -8,10 +8,15 @@ import {
   AlignRight,
   ArrowDown,
   ArrowUp,
+  Bold,
+  Italic,
   ImagePlus,
   Plus,
   RotateCcw,
+  Strikethrough,
   Trash2,
+  Type,
+  Underline,
   Upload,
   Wand2,
   Video as VideoIcon,
@@ -570,6 +575,158 @@ function TextContent({
             );
           })}
         </div>
+      </div>
+
+      <div className="flex flex-col gap-1">
+        <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+          Formatação
+        </span>
+        <div className="grid grid-cols-5 gap-1 rounded-lg border border-border/60 p-0.5">
+          {([
+            {
+              key: "bold",
+              icon: Bold,
+              active: ((c.fontWeight as string) ?? "400") === "700",
+              toggle: () =>
+                patch({
+                  fontWeight:
+                    ((c.fontWeight as string) ?? "400") === "700" ? "400" : "700",
+                }),
+              title: "Negrito",
+            },
+            {
+              key: "italic",
+              icon: Italic,
+              active: c.italic === true,
+              toggle: () => patch({ italic: !(c.italic === true) }),
+              title: "Itálico",
+            },
+            {
+              key: "underline",
+              icon: Underline,
+              active: c.underline === true,
+              toggle: () => patch({ underline: !(c.underline === true) }),
+              title: "Sublinhado",
+            },
+            {
+              key: "strike",
+              icon: Strikethrough,
+              active: c.strikethrough === true,
+              toggle: () =>
+                patch({ strikethrough: !(c.strikethrough === true) }),
+              title: "Riscado",
+            },
+            {
+              key: "uppercase",
+              icon: Type,
+              active: c.uppercase === true,
+              toggle: () => patch({ uppercase: !(c.uppercase === true) }),
+              title: "MAIÚSCULAS",
+            },
+          ] as const).map((btn) => {
+            const Icon = btn.icon;
+            return (
+              <button
+                key={btn.key}
+                type="button"
+                disabled={disabled}
+                onClick={btn.toggle}
+                title={btn.title}
+                className={cn(
+                  "flex items-center justify-center rounded-md py-1.5 transition",
+                  btn.active
+                    ? "bg-primary/20 text-primary"
+                    : "hover:bg-muted/60 text-muted-foreground",
+                )}
+              >
+                <Icon className="h-4 w-4" />
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-2">
+        <div className="flex flex-col gap-1">
+          <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+            Espaçamento ({(c.letterSpacing as number) ?? 0})
+          </span>
+          <Slider
+            value={[(c.letterSpacing as number) ?? 0]}
+            min={-5}
+            max={30}
+            step={1}
+            disabled={disabled}
+            onValueChange={([v]) => patch({ letterSpacing: v })}
+          />
+        </div>
+        <div className="flex flex-col gap-1">
+          <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+            Altura linha ({((c.lineHeight as number) ?? 1.2).toFixed(2)})
+          </span>
+          <Slider
+            value={[Math.round(((c.lineHeight as number) ?? 1.2) * 100)]}
+            min={80}
+            max={300}
+            step={5}
+            disabled={disabled}
+            onValueChange={([v]) => patch({ lineHeight: v / 100 })}
+          />
+        </div>
+      </div>
+
+      <div className="flex items-center justify-between">
+        <Label className="text-xs">Sombra do texto</Label>
+        <Switch
+          checked={c.textShadow === true}
+          disabled={disabled}
+          onCheckedChange={(v) => patch({ textShadow: v })}
+        />
+      </div>
+
+      <Separator />
+
+      <div className="flex flex-col gap-2">
+        <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+          Animação
+        </span>
+        <Select
+          value={(c.animation as string) ?? "none"}
+          onValueChange={(v) => patch({ animation: v })}
+          disabled={disabled}
+        >
+          <SelectTrigger className="h-8 text-xs">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="none">Nenhuma</SelectItem>
+            <SelectItem value="fade">Fade (esmaecer)</SelectItem>
+            <SelectItem value="slide-up">Deslizar para cima</SelectItem>
+            <SelectItem value="slide-down">Deslizar para baixo</SelectItem>
+            <SelectItem value="slide-left">Deslizar p/ esquerda</SelectItem>
+            <SelectItem value="slide-right">Deslizar p/ direita</SelectItem>
+            <SelectItem value="zoom">Zoom</SelectItem>
+            <SelectItem value="pulse">Pulsar</SelectItem>
+            <SelectItem value="blink">Piscar</SelectItem>
+            <SelectItem value="bounce">Quicar</SelectItem>
+            <SelectItem value="typewriter">Máquina de escrever</SelectItem>
+          </SelectContent>
+        </Select>
+        {((c.animation as string) ?? "none") !== "none" && (
+          <div className="flex flex-col gap-1">
+            <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+              Duração ({((c.animationSpeed as number) ?? 3).toFixed(1)}s)
+            </span>
+            <Slider
+              value={[Math.round(((c.animationSpeed as number) ?? 3) * 10)]}
+              min={5}
+              max={200}
+              step={1}
+              disabled={disabled}
+              onValueChange={([v]) => patch({ animationSpeed: v / 10 })}
+            />
+          </div>
+        )}
       </div>
 
       <Separator />

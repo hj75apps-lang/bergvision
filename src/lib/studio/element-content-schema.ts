@@ -30,6 +30,29 @@ export const TextElementSchema = z.object({
   textAlign: z.enum(['left', 'center', 'right']).default('left'),
   backgroundColor: hexColor.optional(),
   backgroundOpacity: z.number().min(0).max(1).optional(),
+  italic: z.boolean().optional(),
+  underline: z.boolean().optional(),
+  strikethrough: z.boolean().optional(),
+  uppercase: z.boolean().optional(),
+  letterSpacing: z.number().min(-10).max(30).optional(),
+  lineHeight: z.number().min(0.8).max(3).optional(),
+  textShadow: z.boolean().optional(),
+  animation: z
+    .enum([
+      'none',
+      'fade',
+      'slide-up',
+      'slide-down',
+      'slide-left',
+      'slide-right',
+      'zoom',
+      'pulse',
+      'blink',
+      'bounce',
+      'typewriter',
+    ])
+    .optional(),
+  animationSpeed: z.number().min(0.5).max(20).optional(),
 });
 
 export const ImageElementSchema = z.object({
