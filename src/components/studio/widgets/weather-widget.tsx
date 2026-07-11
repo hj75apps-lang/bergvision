@@ -388,6 +388,12 @@ function PresetForecast({
               {d.unit}
             </span>
           </span>
+          <span
+            className="truncate"
+            style={{ fontSize: "5.5cqh", opacity: 0.9, marginTop: "1cqh" }}
+          >
+            {d.description}
+          </span>
         </div>
         <div style={{ width: "34cqh", height: "34cqh", flexShrink: 0 }}>
           <WeatherIcon code={d.code} isDay={d.isDay} accent={accent} animated={animated} />
