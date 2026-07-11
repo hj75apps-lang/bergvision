@@ -319,7 +319,19 @@ function ContentBlock({
     case "text":
       return <TextContent c={c} patch={patch} disabled={disabled} />;
     case "image":
-    case "logo":
+    case "logo": {
+      const subtype = (c.imageSubtype as string) ?? "static";
+      if (subtype === "sequence" && element.element_type === "image") {
+        return (
+          <ImageSequenceContent c={c} patch={patch} disabled={disabled} />
+        );
+      }
+      const acceptExtensions =
+        subtype === "gif"
+          ? ["gif"]
+          : subtype === "apng"
+            ? ["apng", "png"]
+            : undefined;
       return (
         <MediaContent
           c={c}
@@ -329,8 +341,17 @@ function ContentBlock({
           allowFill={element.element_type === "image"}
           requiredWidth={requiredWidth}
           requiredHeight={requiredHeight}
+          acceptExtensions={acceptExtensions}
+          hint={
+            subtype === "gif"
+              ? "Envie um GIF animado (com transparência opcional)."
+              : subtype === "apng"
+                ? "Envie um APNG (PNG animado com transparência)."
+                : undefined
+          }
         />
       );
+    }
     case "video":
       return (
         <VideoContent
