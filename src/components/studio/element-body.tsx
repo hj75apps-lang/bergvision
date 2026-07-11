@@ -1136,7 +1136,11 @@ export type LowerThirdsPresetId =
   | "glass"
   | "editorial"
   | "esports"
-  | "talkshow";
+  | "talkshow"
+  | "global24"
+  | "orangeNotch"
+  | "stackedBars"
+  | "dualBadge";
 
 type LowerThirdsPreset = {
   id: LowerThirdsPresetId;
@@ -1159,6 +1163,18 @@ type LowerThirdsPreset = {
   kickerText?: string;
   accentBarWidth?: string; // vertical bar left/right
   showAccentBar?: boolean;
+  /** Layout de renderização. 'classic' = barra horizontal padrão. */
+  layout?: "classic" | "angled" | "notched" | "stacked" | "dual";
+  /** Skew aplicado aos blocos angulares (ex.: "-12deg"). */
+  skew?: string;
+  /** Badge quadrado direito (usado por layout 'dual'). */
+  rightBadgeBg?: string;
+  rightBadgeColor?: string;
+  rightBadgeText?: string;
+  /** Fundo da faixa de subtítulo (layouts stacked/dual). */
+  subtitleBg?: string;
+  /** Itálico opcional para títulos estilo broadcast clássico. */
+  titleItalic?: boolean;
 };
 
 export const LOWER_THIRDS_PRESETS: Record<LowerThirdsPresetId, LowerThirdsPreset> = {
@@ -1380,14 +1396,140 @@ export const LOWER_THIRDS_PRESETS: Record<LowerThirdsPresetId, LowerThirdsPreset
     showAccentBar: true,
     accentBarWidth: "5px",
   },
+  global24: {
+    id: "global24",
+    label: "Global 24",
+    bg: "#FFFFFF",
+    titleColor: "#0F172A",
+    subtitleColor: "#FFFFFF",
+    accent: "#DC2626",
+    fontFamily: "'Playfair Display', Georgia, serif",
+    titleWeight: 700,
+    subtitleWeight: 500,
+    titleItalic: true,
+    letterSpacing: "0.01em",
+    kickerBg: "#DC2626",
+    kickerColor: "#FFFFFF",
+    kickerText: "Global 24",
+    subtitleBg: "#DC2626",
+    layout: "angled",
+    skew: "-14deg",
+  },
+  orangeNotch: {
+    id: "orangeNotch",
+    label: "24 News (laranja)",
+    bg: "#0F172A",
+    titleColor: "#FFFFFF",
+    subtitleColor: "#F8FAFC",
+    accent: "#F59E0B",
+    fontFamily: "'Space Grotesk', Inter, sans-serif",
+    titleWeight: 800,
+    subtitleWeight: 500,
+    titleItalic: true,
+    letterSpacing: "0.02em",
+    kickerBg: "#F59E0B",
+    kickerColor: "#0F172A",
+    kickerText: "24 News",
+    subtitleBg: "rgba(15,23,42,0.55)",
+    layout: "notched",
+    skew: "-16deg",
+  },
+  stackedBars: {
+    id: "stackedBars",
+    label: "Barras empilhadas",
+    bg: "#0EA5E9",
+    titleColor: "#FFFFFF",
+    subtitleColor: "#0F172A",
+    accent: "#0284C7",
+    fontFamily: "'Space Grotesk', Inter, sans-serif",
+    titleWeight: 800,
+    subtitleWeight: 500,
+    titleItalic: true,
+    letterSpacing: "0.02em",
+    kickerBg: "#0F172A",
+    kickerColor: "#FFFFFF",
+    kickerText: "24",
+    subtitleBg: "#FFFFFF",
+    layout: "stacked",
+    skew: "-12deg",
+  },
+  dualBadge: {
+    id: "dualBadge",
+    label: "Duplo badge",
+    bg: "#FFFFFF",
+    titleColor: "#0F172A",
+    subtitleColor: "#F8FAFC",
+    accent: "#7C3AED",
+    fontFamily: "'Space Grotesk', Inter, sans-serif",
+    titleWeight: 800,
+    subtitleWeight: 500,
+    titleItalic: true,
+    letterSpacing: "0.02em",
+    kickerBg: "#7C3AED",
+    kickerColor: "#FFFFFF",
+    kickerText: "24 News",
+    rightBadgeBg: "#7C3AED",
+    rightBadgeColor: "#FFFFFF",
+    rightBadgeText: "24\nNews",
+    subtitleBg: "rgba(15,23,42,0.75)",
+    layout: "dual",
+  },
 };
 
 function LowerThirdsWidget({ config }: { config: Record<string, unknown> }) {
   const presetId = ((config.preset as string) ?? "broadcast") as LowerThirdsPresetId;
   const preset = LOWER_THIRDS_PRESETS[presetId] ?? LOWER_THIRDS_PRESETS.broadcast;
 
-  const title = ((config.title as string) ?? "Título da matéria").slice(0, 200);
-  const subtitle = ((config.subtitle as string) ?? "Legenda ou fonte").slice(0, 200);
+  const staticTitle = ((config.title as string) ?? "Título da matéria").slice(0, 200);
+  const staticSubtitle = ((config.subtitle as string) ?? "Legenda ou fonte").slice(0, 200);
+
+  // ---- RSS opcional ----
+  const feedUrl = ((config.feedUrl as string) ?? "").trim();
+  const rotationSec = Math.max(
+    3,
+    Math.min(120, (config.rotationSeconds as number) ?? 8),
+  );
+  const maxItems = Math.max(1, Math.min(20, (config.maxItems as number) ?? 6));
+
+  const rssQ = useQuery({
+    queryKey: ["widget-lowerthirds-rss", feedUrl, maxItems],
+    enabled: feedUrl.length > 0,
+    staleTime: 5 * 60 * 1000,
+    refetchInterval: 10 * 60 * 1000,
+    queryFn: async () => {
+      const { data, error } = await supabase.functions.invoke("widget-rss", {
+        body: { url: feedUrl, max: maxItems },
+      });
+      if (error) throw error;
+      return data as { items: { title: string; pubDate?: string }[] };
+    },
+  });
+
+  const rssItems = feedUrl ? (rssQ.data?.items ?? []).filter((i) => i.title) : [];
+  const [rssIdx, setRssIdx] = useState(0);
+  useEffect(() => {
+    if (rssItems.length <= 1) return;
+    const id = window.setInterval(
+      () => setRssIdx((i) => (i + 1) % rssItems.length),
+      rotationSec * 1000,
+    );
+    return () => window.clearInterval(id);
+  }, [rssItems.length, rotationSec]);
+
+  let title = staticTitle;
+  let subtitle = staticSubtitle;
+  if (feedUrl && rssItems.length > 0) {
+    const item = rssItems[rssIdx % rssItems.length];
+    title = item.title.slice(0, 200);
+    if (item.pubDate) subtitle = item.pubDate.slice(0, 200);
+  } else if (feedUrl && rssQ.isLoading) {
+    title = "Carregando feed...";
+    subtitle = "";
+  } else if (feedUrl && (rssQ.isError || rssItems.length === 0)) {
+    title = "Feed indisponível";
+    subtitle = "";
+  }
+
   const align = ((config.align as string) ?? "left") as "left" | "right";
   const anim = ((config.animation as string) ?? "slide") as
     | "none"
@@ -1417,6 +1559,10 @@ function LowerThirdsWidget({ config }: { config: Record<string, unknown> }) {
   const subtitleSize = Math.max(4, Math.min(40, (config.subtitleSize as number) ?? 14));
 
   const titleColor = (config.titleColor as string) || preset.titleColor;
+  const titleItalic =
+    typeof config.titleItalic === "boolean"
+      ? (config.titleItalic as boolean)
+      : preset.titleItalic ?? false;
   const subtitleColor = (config.subtitleColor as string) || preset.subtitleColor;
   const bgOverride = (config.bgColor as string) || null;
   const bgOpacity =
@@ -1445,6 +1591,33 @@ function LowerThirdsWidget({ config }: { config: Record<string, unknown> }) {
         : anim === "reveal"
           ? "bv-lt-reveal"
           : undefined;
+
+  const layout = preset.layout ?? "classic";
+
+  // Layouts especializados (broadcast estilizado)
+  if (layout !== "classic") {
+    return (
+      <BroadcastLayout
+        preset={preset}
+        layout={layout}
+        title={title}
+        subtitle={subtitle}
+        showSubtitle={showSubtitle}
+        showKicker={showKicker}
+        kickerText={kickerText}
+        titleColor={titleColor}
+        subtitleColor={subtitleColor}
+        accentColor={accentColor}
+        titleUppercase={titleUppercase}
+        subtitleUppercase={subtitleUppercase}
+        titleItalic={titleItalic}
+        titleSize={titleSize}
+        subtitleSize={subtitleSize}
+        align={align}
+        animName={animName}
+      />
+    );
+  }
 
   return (
     <div
@@ -1513,6 +1686,7 @@ function LowerThirdsWidget({ config }: { config: Record<string, unknown> }) {
             fontWeight: preset.titleWeight as number,
             letterSpacing: preset.letterSpacing,
             textTransform: titleUppercase ? "uppercase" : undefined,
+            fontStyle: titleItalic ? "italic" : undefined,
             lineHeight: 1.05,
           }}
         >
