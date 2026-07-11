@@ -108,6 +108,22 @@ export const WeatherWidgetConfigSchema = z.object({
   backgroundImageOpacity: z.number().min(0).max(1).optional(),
   backgroundImageFit: z.enum(['cover', 'contain', 'fill']).optional(),
   backgroundImageBlur: z.number().min(0).max(40).optional(),
+  // Animação suave do fundo (Ken Burns / pan). Nomes derivados de CSS
+  // keyframes registrados no componente do widget — mantidos leves via
+  // transform + will-change para não pesar o player.
+  backgroundImageAnimation: z
+    .enum([
+      'none',
+      'ken-burns',
+      'zoom-in',
+      'zoom-out',
+      'pan-left',
+      'pan-right',
+      'pan-up',
+      'pan-down',
+    ])
+    .optional(),
+  backgroundImageAnimationDuration: z.number().int().min(5).max(120).optional(),
   // Nunca aceitar apiKey aqui — resolvido em Edge Function.
 });
 
