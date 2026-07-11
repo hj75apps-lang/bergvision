@@ -2708,6 +2708,8 @@ function WidgetContent({
       {widgetType === "lowerthirds" && (
         <LowerThirdsConfig config={config} setCfg={setCfg} disabled={disabled} />
       )}
+
+      <AppearanceFields c={c} patch={patch} disabled={disabled} />
     </div>
   );
 }
