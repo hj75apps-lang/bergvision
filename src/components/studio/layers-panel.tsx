@@ -216,6 +216,54 @@ export function LayersPanel({
   const anyGrouped = elements.some((e) => getGroupPath(e).length > 0);
   const rootDropActive = !!dragIds && dropMode === "root";
 
+  const orderedIds = useMemo(() => ordered.map((e) => e.id), [ordered]);
+
+  const moveIds = (ids: string[], kind: "up" | "down" | "front" | "back") => {
+    if (ids.length === 0) return;
+    const set = new Set(ids);
+    const rest = orderedIds.filter((id) => !set.has(id));
+    const moving = orderedIds.filter((id) => set.has(id));
+    let next: string[] = orderedIds.slice();
+    if (kind === "front") {
+      next = [...moving, ...rest];
+    } else if (kind === "back") {
+      next = [...rest, ...moving];
+    } else if (kind === "up") {
+      next = orderedIds.slice();
+      // "up" = maior z_index = mover para índice menor
+      const positions = moving
+        .map((id) => next.indexOf(id))
+        .sort((a, b) => a - b);
+      for (const pos of positions) {
+        if (pos > 0 && !set.has(next[pos - 1])) {
+          const [x] = next.splice(pos, 1);
+          next.splice(pos - 1, 0, x);
+        }
+      }
+    } else if (kind === "down") {
+      next = orderedIds.slice();
+      const positions = moving
+        .map((id) => next.indexOf(id))
+        .sort((a, b) => b - a);
+      for (const pos of positions) {
+        if (pos < next.length - 1 && !set.has(next[pos + 1])) {
+          const [x] = next.splice(pos, 1);
+          next.splice(pos + 1, 0, x);
+        }
+      }
+    }
+    onReorder(next);
+  };
+
+  const ensureSelection = (id: string) => {
+    if (!selectedIds.includes(id)) onSelect(id, false);
+  };
+
+  const targetsFor = (id: string): string[] => {
+    if (selectedIds.includes(id) && selectedIds.length > 1) return selectedIds;
+    return [id];
+  };
+
   const renderNode = (
     node: TreeNode,
     depth: number,
