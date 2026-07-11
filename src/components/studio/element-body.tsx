@@ -443,6 +443,13 @@ function RssWidget({ config }: { config: Record<string, unknown> }) {
   const url = ((config.feedUrl as string) ?? "").trim();
   const max = (config.maxItems as number) ?? 5;
   const sizeCqh = Math.max(3, Math.min(90, (config.sizePercent as number) ?? 14));
+  const showText = (config.showText as boolean | undefined) ?? true;
+  const showImage = (config.showImage as boolean | undefined) ?? false;
+  const imagePosition = ((config.imagePosition as string) ?? "left") as
+    | "left"
+    | "right"
+    | "top"
+    | "background";
   const motion = ((config.motion as string) ?? "fade") as
     | "none"
     | "fade"
@@ -462,10 +469,13 @@ function RssWidget({ config }: { config: Record<string, unknown> }) {
         body: { url, max },
       });
       if (error) throw error;
-      return data as { items: { title: string; pubDate: string }[] };
+      return data as {
+        items: { title: string; pubDate: string; image?: string | null }[];
+      };
     },
   });
   const [idx, setIdx] = useState(0);
+  const [imgFailed, setImgFailed] = useState<Record<number, boolean>>({});
   const items = q.data?.items ?? [];
   useEffect(() => {
     if (items.length <= 1) return;
@@ -575,23 +585,95 @@ function RssWidget({ config }: { config: Record<string, unknown> }) {
   }
 
   // Fade / none (comportamento anterior)
+  const current = items[idx];
+  const curImg =
+    showImage && current?.image && !imgFailed[idx] ? current.image : null;
+  const onImgError = () =>
+    setImgFailed((prev) => ({ ...prev, [idx]: true }));
+
+  // Background: imagem cobre tudo, texto por cima com sombra
+  if (curImg && imagePosition === "background") {
+    return (
+      <div
+        className="relative flex h-full w-full overflow-hidden text-white"
+        style={wrapperStyle}
+      >
+        <img
+          src={curImg}
+          alt=""
+          onError={onImgError}
+          referrerPolicy="no-referrer"
+          className="absolute inset-0 h-full w-full object-cover"
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
+        {showText && (
+          <span
+            key={motion === "fade" ? idx : "static"}
+            style={{
+              fontSize: `${sizeCqh}cqh`,
+              fontWeight: 600,
+              lineHeight: 1.2,
+              animation:
+                motion === "fade" ? "bv-fade 0.6s ease-out" : undefined,
+            }}
+            className="relative mt-auto line-clamp-3 p-3"
+          >
+            {current?.title}
+          </span>
+        )}
+        <style>{`@keyframes bv-fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}`}</style>
+      </div>
+    );
+  }
+
+  const isRow =
+    curImg && (imagePosition === "left" || imagePosition === "right");
+  const isCol = curImg && imagePosition === "top";
+  const flexDir = isRow
+    ? imagePosition === "right"
+      ? "flex-row-reverse"
+      : "flex-row"
+    : isCol
+      ? "flex-col"
+      : "flex-col";
+
   return (
     <div
-      className="flex h-full w-full flex-col justify-center gap-1 overflow-hidden p-2 text-white"
+      className={`flex h-full w-full ${flexDir} items-stretch justify-center gap-2 overflow-hidden p-2 text-white`}
       style={wrapperStyle}
     >
-      <span
-        key={motion === "fade" ? idx : "static"}
-        style={{
-          fontSize: `${sizeCqh}cqh`,
-          fontWeight: 600,
-          lineHeight: 1.2,
-          animation: motion === "fade" ? "bv-fade 0.6s ease-out" : undefined,
-        }}
-        className="line-clamp-3"
-      >
-        {items[idx]?.title}
-      </span>
+      {curImg && (
+        <img
+          key={`img-${idx}`}
+          src={curImg}
+          alt=""
+          onError={onImgError}
+          referrerPolicy="no-referrer"
+          className={
+            isRow
+              ? "h-full w-2/5 shrink-0 rounded object-cover"
+              : "h-1/2 w-full shrink-0 rounded object-cover"
+          }
+          style={{
+            animation:
+              motion === "fade" ? "bv-fade 0.6s ease-out" : undefined,
+          }}
+        />
+      )}
+      {showText && (
+        <span
+          key={motion === "fade" ? idx : "static"}
+          style={{
+            fontSize: `${sizeCqh}cqh`,
+            fontWeight: 600,
+            lineHeight: 1.2,
+            animation: motion === "fade" ? "bv-fade 0.6s ease-out" : undefined,
+          }}
+          className="line-clamp-3 self-center"
+        >
+          {current?.title}
+        </span>
+      )}
       <style>{`@keyframes bv-fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}`}</style>
     </div>
   );

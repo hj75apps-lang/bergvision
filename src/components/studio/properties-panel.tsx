@@ -1410,6 +1410,65 @@ function WidgetContent({
             disabled={disabled}
             onCommit={(v) => setCfg({ maxItems: v })}
           />
+          <div className="flex items-center justify-between rounded-md border border-border/50 bg-muted/30 px-2 py-1.5">
+            <span className="text-[11px] font-medium">Mostrar imagem</span>
+            <Switch
+              checked={(config.showImage as boolean | undefined) ?? false}
+              disabled={disabled}
+              onCheckedChange={(v) => {
+                // Não permitir desligar as duas ao mesmo tempo
+                const showText =
+                  (config.showText as boolean | undefined) ?? true;
+                if (!v && !showText) {
+                  setCfg({ showImage: false, showText: true });
+                } else {
+                  setCfg({ showImage: v });
+                }
+              }}
+            />
+          </div>
+          <div className="flex items-center justify-between rounded-md border border-border/50 bg-muted/30 px-2 py-1.5">
+            <span className="text-[11px] font-medium">Mostrar texto</span>
+            <Switch
+              checked={(config.showText as boolean | undefined) ?? true}
+              disabled={disabled}
+              onCheckedChange={(v) => {
+                const showImage =
+                  (config.showImage as boolean | undefined) ?? false;
+                if (!v && !showImage) {
+                  setCfg({ showText: false, showImage: true });
+                } else {
+                  setCfg({ showText: v });
+                }
+              }}
+            />
+          </div>
+          {((config.showImage as boolean | undefined) ?? false) && (
+            <label className="flex flex-col gap-1">
+              <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                Posição da imagem
+              </span>
+              <Select
+                value={(config.imagePosition as string) ?? "left"}
+                onValueChange={(v) => setCfg({ imagePosition: v })}
+                disabled={disabled}
+              >
+                <SelectTrigger className="h-8 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="left">Esquerda</SelectItem>
+                  <SelectItem value="right">Direita</SelectItem>
+                  <SelectItem value="top">Topo</SelectItem>
+                  <SelectItem value="background">Fundo (cobrir)</SelectItem>
+                </SelectContent>
+              </Select>
+              <span className="text-[10px] text-muted-foreground">
+                Imagem vem direto do site da notícia (sem armazenamento).
+                Se o site bloquear, mostramos só o texto.
+              </span>
+            </label>
+          )}
           <label className="flex flex-col gap-1">
             <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
               Animação
