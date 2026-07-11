@@ -3014,7 +3014,13 @@ function defaultWidgetConfig(type: string): Record<string, unknown> {
     case "clock":
       return { format: "24h", timezone: "America/Sao_Paulo" };
     case "weather":
-      return { city: "", units: "metric" };
+      return {
+        city: "",
+        units: "metric",
+        preset: "complete",
+        theme: "gradient",
+        showAnimatedIcons: true,
+      };
     case "rss":
     case "news":
       return { feedUrl: "", maxItems: 5 };
