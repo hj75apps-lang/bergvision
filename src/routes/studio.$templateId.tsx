@@ -37,6 +37,7 @@ import {
   Type as TypeIcon,
   Undo2,
   Video as VideoIcon,
+  ChevronDown,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -44,6 +45,14 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Dialog,
   DialogContent,
@@ -961,19 +970,80 @@ function EditorPage() {
           Adicionar
         </span>
         <Separator orientation="vertical" className="h-6" />
-        {TOOLS.map((tool) => (
-          <Button
-            key={tool.type}
-            variant="ghost"
-            size="sm"
-            className="rounded-lg"
-            disabled={!canEdit || addElement.isPending}
-            onClick={() => addElement.mutate(tool)}
-          >
-            <tool.icon className="mr-1.5 h-4 w-4" />
-            {tool.label}
-          </Button>
-        ))}
+        {(() => {
+          const isImageSubtype = (t: ToolDef) =>
+            t.type === "image" &&
+            typeof (t.defaultContent as Record<string, unknown>).imageSubtype === "string";
+          const imageMainIdx = TOOLS.findIndex(
+            (t) => t.type === "image" && !isImageSubtype(t),
+          );
+          const imageMain = imageMainIdx >= 0 ? TOOLS[imageMainIdx] : null;
+          const imageSubtypes = TOOLS.filter(isImageSubtype);
+          return TOOLS.map((tool, idx) => {
+            if (isImageSubtype(tool)) return null;
+            if (tool === imageMain) {
+              return (
+                <div
+                  key={`tool-${idx}`}
+                  className="inline-flex items-center rounded-lg"
+                >
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="rounded-l-lg rounded-r-none pr-2"
+                    disabled={!canEdit || addElement.isPending}
+                    onClick={() => addElement.mutate(tool)}
+                  >
+                    <tool.icon className="mr-1.5 h-4 w-4" />
+                    {tool.label}
+                  </Button>
+                  {imageSubtypes.length > 0 && (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="rounded-l-none rounded-r-lg border-l border-border/60 px-1.5"
+                          disabled={!canEdit || addElement.isPending}
+                          title="Mais formatos de imagem"
+                        >
+                          <ChevronDown className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="start" className="w-56">
+                        <DropdownMenuLabel>Formatos animados</DropdownMenuLabel>
+                        <DropdownMenuSeparator />
+                        {imageSubtypes.map((t, i) => (
+                          <DropdownMenuItem
+                            key={`sub-${i}`}
+                            disabled={!canEdit || addElement.isPending}
+                            onSelect={() => addElement.mutate(t)}
+                          >
+                            <t.icon className="mr-2 h-4 w-4" />
+                            {t.label}
+                          </DropdownMenuItem>
+                        ))}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  )}
+                </div>
+              );
+            }
+            return (
+              <Button
+                key={`tool-${idx}`}
+                variant="ghost"
+                size="sm"
+                className="rounded-lg"
+                disabled={!canEdit || addElement.isPending}
+                onClick={() => addElement.mutate(tool)}
+              >
+                <tool.icon className="mr-1.5 h-4 w-4" />
+                {tool.label}
+              </Button>
+            );
+          });
+        })()}
       </div>
 
       {/* Main workspace */}
