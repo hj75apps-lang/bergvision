@@ -1225,6 +1225,15 @@ function EditorPage() {
                 queryKey: ["studio_elements", templateId],
               });
             }}
+            onDuplicate={(ids) => void duplicateElements(ids)}
+            onDelete={(ids) => void deleteElements(ids)}
+            onDeleteGroup={(groupId) => {
+              const ids = elements
+                .filter((e) => getGroupPath(e).some((s) => s.id === groupId))
+                .map((e) => e.id);
+              if (ids.length === 0) return;
+              void deleteElements(ids);
+            }}
           />
         </aside>
 
