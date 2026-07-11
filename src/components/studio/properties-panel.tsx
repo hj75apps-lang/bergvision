@@ -45,6 +45,7 @@ import {
   isLowRes,
   type PickerMediaFile,
 } from "./media-picker-dialog";
+import { MASK_PRESETS, getAppearanceConfig } from "@/lib/studio/appearance";
 
 const FONT_OPTIONS = [
   "Inter",
@@ -1487,6 +1488,8 @@ function MediaContent({
           })
         }
       />
+
+      <AppearanceFields c={c} patch={patch} disabled={disabled} />
     </div>
   );
 }
