@@ -1582,6 +1582,30 @@ function EditorPage() {
         disabled={!canEdit}
       />
 
+      <ImageEditorDialog
+        open={!!editorElement && !!editorSource}
+        onOpenChange={(v) => {
+          if (!v) setEditorElementId(null);
+        }}
+        source={editorSource}
+        onSaved={({ mediaFile, cacheBust }) => {
+          if (!editorElement) return;
+          const prev = (editorElement.content ?? {}) as Record<string, unknown>;
+          const nextContent: Record<string, unknown> = {
+            ...prev,
+            mediaFileId: mediaFile.id,
+            mediaFileName: mediaFile.name,
+            mediaStoragePath: mediaFile.storage_path,
+            mediaThumbnailPath: mediaFile.thumbnail_path,
+            mediaCacheBust: cacheBust,
+          };
+          void commitElementUpdate(editorElement.id, { content: nextContent });
+          void qc.invalidateQueries({ queryKey: ["studio_media_dims"] });
+          void qc.invalidateQueries({ queryKey: ["studio_media_picker"] });
+          void qc.invalidateQueries({ queryKey: ["media_files"] });
+        }}
+      />
+
       <Dialog open={duplicateOpen} onOpenChange={setDuplicateOpen}>
         <DialogContent className="rounded-2xl sm:max-w-md">
           <DialogHeader>
