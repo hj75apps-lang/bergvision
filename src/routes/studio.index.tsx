@@ -273,10 +273,11 @@ function StudioPage() {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid grid-cols-1 items-start gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {templates.map((t) => {
             const w = t.canvas_width ?? 1920;
             const h = t.canvas_height ?? 1080;
+            const isPortrait = h > w;
             return (
               <Card
                 key={t.id}
@@ -288,18 +289,24 @@ function StudioPage() {
                   })
                 }
               >
-                <div
-                  className="w-full overflow-hidden border-b border-border/60"
-                  style={{
-                    aspectRatio: `${w} / ${h}`,
-                    backgroundColor: t.background_color ?? "#0F172A",
-                    backgroundImage: t.thumbnail_url
-                      ? `url(${t.thumbnail_url})`
-                      : undefined,
-                    backgroundSize: "cover",
-                    backgroundPosition: "center",
-                  }}
-                />
+                <div className="flex h-56 w-full items-center justify-center overflow-hidden border-b border-border/60 bg-neutral-950/60 p-3">
+                  <div
+                    className={
+                      isPortrait
+                        ? "h-full w-auto rounded-md shadow-md ring-1 ring-white/5"
+                        : "w-full h-auto rounded-md shadow-md ring-1 ring-white/5"
+                    }
+                    style={{
+                      aspectRatio: `${w} / ${h}`,
+                      backgroundColor: t.background_color ?? "#0F172A",
+                      backgroundImage: t.thumbnail_url
+                        ? `url(${t.thumbnail_url})`
+                        : undefined,
+                      backgroundSize: "cover",
+                      backgroundPosition: "center",
+                    }}
+                  />
+                </div>
                 <CardHeader className="pb-2">
                   <div className="flex items-start justify-between gap-2">
                     <CardTitle className="text-base">{t.name}</CardTitle>
