@@ -2132,6 +2132,11 @@ function WeatherBackgroundControls({
     typeof config.backgroundImageBlur === "number"
       ? Math.max(0, Math.min(40, config.backgroundImageBlur as number))
       : 0;
+  const bgAnim = ((config.backgroundImageAnimation as string) ?? "none") as string;
+  const bgAnimDuration =
+    typeof config.backgroundImageAnimationDuration === "number"
+      ? Math.max(5, Math.min(120, config.backgroundImageAnimationDuration as number))
+      : 30;
 
   return (
     <div className="flex flex-col gap-2 rounded-md border border-border/50 bg-muted/20 p-2">
@@ -2214,6 +2219,50 @@ function WeatherBackgroundControls({
               onValueChange={([v]) => setCfg({ backgroundImageBlur: v })}
             />
           </label>
+          <label className="flex flex-col gap-1">
+            <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+              Animação
+            </span>
+            <Select
+              value={bgAnim}
+              onValueChange={(v) => setCfg({ backgroundImageAnimation: v })}
+              disabled={disabled}
+            >
+              <SelectTrigger className="h-8 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">Nenhuma</SelectItem>
+                <SelectItem value="ken-burns">Ken Burns (suave)</SelectItem>
+                <SelectItem value="zoom-in">Zoom in</SelectItem>
+                <SelectItem value="zoom-out">Zoom out</SelectItem>
+                <SelectItem value="pan-left">Deslizar ← esquerda</SelectItem>
+                <SelectItem value="pan-right">Deslizar → direita</SelectItem>
+                <SelectItem value="pan-up">Deslizar ↑ cima</SelectItem>
+                <SelectItem value="pan-down">Deslizar ↓ baixo</SelectItem>
+              </SelectContent>
+            </Select>
+          </label>
+          {bgAnim !== "none" && (
+            <label className="flex flex-col gap-1">
+              <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                Duração ({bgAnimDuration}s)
+              </span>
+              <Slider
+                value={[bgAnimDuration]}
+                min={5}
+                max={120}
+                step={1}
+                disabled={disabled}
+                onValueChange={([v]) =>
+                  setCfg({ backgroundImageAnimationDuration: v })
+                }
+              />
+              <span className="text-[10px] text-muted-foreground">
+                Movimentos lentos ficam mais elegantes e consomem menos CPU.
+              </span>
+            </label>
+          )}
         </>
       )}
       <MediaPickerDialog
