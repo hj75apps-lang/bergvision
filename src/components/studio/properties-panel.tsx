@@ -11,6 +11,7 @@ import {
   Bold,
   Italic,
   ImagePlus,
+  Image as ImageIcon,
   Plus,
   RotateCcw,
   Strikethrough,
