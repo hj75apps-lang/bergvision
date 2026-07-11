@@ -567,6 +567,12 @@ function EditorPage() {
     el.width >= 99.99 &&
     el.height >= 99.99;
 
+  const isImageEditable = useCallback((el: TemplateElement) => {
+    return el.element_type === "image" || el.element_type === "logo";
+  }, []);
+
+  const [editorElementId, setEditorElementId] = useState<string | null>(null);
+
   const toggleFullscreen = useCallback(
     async (id: string) => {
       const el = elements.find((e) => e.id === id);
