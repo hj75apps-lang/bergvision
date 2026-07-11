@@ -1572,9 +1572,17 @@ function EditorPage() {
 function ElementView({
   el,
   selected,
+  canEdit,
+  fullscreenable,
+  isFullscreen,
+  onToggleFullscreen,
 }: {
   el: TemplateElement;
   selected: boolean;
+  canEdit: boolean;
+  fullscreenable: boolean;
+  isFullscreen: boolean;
+  onToggleFullscreen: () => void;
 }) {
   const visible = el.visible ?? true;
   const style: React.CSSProperties = {
@@ -1594,7 +1602,7 @@ function ElementView({
     pointerEvents: el.locked ? "none" : "auto",
   };
 
-  return (
+  const body = (
     <div
       data-el-id={el.id}
       data-rot={String(el.rotation ?? 0)}
@@ -1602,5 +1610,18 @@ function ElementView({
     >
       <StudioElementBody el={el} />
     </div>
+  );
+
+  if (!canEdit || !fullscreenable) return body;
+
+  return (
+    <ContextMenu>
+      <ContextMenuTrigger asChild>{body}</ContextMenuTrigger>
+      <ContextMenuContent className="w-56">
+        <ContextMenuItem onSelect={() => onToggleFullscreen()}>
+          {isFullscreen ? "Restaurar tamanho original" : "Ocupar tela toda"}
+        </ContextMenuItem>
+      </ContextMenuContent>
+    </ContextMenu>
   );
 }
