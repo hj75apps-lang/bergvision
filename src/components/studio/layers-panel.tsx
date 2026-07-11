@@ -150,6 +150,9 @@ export function LayersPanel({
   onToggleGroupVisible,
   onToggleGroupLocked,
   onMoveToGroup,
+  onDuplicate,
+  onDelete,
+  onDeleteGroup,
 }: {
   elements: TemplateElement[];
   selectedIds: string[];
@@ -166,6 +169,9 @@ export function LayersPanel({
   onToggleGroupVisible: (groupId: string) => void;
   onToggleGroupLocked: (groupId: string) => void;
   onMoveToGroup: (elementIds: string[], targetPath: GroupSeg[]) => void;
+  onDuplicate: (ids: string[]) => void;
+  onDelete: (ids: string[]) => void;
+  onDeleteGroup: (groupId: string) => void;
 }) {
   const ordered = useMemo(
     () => [...elements].sort((a, b) => b.z_index - a.z_index),
