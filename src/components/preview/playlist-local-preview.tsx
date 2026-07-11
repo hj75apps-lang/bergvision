@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   ChevronLeft,
   ChevronRight,
@@ -19,6 +20,7 @@ import {
   TemplateBackground,
 } from "@/components/studio/element-body";
 import type { TemplateElement } from "@/lib/studio/types";
+import { prefetchSignedUrls } from "@/lib/studio/use-signed-url";
 
 type MediaFile = {
   id: string;
@@ -80,6 +82,48 @@ export function PlaylistLocalPreview({
     () => (draft?.playlist?.items ?? []) as Item[],
     [draft],
   );
+
+  // Pré-carrega URLs assinadas + decode das imagens de TODOS os templates da
+  // playlist assim que a lista muda. Assim, quando um item do tipo template
+  // entra em cena, as imagens já estão prontas — evitando o flash de spinner
+  // ao trocar de item.
+  const qc = useQueryClient();
+  useEffect(() => {
+    const paths: string[] = [];
+    for (const it of items) {
+      if (it.item_type !== "template") continue;
+      const tp = (it.template_payload ?? {}) as {
+        background_media?: { storage_path?: string | null } | null;
+        elements?: unknown[];
+      };
+      const bg = tp.background_media?.storage_path;
+      if (typeof bg === "string" && bg) paths.push(bg);
+      const els = Array.isArray(tp.elements) ? tp.elements : [];
+      for (const raw of els) {
+        const el = raw as { content?: Record<string, unknown> | null } | null;
+        const c = (el?.content ?? {}) as Record<string, unknown>;
+        const mp = c.mediaStoragePath;
+        if (typeof mp === "string" && mp) paths.push(mp);
+        const wbg = (c.widgetConfig as Record<string, unknown> | undefined)
+          ?.backgroundImagePath;
+        if (typeof wbg === "string" && wbg) paths.push(wbg);
+        const frames = Array.isArray(c.frames) ? (c.frames as unknown[]) : [];
+        for (const f of frames) {
+          const sp = (f as { storagePath?: unknown })?.storagePath;
+          if (typeof sp === "string" && sp) paths.push(sp);
+        }
+        const groupItems = Array.isArray(c.items) ? (c.items as unknown[]) : [];
+        for (const gi of groupItems) {
+          const sp = (gi as { storagePath?: unknown })?.storagePath;
+          if (typeof sp === "string" && sp) paths.push(sp);
+        }
+      }
+    }
+    if (paths.length > 0) {
+      // Falhas silenciosas — o <img> real refaz o pedido usando a mesma chave.
+      void prefetchSignedUrls(qc, paths, { warmup: true });
+    }
+  }, [items, qc]);
 
   const [index, setIndex] = useState(0);
   const [playing, setPlaying] = useState(true);
