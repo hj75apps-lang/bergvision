@@ -2,10 +2,10 @@ import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
 
-import { supabase } from "@/integrations/supabase/client";
 import { useSignedUrl } from "@/lib/studio/use-signed-url";
 import { ELEMENT_LABELS, type TemplateElement } from "@/lib/studio/types";
 import { getAppearanceStyle } from "@/lib/studio/appearance";
+import { WeatherWidget } from "./widgets/weather-widget";
 
 function getWidgetType(c: Record<string, unknown>) {
   return ((c.widgetType ?? c.widget_type) as string | undefined) ?? "clock";
@@ -1071,76 +1071,7 @@ function getAnalogStyle(style: string, color: string, accent: string): AnalogSty
   }
 }
 
-function WeatherWidget({ config }: { config: Record<string, unknown> }) {
-  const rawCity = ((config.city as string) ?? "").trim();
-  // Open-Meteo geocoding aceita apenas o nome da cidade (sem sufixo de país
-  // ou pontuação final). Normaliza entradas como "São Paulo, BR." → "São Paulo".
-  const city = rawCity
-    .replace(/[.\s]+$/g, "")
-    .replace(/\s*,\s*(BR|BRA|BRAZIL|BRASIL|US|USA|EUA|UK|PT|AR|CL)\.?$/i, "")
-    .replace(/[.\s]+$/g, "")
-    .trim();
-  const units =
-    (config.units as string) === "imperial" ? "imperial" : "metric";
-  const sizeCqh = Math.max(3, Math.min(90, (config.sizePercent as number) ?? 28));
-  const q = useQuery({
-    queryKey: ["widget-weather", city, units],
-    enabled: city.length > 0,
-    staleTime: 10 * 60 * 1000,
-    refetchInterval: 15 * 60 * 1000,
-    queryFn: async () => {
-      const { data, error } = await supabase.functions.invoke("widget-weather", {
-        body: { city, units },
-      });
-      if (error) throw error;
-      return data as {
-        temp: number;
-        unit: string;
-        description: string;
-        city: string;
-        country: string;
-      };
-    },
-  });
-  return (
-    <div
-      className="flex h-full w-full flex-col items-center justify-center gap-1 overflow-hidden p-2 text-white"
-      style={{
-        containerType: "size",
-        fontFamily: "Inter, system-ui",
-        ...widgetBgStyle(config, 0.3),
-      }}
-    >
-      {!city ? (
-        <span className="text-[11cqh] opacity-70">Configure a cidade</span>
-      ) : q.isLoading ? (
-        <Loader2 className="h-4 w-4 animate-spin opacity-70" />
-      ) : q.isError || !q.data ? (
-        <span className="text-[10cqh] opacity-70">Clima indisponível</span>
-      ) : (
-        <>
-          <span style={{ fontSize: `${sizeCqh}cqh`, fontWeight: 600 }}>
-            {q.data.temp}
-            {q.data.unit}
-          </span>
-          <span
-            style={{ fontSize: `${sizeCqh * 0.35}cqh`, opacity: 0.9 }}
-            className="truncate"
-          >
-            {q.data.description}
-          </span>
-          <span
-            style={{ fontSize: `${sizeCqh * 0.28}cqh`, opacity: 0.7 }}
-            className="truncate"
-          >
-            {q.data.city}
-            {q.data.country ? `, ${q.data.country}` : ""}
-          </span>
-        </>
-      )}
-    </div>
-  );
-}
+// WeatherWidget movido para ./widgets/weather-widget.tsx (presets + ícones animados).
 
 function RssWidget({ config }: { config: Record<string, unknown> }) {
   const url = ((config.feedUrl as string) ?? "").trim();
