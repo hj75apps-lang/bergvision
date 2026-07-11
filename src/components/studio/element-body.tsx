@@ -216,7 +216,7 @@ function WeatherWidget({ config }: { config: Record<string, unknown> }) {
 function RssWidget({ config }: { config: Record<string, unknown> }) {
   const url = ((config.feedUrl as string) ?? "").trim();
   const max = (config.maxItems as number) ?? 5;
-  const scale = ((config.sizePercent as number) ?? 100) / 100;
+  const sizeCqh = (config.sizePercent as number) ?? 14;
   const motion = ((config.motion as string) ?? "fade") as
     | "none"
     | "fade"
@@ -302,7 +302,7 @@ function RssWidget({ config }: { config: Record<string, unknown> }) {
           style={{
             animation: `bv-marquee-x ${speed}s linear infinite`,
             animationDirection: dir,
-            fontSize: `${18 * scale}cqh`,
+            fontSize: `${sizeCqh}cqh`,
             fontWeight: 600,
             paddingLeft: "2rem",
           }}
@@ -334,7 +334,7 @@ function RssWidget({ config }: { config: Record<string, unknown> }) {
             <span
               key={i}
               style={{
-                fontSize: `${14 * scale}cqh`,
+                fontSize: `${sizeCqh}cqh`,
                 fontWeight: 600,
                 lineHeight: 1.3,
               }}
@@ -354,7 +354,7 @@ function RssWidget({ config }: { config: Record<string, unknown> }) {
       style={wrapperStyle}
     >
       <span
-        style={{ fontSize: `${9 * scale}cqh`, opacity: 0.6 }}
+        style={{ fontSize: `${sizeCqh * 0.55}cqh`, opacity: 0.6 }}
         className="uppercase tracking-wider"
       >
         Notícia {idx + 1}/{items.length}
@@ -362,7 +362,7 @@ function RssWidget({ config }: { config: Record<string, unknown> }) {
       <span
         key={motion === "fade" ? idx : "static"}
         style={{
-          fontSize: `${14 * scale}cqh`,
+          fontSize: `${sizeCqh}cqh`,
           fontWeight: 600,
           lineHeight: 1.2,
           animation: motion === "fade" ? "bv-fade 0.6s ease-out" : undefined,
