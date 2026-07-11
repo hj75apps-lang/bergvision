@@ -183,6 +183,6 @@ export function getAppearanceStyle(
 export function hasAppearance(c: Record<string, unknown>): boolean {
   const { borderRadiusPercent, mask, maskUrl } = getAppearanceConfig(c);
   if (borderRadiusPercent > 0) return true;
-  if (mask === "custom") return /^https?:\/\//i.test(maskUrl.trim());
+  if (mask === "custom") return /^(https?:|data:image\/)/i.test(maskUrl.trim());
   return mask !== "none";
 }
