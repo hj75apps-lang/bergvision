@@ -132,6 +132,28 @@ export function PlaylistLocalPreview({
   const [showTimeline, setShowTimeline] = useState(true);
   const videoRef = useRef<HTMLVideoElement | null>(null);
 
+  // Guarda o item anterior por ~600ms para que a transição do novo item
+  // aconteça POR CIMA do antigo (evita "tela preta" entre trocas).
+  const [prev, setPrev] = useState<{ item: Item; tick: number } | null>(null);
+  const prevRef = useRef<{ item: Item; tick: number } | null>(null);
+  const lastKeyRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    const cur = items[index];
+    if (!cur) return;
+    const key = `${cur.id}-${tick}`;
+    if (lastKeyRef.current && lastKeyRef.current !== key) {
+      // marca o item que estava em cena como "saindo"
+      setPrev(prevRef.current);
+      const t = window.setTimeout(() => setPrev(null), 650);
+      lastKeyRef.current = key;
+      prevRef.current = { item: cur, tick };
+      return () => window.clearTimeout(t);
+    }
+    lastKeyRef.current = key;
+    prevRef.current = { item: cur, tick };
+  }, [index, tick, items]);
+
   // Se a lista mudar drasticamente, volta para o começo.
   useEffect(() => {
     setIndex((i) => (i >= items.length ? 0 : i));
@@ -231,15 +253,37 @@ export function PlaylistLocalPreview({
             }}
           >
             {current && (
-              <ItemStage
-                key={`${current.id}-${tick}`}
-                item={current}
-                playing={playing}
-                onVideoEnded={() =>
-                  setIndex((i) => (items.length ? (i + 1) % items.length : 0))
-                }
-                videoRef={videoRef}
-              />
+              <>
+                <TransitionStyles />
+                {prev && (
+                  <div
+                    key={`prev-${prev.item.id}-${prev.tick}`}
+                    className="absolute inset-0"
+                  >
+                    <ItemStage
+                      item={prev.item}
+                      playing={false}
+                      onVideoEnded={() => {}}
+                      videoRef={{ current: null } as React.MutableRefObject<HTMLVideoElement | null>}
+                      animate={false}
+                    />
+                  </div>
+                )}
+                <div
+                  key={`cur-${current.id}-${tick}`}
+                  className="absolute inset-0"
+                >
+                  <ItemStage
+                    item={current}
+                    playing={playing}
+                    onVideoEnded={() =>
+                      setIndex((i) => (items.length ? (i + 1) % items.length : 0))
+                    }
+                    videoRef={videoRef}
+                    animate
+                  />
+                </div>
+              </>
             )}
           </div>
         </div>
@@ -358,11 +402,13 @@ function ItemStage({
   playing,
   onVideoEnded,
   videoRef,
+  animate = true,
 }: {
   item: Item;
   playing: boolean;
   onVideoEnded: () => void;
   videoRef: React.MutableRefObject<HTMLVideoElement | null>;
+  animate?: boolean;
 }) {
   useEffect(() => {
     const v = videoRef.current;
@@ -372,30 +418,24 @@ function ItemStage({
   }, [playing, videoRef]);
 
   const transition = (item.transition ?? "fade").toLowerCase();
-  const animClass = transitionClass(transition);
+  const animClass = animate ? transitionClass(transition) : "";
 
   if (item.item_type === "template") {
     return (
-      <>
-        <TransitionStyles />
-        <div className={cn("h-full w-full", animClass)}>
-          <TemplateFrame item={item} />
-        </div>
-      </>
+      <div className={cn("h-full w-full", animClass)}>
+        <TemplateFrame item={item} />
+      </div>
     );
   }
 
   const url = item.media_file?.url ?? null;
   if (isImage(item)) {
     return url ? (
-      <>
-        <TransitionStyles />
-        <img
-          src={url}
-          alt=""
-          className={cn("h-full w-full object-contain", animClass)}
-        />
-      </>
+      <img
+        src={url}
+        alt=""
+        className={cn("h-full w-full object-contain", animClass)}
+      />
     ) : (
       <div className="grid h-full w-full place-items-center text-white/60">
         Mídia indisponível
@@ -404,18 +444,15 @@ function ItemStage({
   }
   if (isVideo(item)) {
     return url ? (
-      <>
-        <TransitionStyles />
-        <video
-          ref={videoRef}
-          src={url}
-          autoPlay={playing}
-          muted
-          playsInline
-          onEnded={onVideoEnded}
-          className={cn("h-full w-full object-contain", animClass)}
-        />
-      </>
+      <video
+        ref={videoRef}
+        src={url}
+        autoPlay={playing}
+        muted
+        playsInline
+        onEnded={onVideoEnded}
+        className={cn("h-full w-full object-contain", animClass)}
+      />
     ) : (
       <div className="grid h-full w-full place-items-center text-white/60">
         Vídeo indisponível
