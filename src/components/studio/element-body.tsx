@@ -118,7 +118,7 @@ export function ElementBody({ el }: { el: TemplateElement }) {
 function ClockWidget({ config }: { config: Record<string, unknown> }) {
   const format = (config.format as string) ?? "24h";
   const timezone = (config.timezone as string) ?? "America/Sao_Paulo";
-  const scale = ((config.sizePercent as number) ?? 100) / 100;
+  const sizeCqh = (config.sizePercent as number) ?? 28;
   const [now, setNow] = useState(() => new Date());
   useEffect(() => {
     const id = setInterval(() => setNow(new Date()), 1000);
@@ -143,7 +143,7 @@ function ClockWidget({ config }: { config: Record<string, unknown> }) {
         fontFamily: "Inter, system-ui, sans-serif",
         fontVariantNumeric: "tabular-nums",
         fontWeight: 600,
-        fontSize: `${28 * scale}cqh`,
+        fontSize: `${sizeCqh}cqh`,
         containerType: "size",
         letterSpacing: "0.02em",
       }}
