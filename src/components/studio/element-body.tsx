@@ -275,6 +275,24 @@ function InlineMediaGroup({ c }: { c: Record<string, unknown> }) {
 // ---------- Widgets ----------
 
 function ClockWidget({ config }: { config: Record<string, unknown> }) {
+  const kind = ((config.clockKind as string) ?? "digital") as "digital" | "analog";
+  const digitalStyle = ((config.digitalStyle as string) ?? "modern") as
+    | "modern"
+    | "led"
+    | "flip"
+    | "outline"
+    | "mono"
+    | "minimal"
+    | "neon";
+  const analogStyle = ((config.analogStyle as string) ?? "classic") as
+    | "classic"
+    | "modern"
+    | "roman"
+    | "minimal"
+    | "swiss"
+    | "railway"
+    | "dark"
+    | "neon";
   const format = (config.format as string) ?? "24h";
   const timezone = (config.timezone as string) ?? "America/Sao_Paulo";
   const sizeCqh = Math.max(3, Math.min(90, (config.sizePercent as number) ?? 28));
@@ -288,11 +306,13 @@ function ClockWidget({ config }: { config: Record<string, unknown> }) {
     | "yyyy-MM-dd";
   const layout = ((config.layout as string) ?? "stack") as "stack" | "inline";
   const color = (config.color as string) ?? "#FFFFFF";
+  const accent = (config.accentColor as string) ?? color;
   const [now, setNow] = useState(() => new Date());
   useEffect(() => {
-    const id = setInterval(() => setNow(new Date()), showSeconds ? 1000 : 15000);
+    const tick = kind === "analog" ? 1000 : showSeconds ? 1000 : 15000;
+    const id = setInterval(() => setNow(new Date()), tick);
     return () => clearInterval(id);
-  }, [showSeconds]);
+  }, [showSeconds, kind]);
   let text = "--:--";
   try {
     text = new Intl.DateTimeFormat("pt-BR", {
@@ -339,23 +359,80 @@ function ClockWidget({ config }: { config: Record<string, unknown> }) {
     }
   }
 
+  if (kind === "analog") {
+    return (
+      <div
+        className="flex h-full w-full items-center justify-center overflow-hidden"
+        style={{
+          containerType: "size",
+          color,
+          ...widgetBgStyle(config, 0),
+        }}
+      >
+        <div
+          className={`flex h-full w-full items-center justify-center ${
+            layout === "inline" && dateText ? "flex-row gap-[3cqmin]" : "flex-col gap-[2cqmin]"
+          }`}
+        >
+          <AnalogClock
+            date={now}
+            timezone={timezone}
+            style={analogStyle}
+            color={color}
+            accent={accent}
+            showSeconds={showSeconds}
+          />
+          {dateText && (
+            <span
+              style={{
+                fontFamily: "Inter, system-ui, sans-serif",
+                fontSize: `${Math.max(3, sizeCqh * 0.22)}cqh`,
+                opacity: 0.85,
+                fontWeight: 500,
+                lineHeight: 1.1,
+                textTransform: "capitalize",
+                color,
+              }}
+              className="truncate"
+            >
+              {dateText}
+            </span>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  const digitalTypography = getDigitalTypography(digitalStyle, color, accent);
   const wrapperFlex = layout === "inline" ? "flex-row items-baseline gap-2" : "flex-col items-center";
   return (
     <div
       className={`flex h-full w-full justify-center overflow-hidden text-white ${wrapperFlex}`}
       style={{
-        fontFamily: "Inter, system-ui, sans-serif",
+        fontFamily: digitalTypography.fontFamily,
         fontVariantNumeric: "tabular-nums",
-        fontWeight: 600,
+        fontWeight: digitalTypography.fontWeight,
         containerType: "size",
-        letterSpacing: "0.02em",
+        letterSpacing: digitalTypography.letterSpacing,
         color,
         alignItems: layout === "stack" ? "center" : "baseline",
         justifyContent: "center",
         ...widgetBgStyle(config, 0),
       }}
     >
-      <span style={{ fontSize: `${sizeCqh}cqh`, lineHeight: 1 }}>{text}</span>
+      {digitalStyle === "flip" ? (
+        <FlipDigits text={text} sizeCqh={sizeCqh} color={color} accent={accent} />
+      ) : (
+        <span
+          style={{
+            fontSize: `${sizeCqh}cqh`,
+            lineHeight: 1,
+            ...digitalTypography.textStyle,
+          }}
+        >
+          {text}
+        </span>
+      )}
       {dateText && (
         <span
           style={{
@@ -373,6 +450,473 @@ function ClockWidget({ config }: { config: Record<string, unknown> }) {
       )}
     </div>
   );
+}
+
+function getDigitalTypography(
+  style: string,
+  color: string,
+  accent: string,
+): {
+  fontFamily: string;
+  fontWeight: number | string;
+  letterSpacing: string;
+  textStyle: React.CSSProperties;
+} {
+  switch (style) {
+    case "led":
+      return {
+        fontFamily: '"Share Tech Mono", "Courier New", monospace',
+        fontWeight: 700,
+        letterSpacing: "0.08em",
+        textStyle: {
+          color: accent,
+          textShadow: `0 0 0.3em ${accent}, 0 0 0.6em ${accent}80`,
+        },
+      };
+    case "outline":
+      return {
+        fontFamily: "Inter, system-ui, sans-serif",
+        fontWeight: 800,
+        letterSpacing: "0.02em",
+        textStyle: {
+          color: "transparent",
+          WebkitTextStroke: `0.06em ${color}`,
+        },
+      };
+    case "mono":
+      return {
+        fontFamily: '"JetBrains Mono", "SF Mono", ui-monospace, monospace',
+        fontWeight: 600,
+        letterSpacing: "0.04em",
+        textStyle: {},
+      };
+    case "minimal":
+      return {
+        fontFamily: "Inter, system-ui, sans-serif",
+        fontWeight: 300,
+        letterSpacing: "0.02em",
+        textStyle: {},
+      };
+    case "neon":
+      return {
+        fontFamily: "Inter, system-ui, sans-serif",
+        fontWeight: 700,
+        letterSpacing: "0.04em",
+        textStyle: {
+          color: accent,
+          textShadow: `0 0 0.15em ${accent}, 0 0 0.45em ${accent}, 0 0 0.9em ${accent}80`,
+        },
+      };
+    case "modern":
+    default:
+      return {
+        fontFamily: "Inter, system-ui, sans-serif",
+        fontWeight: 600,
+        letterSpacing: "0.02em",
+        textStyle: {},
+      };
+  }
+}
+
+function FlipDigits({
+  text,
+  sizeCqh,
+  color,
+  accent,
+}: {
+  text: string;
+  sizeCqh: number;
+  color: string;
+  accent: string;
+}) {
+  const chars = text.split("");
+  return (
+    <div className="flex items-center" style={{ gap: "0.12em" }}>
+      {chars.map((ch, i) => {
+        const isSep = ch === ":" || ch === " ";
+        if (isSep) {
+          return (
+            <span
+              key={i}
+              style={{ fontSize: `${sizeCqh}cqh`, lineHeight: 1, color }}
+            >
+              {ch}
+            </span>
+          );
+        }
+        return (
+          <span
+            key={i}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              minWidth: `${sizeCqh * 0.7}cqh`,
+              padding: "0.05em 0.15em",
+              borderRadius: "0.12em",
+              background:
+                "linear-gradient(180deg, rgba(255,255,255,0.06) 0%, rgba(0,0,0,0.45) 50%, rgba(0,0,0,0.65) 50%, rgba(0,0,0,0.85) 100%)",
+              boxShadow: `inset 0 -0.02em 0 ${accent}30, 0 0.05em 0.15em rgba(0,0,0,0.4)`,
+              color,
+              fontSize: `${sizeCqh}cqh`,
+              lineHeight: 1,
+            }}
+          >
+            {ch}
+          </span>
+        );
+      })}
+    </div>
+  );
+}
+
+function AnalogClock({
+  date,
+  timezone,
+  style,
+  color,
+  accent,
+  showSeconds,
+}: {
+  date: Date;
+  timezone: string;
+  style: string;
+  color: string;
+  accent: string;
+  showSeconds: boolean;
+}) {
+  // Extrair h/m/s no fuso escolhido
+  let hours = date.getHours();
+  let minutes = date.getMinutes();
+  let seconds = date.getSeconds();
+  try {
+    const parts = new Intl.DateTimeFormat("en-GB", {
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: false,
+      timeZone: timezone,
+    }).formatToParts(date);
+    for (const p of parts) {
+      if (p.type === "hour") hours = parseInt(p.value, 10);
+      if (p.type === "minute") minutes = parseInt(p.value, 10);
+      if (p.type === "second") seconds = parseInt(p.value, 10);
+    }
+  } catch {
+    /* fallback já feito */
+  }
+  const hourAngle = ((hours % 12) + minutes / 60 + seconds / 3600) * 30;
+  const minuteAngle = (minutes + seconds / 60) * 6;
+  const secondAngle = seconds * 6;
+
+  // Estilos visuais
+  const cfg = getAnalogStyle(style, color, accent);
+  const size = 100;
+  const cx = 50;
+  const cy = 50;
+
+  const marks: React.ReactNode[] = [];
+  for (let i = 0; i < 60; i++) {
+    const isHour = i % 5 === 0;
+    if (cfg.marks === "none") continue;
+    if (cfg.marks === "hours" && !isHour) continue;
+    const angle = (i * 6 * Math.PI) / 180;
+    const outer = 46;
+    const inner = isHour ? cfg.markInnerHour : cfg.markInnerMinute;
+    if (inner < 0) continue;
+    const x1 = cx + Math.sin(angle) * inner;
+    const y1 = cy - Math.cos(angle) * inner;
+    const x2 = cx + Math.sin(angle) * outer;
+    const y2 = cy - Math.cos(angle) * outer;
+    marks.push(
+      <line
+        key={`m${i}`}
+        x1={x1}
+        y1={y1}
+        x2={x2}
+        y2={y2}
+        stroke={isHour ? cfg.markHourColor : cfg.markMinuteColor}
+        strokeWidth={isHour ? cfg.markHourWidth : cfg.markMinuteWidth}
+        strokeLinecap="round"
+      />,
+    );
+  }
+
+  const numerals: React.ReactNode[] = [];
+  if (cfg.numerals !== "none") {
+    const labels =
+      cfg.numerals === "roman"
+        ? ["XII", "I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI"]
+        : ["12", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11"];
+    for (let i = 0; i < 12; i++) {
+      const angle = (i * 30 * Math.PI) / 180;
+      const r = 38;
+      const x = cx + Math.sin(angle) * r;
+      const y = cy - Math.cos(angle) * r;
+      numerals.push(
+        <text
+          key={`n${i}`}
+          x={x}
+          y={y}
+          textAnchor="middle"
+          dominantBaseline="central"
+          fill={cfg.numeralColor}
+          fontSize={cfg.numeralSize}
+          fontFamily={cfg.numeralFont}
+          fontWeight={cfg.numeralWeight}
+        >
+          {labels[i]}
+        </text>,
+      );
+    }
+  }
+
+  return (
+    <svg
+      viewBox={`0 0 ${size} ${size}`}
+      style={{ width: "min(90cqw, 90cqh)", height: "min(90cqw, 90cqh)" }}
+    >
+      {/* Face */}
+      <circle
+        cx={cx}
+        cy={cy}
+        r={49}
+        fill={cfg.faceFill}
+        stroke={cfg.faceStroke}
+        strokeWidth={cfg.faceStrokeWidth}
+        style={cfg.faceFilter ? { filter: cfg.faceFilter } : undefined}
+      />
+      {marks}
+      {numerals}
+      {/* Hour hand */}
+      <line
+        x1={cx}
+        y1={cy + 6}
+        x2={cx}
+        y2={cy - 26}
+        stroke={cfg.hourColor}
+        strokeWidth={cfg.hourWidth}
+        strokeLinecap="round"
+        transform={`rotate(${hourAngle} ${cx} ${cy})`}
+        style={cfg.handFilter ? { filter: cfg.handFilter } : undefined}
+      />
+      {/* Minute hand */}
+      <line
+        x1={cx}
+        y1={cy + 8}
+        x2={cx}
+        y2={cy - 38}
+        stroke={cfg.minuteColor}
+        strokeWidth={cfg.minuteWidth}
+        strokeLinecap="round"
+        transform={`rotate(${minuteAngle} ${cx} ${cy})`}
+        style={cfg.handFilter ? { filter: cfg.handFilter } : undefined}
+      />
+      {/* Second hand */}
+      {showSeconds && (
+        <g transform={`rotate(${secondAngle} ${cx} ${cy})`}>
+          <line
+            x1={cx}
+            y1={cy + 12}
+            x2={cx}
+            y2={cy - 42}
+            stroke={cfg.secondColor}
+            strokeWidth={cfg.secondWidth}
+            strokeLinecap="round"
+            style={cfg.handFilter ? { filter: cfg.handFilter } : undefined}
+          />
+          {cfg.secondBob > 0 && (
+            <circle cx={cx} cy={cy - 34} r={cfg.secondBob} fill={cfg.secondColor} />
+          )}
+        </g>
+      )}
+      {/* Center cap */}
+      <circle cx={cx} cy={cy} r={cfg.capOuter} fill={cfg.capOuterColor} />
+      {cfg.capInner > 0 && (
+        <circle cx={cx} cy={cy} r={cfg.capInner} fill={cfg.capInnerColor} />
+      )}
+    </svg>
+  );
+}
+
+type AnalogStyleCfg = {
+  faceFill: string;
+  faceStroke: string;
+  faceStrokeWidth: number;
+  faceFilter?: string;
+  marks: "all" | "hours" | "none";
+  markHourColor: string;
+  markMinuteColor: string;
+  markHourWidth: number;
+  markMinuteWidth: number;
+  markInnerHour: number;
+  markInnerMinute: number;
+  numerals: "arabic" | "roman" | "none";
+  numeralColor: string;
+  numeralSize: number;
+  numeralFont: string;
+  numeralWeight: number | string;
+  hourColor: string;
+  hourWidth: number;
+  minuteColor: string;
+  minuteWidth: number;
+  secondColor: string;
+  secondWidth: number;
+  secondBob: number;
+  handFilter?: string;
+  capOuter: number;
+  capOuterColor: string;
+  capInner: number;
+  capInnerColor: string;
+};
+
+function getAnalogStyle(style: string, color: string, accent: string): AnalogStyleCfg {
+  const base: AnalogStyleCfg = {
+    faceFill: "rgba(0,0,0,0.4)",
+    faceStroke: color,
+    faceStrokeWidth: 1.5,
+    marks: "all",
+    markHourColor: color,
+    markMinuteColor: color,
+    markHourWidth: 1.6,
+    markMinuteWidth: 0.5,
+    markInnerHour: 42,
+    markInnerMinute: 44,
+    numerals: "none",
+    numeralColor: color,
+    numeralSize: 7,
+    numeralFont: "Inter, system-ui, sans-serif",
+    numeralWeight: 600,
+    hourColor: color,
+    hourWidth: 3,
+    minuteColor: color,
+    minuteWidth: 2,
+    secondColor: accent,
+    secondWidth: 1,
+    secondBob: 2,
+    capOuter: 2.2,
+    capOuterColor: color,
+    capInner: 1,
+    capInnerColor: accent,
+  };
+  switch (style) {
+    case "modern":
+      return {
+        ...base,
+        faceFill: "rgba(255,255,255,0.04)",
+        faceStrokeWidth: 0.6,
+        marks: "hours",
+        markHourWidth: 2.4,
+        markInnerHour: 40,
+        hourWidth: 3.5,
+        minuteWidth: 2.2,
+      };
+    case "roman":
+      return {
+        ...base,
+        numerals: "roman",
+        numeralSize: 6,
+        numeralWeight: 500,
+        marks: "none",
+        hourWidth: 2.6,
+        minuteWidth: 1.8,
+      };
+    case "minimal":
+      return {
+        ...base,
+        faceFill: "transparent",
+        faceStroke: "transparent",
+        faceStrokeWidth: 0,
+        marks: "hours",
+        markHourWidth: 1.4,
+        markInnerHour: 43,
+        hourWidth: 2.2,
+        minuteWidth: 1.4,
+        secondWidth: 0.8,
+        secondBob: 0,
+        capOuter: 1.4,
+      };
+    case "swiss":
+      return {
+        ...base,
+        faceFill: "#FFFFFF",
+        faceStroke: "#111111",
+        faceStrokeWidth: 1,
+        markHourColor: "#111111",
+        markMinuteColor: "#111111",
+        markHourWidth: 2,
+        markMinuteWidth: 0.6,
+        hourColor: "#111111",
+        minuteColor: "#111111",
+        secondColor: "#E53935",
+        secondWidth: 1.2,
+        secondBob: 2.4,
+        capOuter: 2.5,
+        capOuterColor: "#111111",
+        capInner: 1.2,
+        capInnerColor: "#E53935",
+      };
+    case "railway":
+      return {
+        ...base,
+        faceFill: "#FFFFFF",
+        faceStroke: "#0F0F0F",
+        faceStrokeWidth: 1.5,
+        marks: "all",
+        markHourColor: "#0F0F0F",
+        markMinuteColor: "#0F0F0F",
+        markHourWidth: 2.4,
+        markMinuteWidth: 0.6,
+        hourColor: "#0F0F0F",
+        minuteColor: "#0F0F0F",
+        hourWidth: 3.5,
+        minuteWidth: 2.4,
+        secondColor: "#D0021B",
+        secondWidth: 1,
+        secondBob: 3.5,
+        capOuter: 0,
+        capInner: 0,
+      };
+    case "dark":
+      return {
+        ...base,
+        faceFill: "#0B0B0F",
+        faceStroke: "#2A2A33",
+        faceStrokeWidth: 1.5,
+        markHourColor: "#F5F5F7",
+        markMinuteColor: "#6E6E76",
+        markHourWidth: 2,
+        hourColor: "#F5F5F7",
+        minuteColor: "#F5F5F7",
+        secondColor: accent,
+        hourWidth: 3.2,
+        minuteWidth: 2,
+      };
+    case "neon":
+      return {
+        ...base,
+        faceFill: "rgba(10,10,20,0.6)",
+        faceStroke: accent,
+        faceStrokeWidth: 1,
+        faceFilter: `drop-shadow(0 0 1.5px ${accent})`,
+        marks: "hours",
+        markHourColor: accent,
+        markHourWidth: 2,
+        hourColor: color,
+        minuteColor: color,
+        secondColor: accent,
+        handFilter: `drop-shadow(0 0 0.8px ${accent})`,
+        capOuterColor: accent,
+      };
+    case "classic":
+    default:
+      return {
+        ...base,
+        numerals: "arabic",
+        numeralSize: 7,
+        marks: "all",
+      };
+  }
 }
 
 function WeatherWidget({ config }: { config: Record<string, unknown> }) {
