@@ -34,7 +34,9 @@ export type PlaylistDraftMeta = {
 export type PlaylistDraftItem = {
   id: string;
   playlist_id: string;
-  media_file_id: string;
+  item_type: "media" | "template";
+  media_file_id: string | null;
+  template_id: string | null;
   position: number;
   duration: number | null;
   transition: string | null;
@@ -58,10 +60,29 @@ export function usePlaylistDraftPayload(
   enabled: boolean,
 ) {
   const mediaIds = useMemo(
-    () => Array.from(new Set(items.map((i) => i.media_file_id).filter(Boolean))),
+    () =>
+      Array.from(
+        new Set(
+          items
+            .filter((i) => i.item_type === "media" && i.media_file_id)
+            .map((i) => i.media_file_id as string),
+        ),
+      ),
+    [items],
+  );
+  const templateIds = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          items
+            .filter((i) => i.item_type === "template" && i.template_id)
+            .map((i) => i.template_id as string),
+        ),
+      ),
     [items],
   );
   const idsKey = mediaIds.join(",");
+  const tplKey = templateIds.join(",");
 
   const mediaQ = useQuery({
     enabled: enabled && !!meta && mediaIds.length > 0,
@@ -89,17 +110,110 @@ export function usePlaylistDraftPayload(
     staleTime: SIGNED_URL_TTL * 1000 * 0.8,
   });
 
+  // Templates de itens do tipo 'template' — resolve recursivamente elementos
+  // + mídias referenciadas (mesmo formato do get-preview-data para template).
+  const templatesQ = useQuery({
+    enabled: enabled && !!meta && templateIds.length > 0,
+    queryKey: ["playlist_draft_templates", tplKey],
+    queryFn: async () => {
+      const [tplRes, elRes] = await Promise.all([
+        supabase.from("templates").select("*").in("id", templateIds),
+        supabase
+          .from("template_elements")
+          .select("*")
+          .in("template_id", templateIds)
+          .order("z_index"),
+      ]);
+      if (tplRes.error) throw tplRes.error;
+      if (elRes.error) throw elRes.error;
+      const tpls = (tplRes.data ?? []) as Array<Record<string, unknown>>;
+      const elements = (elRes.data ?? []) as Array<Record<string, unknown>>;
+
+      // Coletar mídias referenciadas em elementos + backgrounds
+      const mids = new Set<string>();
+      for (const t of tpls) {
+        const bg = t.background_media_id as string | null | undefined;
+        if (bg) mids.add(bg);
+      }
+      for (const el of elements) {
+        const c = (el.content as { mediaFileId?: string } | null) ?? null;
+        if (c?.mediaFileId) mids.add(c.mediaFileId);
+      }
+
+      let mediaMap = new Map<string, EnrichedMedia>();
+      if (mids.size > 0) {
+        const { data, error } = await supabase
+          .from("media_files")
+          .select(
+            "id, name, type, storage_path, thumbnail_path, width, height, duration",
+          )
+          .in("id", Array.from(mids));
+        if (error) throw error;
+        const signed = await Promise.all(
+          ((data ?? []) as MediaRow[]).map(async (m) => {
+            const [url, thumbnail_url] = await Promise.all([
+              signPath(m.storage_path),
+              signPath(m.thumbnail_path),
+            ]);
+            return [m.id, { ...m, url, thumbnail_url }] as const;
+          }),
+        );
+        mediaMap = new Map(signed);
+      }
+
+      const byTemplate = new Map<
+        string,
+        Record<string, unknown>
+      >();
+      for (const t of tpls) {
+        const tid = t.id as string;
+        const bg = t.background_media_id as string | null | undefined;
+        const els = elements
+          .filter((e) => e.template_id === tid)
+          .map((e) => {
+            const c = (e.content as { mediaFileId?: string } | null) ?? null;
+            if (c?.mediaFileId) {
+              return { ...e, media_file: mediaMap.get(c.mediaFileId) ?? null };
+            }
+            return e;
+          });
+        byTemplate.set(tid, {
+          template: t,
+          background_media: bg ? mediaMap.get(bg) ?? null : null,
+          zones: [],
+          elements: els,
+        });
+      }
+      return byTemplate;
+    },
+    staleTime: SIGNED_URL_TTL * 1000 * 0.8,
+  });
+
   return useMemo(() => {
     if (!enabled || !meta) return undefined;
     const media = mediaQ.data ?? new Map<string, EnrichedMedia>();
+    const templates =
+      templatesQ.data ?? new Map<string, Record<string, unknown>>();
 
     const sorted = items
       .slice()
       .sort((a, b) => a.position - b.position)
-      .map((it) => ({
-        ...it,
-        media_file: media.get(it.media_file_id) ?? null,
-      }));
+      .map((it) => {
+        if (it.item_type === "template" && it.template_id) {
+          return {
+            ...it,
+            media_file: null,
+            template_payload: templates.get(it.template_id) ?? null,
+          };
+        }
+        return {
+          ...it,
+          media_file: it.media_file_id
+            ? media.get(it.media_file_id) ?? null
+            : null,
+          template_payload: null,
+        };
+      });
 
     return {
       mode: "live" as const,
@@ -111,5 +225,5 @@ export function usePlaylistDraftPayload(
         items: sorted,
       },
     };
-  }, [enabled, meta, items, mediaQ.data]);
+  }, [enabled, meta, items, mediaQ.data, templatesQ.data]);
 }
