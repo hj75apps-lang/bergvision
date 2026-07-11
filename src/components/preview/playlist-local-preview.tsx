@@ -13,6 +13,18 @@ import {
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
+const PLAYER_PREVIEW_URL = (
+  import.meta.env.VITE_PLAYER_PREVIEW_URL ?? ""
+).replace(/\/+$/, "");
+const PLAYER_PREVIEW_ORIGIN = (() => {
+  try {
+    return PLAYER_PREVIEW_URL ? new URL(PLAYER_PREVIEW_URL).origin : "";
+  } catch {
+    return "";
+  }
+})();
+const PLAYER_CONFIGURED = Boolean(PLAYER_PREVIEW_URL);
+
 type MediaFile = {
   id: string;
   name: string | null;
@@ -30,6 +42,9 @@ type Item = {
   media_file?: MediaFile | null;
   template_payload?: {
     template?: { id: string; name: string; type: string | null } | null;
+    background_media?: unknown;
+    zones?: unknown;
+    elements?: unknown;
   } | null;
 };
 
@@ -292,23 +307,7 @@ function ItemStage({
   }, [playing, videoRef]);
 
   if (item.item_type === "template") {
-    const t = item.template_payload?.template;
-    return (
-      <div className="grid h-full w-full place-items-center bg-gradient-to-br from-indigo-600/30 via-fuchsia-600/20 to-black">
-        <div className="flex flex-col items-center gap-3 rounded-2xl bg-black/40 px-6 py-5 text-center ring-1 ring-white/10">
-          <div className="grid h-12 w-12 place-items-center rounded-2xl bg-white/10 text-white">
-            <LayoutTemplate className="h-5 w-5" />
-          </div>
-          <div className="text-sm font-semibold text-white">
-            {t?.name ?? "Template"}
-          </div>
-          <div className="max-w-[240px] text-[11px] text-white/60">
-            A renderização fiel deste template acontece no preview do Player
-            (aba ao lado). Aqui simulamos apenas a sequência e o timing.
-          </div>
-        </div>
-      </div>
-    );
+    return <TemplateFrame item={item} />;
   }
 
   const url = item.media_file?.url ?? null;
