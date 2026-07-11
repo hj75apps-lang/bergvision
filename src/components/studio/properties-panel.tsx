@@ -820,6 +820,365 @@ function TickerConfig({
   );
 }
 
+function LowerThirdsConfig({
+  config,
+  setCfg,
+  disabled,
+}: {
+  config: Record<string, unknown>;
+  setCfg: (p: Record<string, unknown>) => void;
+  disabled: boolean;
+}) {
+  const presetId = ((config.preset as string) ?? "broadcast") as LowerThirdsPresetId;
+  const preset = LOWER_THIRDS_PRESETS[presetId] ?? LOWER_THIRDS_PRESETS.broadcast;
+  const align = ((config.align as string) ?? "left") as "left" | "right";
+  const anim = ((config.animation as string) ?? "slide") as
+    | "none"
+    | "slide"
+    | "fade"
+    | "reveal";
+  const showKicker =
+    typeof config.showKicker === "boolean"
+      ? (config.showKicker as boolean)
+      : !!preset.kickerText;
+  const showSubtitle =
+    typeof config.showSubtitle === "boolean"
+      ? (config.showSubtitle as boolean)
+      : true;
+  const titleSize = Math.max(6, Math.min(60, (config.titleSize as number) ?? 26));
+  const subtitleSize = Math.max(4, Math.min(40, (config.subtitleSize as number) ?? 14));
+  const titleUppercase =
+    typeof config.titleUppercase === "boolean"
+      ? (config.titleUppercase as boolean)
+      : preset.titleUppercase ?? false;
+  const subtitleUppercase =
+    typeof config.subtitleUppercase === "boolean"
+      ? (config.subtitleUppercase as boolean)
+      : preset.subtitleUppercase ?? false;
+  const showAccentBar =
+    typeof config.showAccentBar === "boolean"
+      ? (config.showAccentBar as boolean)
+      : preset.showAccentBar ?? false;
+
+  return (
+    <div className="flex flex-col gap-3">
+      <Separator />
+
+      <div className="flex flex-col gap-1.5">
+        <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+          Estilo ({Object.keys(LOWER_THIRDS_PRESETS).length} opções)
+        </span>
+        <div className="grid grid-cols-2 gap-1.5">
+          {Object.values(LOWER_THIRDS_PRESETS).map((p) => {
+            const active = p.id === presetId;
+            return (
+              <button
+                key={p.id}
+                type="button"
+                disabled={disabled}
+                onClick={() =>
+                  setCfg({
+                    preset: p.id,
+                    titleColor: undefined,
+                    subtitleColor: undefined,
+                    bgColor: undefined,
+                    accentColor: undefined,
+                    kickerText: undefined,
+                    showKicker: undefined,
+                    titleUppercase: undefined,
+                    subtitleUppercase: undefined,
+                    showAccentBar: undefined,
+                  })
+                }
+                className={cn(
+                  "flex flex-col gap-1 overflow-hidden rounded-md border p-1.5 text-left transition",
+                  active
+                    ? "border-primary ring-2 ring-primary/40"
+                    : "border-border/60 hover:border-border",
+                )}
+                title={p.label}
+              >
+                <div
+                  className="flex h-10 items-center gap-1 overflow-hidden rounded px-1.5"
+                  style={{
+                    background: p.bg === "transparent" ? "#1F2937" : p.bg,
+                    border: p.border,
+                    borderRadius: p.borderRadius,
+                    fontFamily: p.fontFamily,
+                  }}
+                >
+                  {p.showAccentBar && (
+                    <span
+                      style={{
+                        background: p.accent,
+                        width: p.accentBarWidth ?? "3px",
+                        height: "70%",
+                        borderRadius: "2px",
+                      }}
+                    />
+                  )}
+                  <div className="flex min-w-0 flex-col leading-tight">
+                    {p.kickerText && (
+                      <span
+                        style={{
+                          background: p.kickerBg ?? p.accent,
+                          color: p.kickerColor ?? "#FFFFFF",
+                          fontSize: "6px",
+                          padding: "1px 3px",
+                          borderRadius: "2px",
+                          alignSelf: "flex-start",
+                          fontWeight: 800,
+                          letterSpacing: "0.08em",
+                        }}
+                      >
+                        {p.kickerText}
+                      </span>
+                    )}
+                    <span
+                      className="truncate"
+                      style={{
+                        color: p.titleColor,
+                        fontSize: "9px",
+                        fontWeight: p.titleWeight as number,
+                        textTransform: p.titleUppercase ? "uppercase" : undefined,
+                        letterSpacing: p.letterSpacing,
+                        textShadow: p.textShadow,
+                      }}
+                    >
+                      Título do bloco
+                    </span>
+                    <span
+                      className="truncate"
+                      style={{
+                        color: p.subtitleColor,
+                        fontSize: "7px",
+                        fontWeight: p.subtitleWeight as number,
+                        textTransform: p.subtitleUppercase ? "uppercase" : undefined,
+                        letterSpacing: p.letterSpacing,
+                      }}
+                    >
+                      Legenda ou fonte
+                    </span>
+                  </div>
+                </div>
+                <span className="truncate text-[10px] text-muted-foreground">
+                  {p.label}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <Separator />
+
+      <label className="flex flex-col gap-1">
+        <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+          Título
+        </span>
+        <Input
+          value={(config.title as string) ?? ""}
+          disabled={disabled}
+          maxLength={200}
+          onChange={(e) => setCfg({ title: e.target.value })}
+          placeholder="Título da matéria"
+          className="h-8 text-xs"
+        />
+      </label>
+
+      <div className="flex items-center justify-between rounded-md border border-border/50 bg-muted/30 px-2 py-1.5">
+        <span className="text-[11px] font-medium">Mostrar legenda</span>
+        <Switch
+          checked={showSubtitle}
+          disabled={disabled}
+          onCheckedChange={(v) => setCfg({ showSubtitle: v })}
+        />
+      </div>
+
+      {showSubtitle && (
+        <label className="flex flex-col gap-1">
+          <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+            Legenda
+          </span>
+          <Input
+            value={(config.subtitle as string) ?? ""}
+            disabled={disabled}
+            maxLength={200}
+            onChange={(e) => setCfg({ subtitle: e.target.value })}
+            placeholder="Legenda ou fonte"
+            className="h-8 text-xs"
+          />
+        </label>
+      )}
+
+      <div className="flex items-center justify-between rounded-md border border-border/50 bg-muted/30 px-2 py-1.5">
+        <span className="text-[11px] font-medium">Mostrar badge (kicker)</span>
+        <Switch
+          checked={showKicker}
+          disabled={disabled}
+          onCheckedChange={(v) => setCfg({ showKicker: v })}
+        />
+      </div>
+      {showKicker && (
+        <label className="flex flex-col gap-1">
+          <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+            Texto do badge
+          </span>
+          <Input
+            value={(config.kickerText as string) ?? preset.kickerText ?? "AO VIVO"}
+            disabled={disabled}
+            maxLength={24}
+            onChange={(e) => setCfg({ kickerText: e.target.value })}
+            className="h-8 text-xs"
+          />
+        </label>
+      )}
+
+      <label className="flex flex-col gap-1">
+        <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+          Alinhamento
+        </span>
+        <div className="grid grid-cols-2 gap-1 rounded-lg border border-border/60 p-0.5">
+          {(
+            [
+              { v: "left", label: "Esquerda" },
+              { v: "right", label: "Direita" },
+            ] as const
+          ).map(({ v, label }) => (
+            <button
+              key={v}
+              type="button"
+              disabled={disabled}
+              onClick={() => setCfg({ align: v })}
+              className={cn(
+                "rounded-md py-1.5 text-xs transition",
+                align === v
+                  ? "bg-primary/20 text-primary"
+                  : "hover:bg-muted/60 text-muted-foreground",
+              )}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </label>
+
+      <label className="flex flex-col gap-1">
+        <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+          Animação de entrada
+        </span>
+        <Select
+          value={anim}
+          onValueChange={(v) => setCfg({ animation: v })}
+          disabled={disabled}
+        >
+          <SelectTrigger className="h-8 text-xs">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="slide">Deslizar</SelectItem>
+            <SelectItem value="fade">Fade</SelectItem>
+            <SelectItem value="reveal">Revelar</SelectItem>
+            <SelectItem value="none">Nenhuma</SelectItem>
+          </SelectContent>
+        </Select>
+      </label>
+
+      <div className="flex flex-col gap-1">
+        <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+          Tamanho do título ({titleSize}%)
+        </span>
+        <Slider
+          value={[titleSize]}
+          min={6}
+          max={60}
+          step={1}
+          disabled={disabled}
+          onValueChange={([v]) => setCfg({ titleSize: v })}
+        />
+      </div>
+
+      {showSubtitle && (
+        <div className="flex flex-col gap-1">
+          <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+            Tamanho da legenda ({subtitleSize}%)
+          </span>
+          <Slider
+            value={[subtitleSize]}
+            min={4}
+            max={40}
+            step={1}
+            disabled={disabled}
+            onValueChange={([v]) => setCfg({ subtitleSize: v })}
+          />
+        </div>
+      )}
+
+      <div className="flex items-center justify-between rounded-md border border-border/50 bg-muted/30 px-2 py-1.5">
+        <span className="text-[11px] font-medium">Título em MAIÚSCULAS</span>
+        <Switch
+          checked={titleUppercase}
+          disabled={disabled}
+          onCheckedChange={(v) => setCfg({ titleUppercase: v })}
+        />
+      </div>
+      {showSubtitle && (
+        <div className="flex items-center justify-between rounded-md border border-border/50 bg-muted/30 px-2 py-1.5">
+          <span className="text-[11px] font-medium">Legenda em MAIÚSCULAS</span>
+          <Switch
+            checked={subtitleUppercase}
+            disabled={disabled}
+            onCheckedChange={(v) => setCfg({ subtitleUppercase: v })}
+          />
+        </div>
+      )}
+      <div className="flex items-center justify-between rounded-md border border-border/50 bg-muted/30 px-2 py-1.5">
+        <span className="text-[11px] font-medium">Barra de destaque lateral</span>
+        <Switch
+          checked={showAccentBar}
+          disabled={disabled}
+          onCheckedChange={(v) => setCfg({ showAccentBar: v })}
+        />
+      </div>
+
+      <Separator />
+
+      <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+        Personalização de cores (sobrescreve o estilo)
+      </span>
+      <ColorField
+        label="Cor do título"
+        value={(config.titleColor as string) ?? preset.titleColor}
+        disabled={disabled}
+        onChange={(v) => setCfg({ titleColor: v })}
+      />
+      {showSubtitle && (
+        <ColorField
+          label="Cor da legenda"
+          value={(config.subtitleColor as string) ?? preset.subtitleColor}
+          disabled={disabled}
+          onChange={(v) => setCfg({ subtitleColor: v })}
+        />
+      )}
+      <ColorField
+        label="Cor de fundo"
+        value={
+          (config.bgColor as string) ??
+          (preset.bg.startsWith("#") ? preset.bg : "#0F172A")
+        }
+        disabled={disabled}
+        onChange={(v) => setCfg({ bgColor: v })}
+      />
+      <ColorField
+        label="Cor de destaque"
+        value={(config.accentColor as string) ?? preset.accent}
+        disabled={disabled}
+        onChange={(v) => setCfg({ accentColor: v })}
+      />
+    </div>
+  );
+}
+
 function MediaContent({
   c,
   patch,
