@@ -47,3 +47,41 @@ export const ELEMENT_LABELS: Record<ElementType, string> = {
   widget: "Widget",
   shape: "Forma",
 };
+
+// ---------- Layer groups (pastas organizacionais) ----------
+
+export type GroupSeg = { id: string; name: string };
+
+export function getGroupPath(el: TemplateElement): GroupSeg[] {
+  const c = (el.content ?? {}) as Record<string, unknown>;
+  const raw = Array.isArray(c.groupPath) ? (c.groupPath as unknown[]) : [];
+  const out: GroupSeg[] = [];
+  for (const item of raw) {
+    if (item && typeof item === "object") {
+      const obj = item as Record<string, unknown>;
+      if (typeof obj.id === "string" && typeof obj.name === "string") {
+        out.push({ id: obj.id, name: obj.name });
+      }
+    }
+  }
+  return out;
+}
+
+export function commonGroupPrefix(paths: GroupSeg[][]): GroupSeg[] {
+  if (paths.length === 0) return [];
+  const min = paths.reduce((m, p) => Math.min(m, p.length), Infinity);
+  const out: GroupSeg[] = [];
+  for (let i = 0; i < min; i++) {
+    const id = paths[0][i].id;
+    if (paths.every((p) => p[i].id === id)) out.push(paths[0][i]);
+    else break;
+  }
+  return out;
+}
+
+export function makeGroupId(): string {
+  return (
+    (crypto as { randomUUID?: () => string }).randomUUID?.() ??
+    `g_${Math.random().toString(36).slice(2, 10)}`
+  );
+}
