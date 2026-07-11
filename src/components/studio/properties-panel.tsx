@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { AlertTriangle, AlignCenter, AlignLeft, AlignRight, ImagePlus } from "lucide-react";
+import { AlertTriangle, AlignCenter, AlignLeft, AlignRight, ImagePlus, RotateCcw } from "lucide-react";
 
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
@@ -775,6 +775,11 @@ function WidgetContent({
   const clampSize = (v: number) => Math.max(3, Math.min(90, Math.round(v)));
   const defaultSize = widgetType === "clock" || widgetType === "weather" ? 28 : 14;
   const currentSize = clampSize((config.sizePercent as number) ?? defaultSize);
+  const resetSize = () => {
+    setCfg({ sizePercent: defaultSize });
+    // Also clear custom label so the layer name reverts to the widget default
+    patch({ name: "" });
+  };
   return (
     <div className="flex flex-col gap-3">
       <label className="flex flex-col gap-1">
@@ -806,9 +811,23 @@ function WidgetContent({
       </label>
 
       <div className="flex flex-col gap-1">
-        <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-          Tamanho da fonte ({currentSize}%)
-        </span>
+        <div className="flex items-center justify-between">
+          <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+            Tamanho da fonte ({currentSize}%)
+          </span>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-6 gap-1 px-2 text-[10px]"
+            disabled={disabled}
+            onClick={resetSize}
+            title="Restaurar tamanho e rótulo padrão"
+          >
+            <RotateCcw className="h-3 w-3" />
+            Reset
+          </Button>
+        </div>
         <Slider
           value={[currentSize]}
           min={3}
