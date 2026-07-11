@@ -486,7 +486,7 @@ function CropStage({
             ref={imgRef}
             src={url}
             alt=""
-            className="max-h-[65vh] max-w-full object-contain"
+            className="max-h-[55vh] max-w-full object-contain md:max-h-[65vh]"
           />
         </ReactCrop>
       </div>
