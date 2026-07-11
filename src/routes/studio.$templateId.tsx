@@ -1483,6 +1483,15 @@ function EditorPage() {
             disabled={!canEdit}
             canvasWidth={template.canvas_width}
             canvasHeight={template.canvas_height}
+            fullscreenable={
+              activeElement ? isFullscreenable(activeElement) : false
+            }
+            isFullscreen={
+              activeElement ? isFullscreenGeom(activeElement) : false
+            }
+            onToggleFullscreen={() => {
+              if (activeElement) void toggleFullscreen(activeElement.id);
+            }}
             onGeomChange={(patch) => {
               if (!activeElement) return;
               void commitElementUpdate(activeElement.id, patch);
