@@ -667,7 +667,12 @@ export function LayersPanel({
           Agrupar
         </Button>
       </div>
-      <ScrollArea className="flex-1">
+      <ScrollArea
+        className="flex-1"
+        onMouseDown={(e) => {
+          if (e.target === e.currentTarget) onSelectMany([], false);
+        }}
+      >
         {ordered.length === 0 ? (
           <p className="p-4 text-xs text-muted-foreground">
             Adicione elementos ao canvas para vê-los aqui.
@@ -698,7 +703,12 @@ export function LayersPanel({
                 Arraste aqui para tirar do grupo
               </div>
             )}
-            <ul className="flex flex-col gap-0.5 p-1.5">
+            <ul
+              className="flex min-h-full flex-col gap-0.5 p-1.5"
+              onMouseDown={(e) => {
+                if (e.target === e.currentTarget) onSelectMany([], false);
+              }}
+            >
               {tree.map((n) => renderNode(n, 0, ""))}
             </ul>
           </>
