@@ -482,11 +482,6 @@ function TemplatesPage() {
   );
 }
 
-function CreateTemplateDialog({
-  ...({} as never)
-  // placeholder — real signature below
-} : any): any;
-
 type CanvasElementPreview = {
   id: string;
   element_type: string;
@@ -560,7 +555,7 @@ function CanvasElementsPreview({
   );
 }
 
-function CreateTemplateDialog2({
+function CreateTemplateDialog({
   orgId,
   userId,
   open,
