@@ -483,6 +483,84 @@ function TemplatesPage() {
 }
 
 function CreateTemplateDialog({
+  ...({} as never)
+  // placeholder — real signature below
+} : any): any;
+
+type CanvasElementPreview = {
+  id: string;
+  element_type: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  rotation: number;
+  z_index: number;
+  opacity: number;
+  visible: boolean;
+  content: Record<string, unknown> | null;
+};
+
+const ELEMENT_COLORS: Record<string, string> = {
+  text: "hsl(217 91% 60% / 0.55)",
+  image: "hsl(160 84% 45% / 0.55)",
+  video: "hsl(340 82% 60% / 0.55)",
+  logo: "hsl(38 92% 55% / 0.55)",
+  playlist: "hsl(265 89% 66% / 0.55)",
+  widget: "hsl(190 84% 55% / 0.55)",
+  shape: "hsl(0 0% 70% / 0.45)",
+};
+
+function CanvasElementsPreview({
+  template,
+  elements,
+}: {
+  template: Template;
+  elements: CanvasElementPreview[];
+}) {
+  const bg = (template as any).background_color ?? "#0F172A";
+  const visible = elements.filter((e) => e.visible !== false);
+  return (
+    <div
+      className="relative w-full overflow-hidden rounded-xl border border-border/60"
+      style={{ aspectRatio: aspectRatioCss(template), background: bg }}
+    >
+      {visible.length === 0 ? (
+        <div className="pointer-events-none absolute inset-0 p-3">
+          <div className="grid h-full w-full grid-cols-6 grid-rows-4 gap-1.5 opacity-70">
+            <div className="col-span-4 row-span-2 rounded-md bg-foreground/15" />
+            <div className="col-span-2 row-span-1 rounded-md bg-foreground/10" />
+            <div className="col-span-2 row-span-1 rounded-md bg-foreground/20" />
+            <div className="col-span-3 row-span-2 rounded-md bg-foreground/10" />
+            <div className="col-span-3 row-span-2 rounded-md bg-foreground/15" />
+          </div>
+        </div>
+      ) : (
+        visible
+          .slice()
+          .sort((a, b) => a.z_index - b.z_index)
+          .map((el) => (
+            <div
+              key={el.id}
+              className="absolute rounded-sm ring-1 ring-white/10"
+              style={{
+                left: `${el.x}%`,
+                top: `${el.y}%`,
+                width: `${el.width}%`,
+                height: `${el.height}%`,
+                transform: `rotate(${el.rotation}deg)`,
+                opacity: el.opacity,
+                background: ELEMENT_COLORS[el.element_type] ?? "hsl(0 0% 60% / 0.4)",
+                zIndex: el.z_index,
+              }}
+            />
+          ))
+      )}
+    </div>
+  );
+}
+
+function CreateTemplateDialog2({
   orgId,
   userId,
   open,
