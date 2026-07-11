@@ -30,10 +30,22 @@ const ICONS: Record<ElementType, typeof TypeIcon> = {
   shape: Square,
 };
 
+const WIDGET_LABELS: Record<string, string> = {
+  clock: "Relógio",
+  weather: "Clima",
+  rss: "RSS",
+  news: "Notícias",
+};
+
 function elementDisplayName(el: TemplateElement): string {
   const c = (el.content ?? {}) as Record<string, unknown>;
   const cname = typeof c.name === "string" ? c.name.trim() : "";
-  return cname || ELEMENT_LABELS[el.element_type];
+  if (cname) return cname;
+  if (el.element_type === "widget") {
+    const wt = (c.widgetType ?? c.widget_type) as string | undefined;
+    if (wt && WIDGET_LABELS[wt]) return WIDGET_LABELS[wt];
+  }
+  return ELEMENT_LABELS[el.element_type];
 }
 
 export function LayersPanel({
