@@ -198,7 +198,7 @@ function PlaylistsPage() {
       const { data, error } = await supabase
         .from("playlists")
         .select(
-          "id, organization_id, name, is_active, schedule_start, schedule_end, schedule_days, created_at, items_count:playlist_items(count)",
+          "id, organization_id, name, is_active, schedule_start, schedule_end, schedule_days, schedule_date_start, schedule_date_end, created_at, items_count:playlist_items(count)",
         )
         .eq("organization_id", orgId!)
         .order("created_at", { ascending: false });
