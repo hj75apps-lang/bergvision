@@ -74,6 +74,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { GridSkeleton } from "@/components/layout/grid-skeleton";
 import { PreviewPanel } from "@/components/preview/preview-panel";
+import { PlaylistLocalPreview } from "@/components/preview/playlist-local-preview";
 import {
   usePlaylistDraftPayload,
   type PlaylistDraftItem,
@@ -633,6 +634,9 @@ function PlaylistEditor({
   );
 
   const draftPayload = usePlaylistDraftPayload(draftMeta, draftItems, open);
+  const [previewTab, setPreviewTab] = useState<"player" | "local" | "both">(
+    "local",
+  );
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -820,14 +824,54 @@ function PlaylistEditor({
         </DialogFooter>
           </div>
           <div className="hidden max-h-[92vh] border-l border-border/60 bg-neutral-950/40 p-4 lg:block">
-            <div className="h-full min-h-[520px]">
-              <PreviewPanel
-                mode="inline"
-                scope="playlist"
-                targetId={playlist.id}
-                draftData={draftPayload}
-                className="h-full"
-              />
+            <div className="flex h-full min-h-[520px] flex-col gap-3">
+              <Tabs
+                value={previewTab}
+                onValueChange={(v) =>
+                  setPreviewTab(v as "player" | "local" | "both")
+                }
+              >
+                <TabsList className="grid w-full grid-cols-3 rounded-xl">
+                  <TabsTrigger value="local" className="rounded-lg text-xs">
+                    Edição
+                  </TabsTrigger>
+                  <TabsTrigger value="player" className="rounded-lg text-xs">
+                    Player
+                  </TabsTrigger>
+                  <TabsTrigger value="both" className="rounded-lg text-xs">
+                    Ambos
+                  </TabsTrigger>
+                </TabsList>
+              </Tabs>
+              <div className="min-h-0 flex-1">
+                {previewTab === "local" && (
+                  <PlaylistLocalPreview draft={draftPayload} className="h-full" />
+                )}
+                {previewTab === "player" && (
+                  <PreviewPanel
+                    mode="inline"
+                    scope="playlist"
+                    targetId={playlist.id}
+                    draftData={draftPayload}
+                    className="h-full"
+                  />
+                )}
+                {previewTab === "both" && (
+                  <div className="grid h-full min-h-0 grid-rows-2 gap-3">
+                    <PlaylistLocalPreview
+                      draft={draftPayload}
+                      className="h-full min-h-0"
+                    />
+                    <PreviewPanel
+                      mode="inline"
+                      scope="playlist"
+                      targetId={playlist.id}
+                      draftData={draftPayload}
+                      className="h-full min-h-0"
+                    />
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
