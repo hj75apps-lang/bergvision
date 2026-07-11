@@ -271,7 +271,7 @@ function PresetForecast({
   accent: string;
   animated: boolean;
 }) {
-  const days = d.forecast.slice(0, 4);
+  const days = (d.forecast ?? []).slice(0, 4);
   return (
     <div className="flex h-full w-full flex-col p-[4cqmin]" style={shell}>
       <div className="flex items-center justify-between gap-[3cqmin]">
