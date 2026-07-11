@@ -968,6 +968,151 @@ function EditorPage() {
               void commitElementUpdate(id, { locked: !(el.locked ?? false) });
             }}
             onReorder={reorderLayers}
+            onSelectMany={(ids, additive) =>
+              setSelectedIds((prev) => {
+                if (!additive) return ids;
+                const set = new Set(prev);
+                const allIn = ids.every((i) => set.has(i));
+                if (allIn) ids.forEach((i) => set.delete(i));
+                else ids.forEach((i) => set.add(i));
+                return Array.from(set);
+              })
+            }
+            onGroup={async (ids) => {
+              if (ids.length < 2) return;
+              snapshot();
+              const sel = elements.filter((e) => ids.includes(e.id));
+              const paths = sel.map((e) => getGroupPath(e));
+              const prefix = commonGroupPrefix(paths);
+              const usedNames = new Set(
+                elements.flatMap((e) => getGroupPath(e).map((s) => s.name)),
+              );
+              let n = usedNames.size + 1;
+              let name = `Grupo ${n}`;
+              while (usedNames.has(name)) name = `Grupo ${++n}`;
+              const seg: GroupSeg = { id: makeGroupId(), name };
+              const target = [...prefix, seg];
+              await Promise.all(
+                sel.map((el) => {
+                  const content = {
+                    ...((el.content ?? {}) as Record<string, unknown>),
+                    groupPath: target,
+                  };
+                  return supabase
+                    .from("template_elements")
+                    .update({ content })
+                    .eq("id", el.id);
+                }),
+              );
+              await qc.invalidateQueries({
+                queryKey: ["studio_elements", templateId],
+              });
+            }}
+            onUngroup={async (groupId) => {
+              snapshot();
+              const affected = elements.filter((e) =>
+                getGroupPath(e).some((s) => s.id === groupId),
+              );
+              await Promise.all(
+                affected.map((el) => {
+                  const path = getGroupPath(el).filter((s) => s.id !== groupId);
+                  const content = {
+                    ...((el.content ?? {}) as Record<string, unknown>),
+                    groupPath: path,
+                  };
+                  return supabase
+                    .from("template_elements")
+                    .update({ content })
+                    .eq("id", el.id);
+                }),
+              );
+              await qc.invalidateQueries({
+                queryKey: ["studio_elements", templateId],
+              });
+            }}
+            onRenameGroup={async (groupId, name) => {
+              const affected = elements.filter((e) =>
+                getGroupPath(e).some((s) => s.id === groupId),
+              );
+              await Promise.all(
+                affected.map((el) => {
+                  const path = getGroupPath(el).map((s) =>
+                    s.id === groupId ? { ...s, name } : s,
+                  );
+                  const content = {
+                    ...((el.content ?? {}) as Record<string, unknown>),
+                    groupPath: path,
+                  };
+                  return supabase
+                    .from("template_elements")
+                    .update({ content })
+                    .eq("id", el.id);
+                }),
+              );
+              await qc.invalidateQueries({
+                queryKey: ["studio_elements", templateId],
+              });
+            }}
+            onToggleGroupVisible={async (groupId) => {
+              const affected = elements.filter((e) =>
+                getGroupPath(e).some((s) => s.id === groupId),
+              );
+              if (affected.length === 0) return;
+              const anyHidden = affected.some((e) => !(e.visible ?? true));
+              const nextVisible = anyHidden; // se algum oculto → mostrar todos; senão ocultar
+              snapshot();
+              await Promise.all(
+                affected.map((el) =>
+                  supabase
+                    .from("template_elements")
+                    .update({ visible: nextVisible })
+                    .eq("id", el.id),
+                ),
+              );
+              await qc.invalidateQueries({
+                queryKey: ["studio_elements", templateId],
+              });
+            }}
+            onToggleGroupLocked={async (groupId) => {
+              const affected = elements.filter((e) =>
+                getGroupPath(e).some((s) => s.id === groupId),
+              );
+              if (affected.length === 0) return;
+              const anyUnlocked = affected.some((e) => !(e.locked ?? false));
+              const nextLocked = anyUnlocked; // se algum destravado → travar todos; senão destravar
+              snapshot();
+              await Promise.all(
+                affected.map((el) =>
+                  supabase
+                    .from("template_elements")
+                    .update({ locked: nextLocked })
+                    .eq("id", el.id),
+                ),
+              );
+              await qc.invalidateQueries({
+                queryKey: ["studio_elements", templateId],
+              });
+            }}
+            onMoveToGroup={async (elementIds, targetPath) => {
+              const items = elements.filter((e) => elementIds.includes(e.id));
+              if (items.length === 0) return;
+              snapshot();
+              await Promise.all(
+                items.map((el) => {
+                  const content = {
+                    ...((el.content ?? {}) as Record<string, unknown>),
+                    groupPath: targetPath,
+                  };
+                  return supabase
+                    .from("template_elements")
+                    .update({ content })
+                    .eq("id", el.id);
+                }),
+              );
+              await qc.invalidateQueries({
+                queryKey: ["studio_elements", templateId],
+              });
+            }}
           />
         </aside>
 
