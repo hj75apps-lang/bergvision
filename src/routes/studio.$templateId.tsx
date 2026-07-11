@@ -1336,6 +1336,15 @@ function EditorPage() {
                 onMouseDown={(e) => {
                   if (e.target === e.currentTarget) setSelectedIds([]);
                 }}
+                onDoubleClick={(e) => {
+                  if (!canEdit) return;
+                  const t = (e.target as HTMLElement).closest(
+                    "[data-el-id]",
+                  ) as HTMLElement | null;
+                  if (!t) return;
+                  const id = t.dataset.elId;
+                  if (id) void toggleFullscreen(id);
+                }}
               >
                 <TemplateBackground
                   color={bg}
@@ -1346,6 +1355,10 @@ function EditorPage() {
                     key={el.id}
                     el={el}
                     selected={selectedIds.includes(el.id)}
+                    canEdit={canEdit}
+                    fullscreenable={isFullscreenable(el)}
+                    isFullscreen={isFullscreenGeom(el)}
+                    onToggleFullscreen={() => void toggleFullscreen(el.id)}
                   />
                 ))}
 
