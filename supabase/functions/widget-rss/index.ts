@@ -23,7 +23,14 @@ const CORS = {
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { "Content-Type": "application/json", ...CORS },
+    headers: {
+      "Content-Type": "application/json",
+      // Cache curto na borda + SWR para reduzir chamadas quando vários
+      // Players compartilham o mesmo feed. As URLs de imagem retornadas
+      // são hotlink direto ao publisher — não armazenamos nada.
+      "Cache-Control": "public, max-age=300, stale-while-revalidate=600",
+      ...CORS,
+    },
   });
 }
 
@@ -52,6 +59,31 @@ function pickLink(block: string): string {
   if (rss && rss[1].trim()) return stripHtml(rss[1]);
   const atom = block.match(/<link[^>]*href="([^"]+)"[^>]*\/?>/i);
   return atom ? atom[1] : "";
+}
+
+// Extrai a URL da imagem da notícia. Testa, em ordem, os padrões mais
+// comuns em feeds de portais (Media RSS, enclosure, itunes, <img> em
+// description/content:encoded). Retorna null se nada for encontrado.
+function pickImage(block: string): string | null {
+  const patterns: RegExp[] = [
+    /<media:content[^>]*url="([^"]+)"[^>]*(?:medium="image"|type="image\/[^"]+")/i,
+    /<media:content[^>]*(?:medium="image"|type="image\/[^"]+")[^>]*url="([^"]+)"/i,
+    /<media:thumbnail[^>]*url="([^"]+)"/i,
+    /<enclosure[^>]*url="([^"]+)"[^>]*type="image\/[^"]+"/i,
+    /<enclosure[^>]*type="image\/[^"]+"[^>]*url="([^"]+)"/i,
+    /<itunes:image[^>]*href="([^"]+)"/i,
+    // <img src="..."> dentro de <description> ou <content:encoded> (CDATA ou não)
+    /<img[^>]+src=["']([^"']+)["']/i,
+  ];
+  for (const re of patterns) {
+    const m = block.match(re);
+    if (m && m[1]) {
+      const url = m[1].trim();
+      // Só HTTPS para evitar mixed content no Player.
+      if (/^https:\/\//i.test(url)) return url;
+    }
+  }
+  return null;
 }
 
 Deno.serve(async (req) => {
@@ -120,6 +152,7 @@ Deno.serve(async (req) => {
         pick(block, "updated") ||
         pick(block, "published") ||
         "",
+      image: pickImage(block),
     }));
 
     return json({ items });
