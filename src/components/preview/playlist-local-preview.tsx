@@ -344,3 +344,79 @@ function ItemStage({
     </div>
   );
 }
+
+function TemplateFrame({ item }: { item: Item }) {
+  const iframeRef = useRef<HTMLIFrameElement | null>(null);
+  const [ready, setReady] = useState(false);
+
+  const payload = useMemo(() => {
+    const tp = item.template_payload ?? {};
+    return {
+      mode: "live" as const,
+      scope: "template" as const,
+      session: { expires_at: null as string | null },
+      draft: true,
+      template: (tp as { template?: unknown }).template ?? null,
+      background_media: (tp as { background_media?: unknown }).background_media ?? null,
+      zones: (tp as { zones?: unknown[] }).zones ?? [],
+      elements: (tp as { elements?: unknown[] }).elements ?? [],
+    };
+  }, [item]);
+
+  useEffect(() => {
+    const onMessage = (ev: MessageEvent) => {
+      if (!PLAYER_PREVIEW_ORIGIN || ev.origin !== PLAYER_PREVIEW_ORIGIN) return;
+      const msg = ev.data as { type?: string } | null;
+      if (msg?.type === "PREVIEW_READY") setReady(true);
+    };
+    window.addEventListener("message", onMessage);
+    return () => window.removeEventListener("message", onMessage);
+  }, []);
+
+  useEffect(() => {
+    if (!ready) return;
+    const win = iframeRef.current?.contentWindow;
+    if (!win || !PLAYER_PREVIEW_ORIGIN) return;
+    win.postMessage(
+      { type: "PREVIEW_DRAFT_UPDATE", payload },
+      PLAYER_PREVIEW_ORIGIN,
+    );
+  }, [ready, payload]);
+
+  const handleLoad = () => {
+    window.setTimeout(() => setReady(true), 2500);
+  };
+
+  if (!PLAYER_CONFIGURED) {
+    const t = (item.template_payload as { template?: { name?: string } } | null)
+      ?.template;
+    return (
+      <div className="grid h-full w-full place-items-center bg-gradient-to-br from-indigo-600/30 via-fuchsia-600/20 to-black">
+        <div className="flex flex-col items-center gap-3 rounded-2xl bg-black/40 px-6 py-5 text-center ring-1 ring-white/10">
+          <div className="grid h-12 w-12 place-items-center rounded-2xl bg-white/10 text-white">
+            <LayoutTemplate className="h-5 w-5" />
+          </div>
+          <div className="text-sm font-semibold text-white">
+            {t?.name ?? "Template"}
+          </div>
+          <div className="max-w-[260px] text-[11px] text-white/60">
+            Preview do Player não configurado. Defina VITE_PLAYER_PREVIEW_URL
+            para ver a renderização fiel deste template aqui.
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <iframe
+      ref={iframeRef}
+      src={`${PLAYER_PREVIEW_URL}/preview`}
+      title="Preview do template"
+      className="h-full w-full border-0 bg-black"
+      sandbox="allow-scripts allow-same-origin"
+      allow="autoplay; fullscreen"
+      onLoad={handleLoad}
+    />
+  );
+}
