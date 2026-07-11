@@ -58,6 +58,7 @@ import { GridSkeleton } from "@/components/layout/grid-skeleton";
 import { TemplateCanvas } from "@/components/template/template-canvas";
 import { LayoutEditorDialog } from "@/components/template/layout-editor-dialog";
 import { PreviewPanel } from "@/components/preview/preview-panel";
+import { cn } from "@/lib/utils";
 import {
   aspectRatioLabel,
   aspectRatioCss,
@@ -293,7 +294,7 @@ function TemplatesPage() {
       {templatesQ.isLoading ? (
         <GridSkeleton count={6} heightClass="h-64" />
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        <div className="grid items-start gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {(templatesQ.data ?? []).map((t) => {
             const zones = zonesByTemplate.get(t.id) ?? [];
             const usage = usageQ.data?.[t.id] ?? 0;
@@ -301,6 +302,17 @@ function TemplatesPage() {
             const elements = elementsByTemplate.get(t.id) ?? [];
             const contentCount = isCanvas ? elements.length : zones.length;
             const contentLabel = isCanvas ? "elemento" : "zona";
+            const isPortrait = (t.canvas_height ?? 1080) > (t.canvas_width ?? 1920);
+            const previewClassName = cn(
+              "rounded-xl shadow-md ring-1 ring-white/5",
+              isPortrait ? "h-full max-h-full" : "w-full max-w-full",
+            );
+            const previewStyle = {
+              width: isPortrait ? "auto" : "100%",
+              height: isPortrait ? "100%" : "auto",
+              maxWidth: "100%",
+              maxHeight: "100%",
+            } as const;
             return (
               <Card
                 key={t.id}
@@ -328,11 +340,25 @@ function TemplatesPage() {
                   </div>
                 </CardHeader>
                 <CardContent className="pb-3">
-                  {isCanvas ? (
-                    <CanvasElementsPreview template={t} elements={elements} />
-                  ) : (
-                    <TemplateCanvas template={t} zones={zones} mode="preview" showLabels={false} />
-                  )}
+                  <div className="flex h-56 w-full items-center justify-center overflow-hidden rounded-xl bg-neutral-950/60 p-3">
+                    {isCanvas ? (
+                      <CanvasElementsPreview
+                        template={t}
+                        elements={elements}
+                        className={previewClassName}
+                        style={previewStyle}
+                      />
+                    ) : (
+                      <TemplateCanvas
+                        template={t}
+                        zones={zones}
+                        mode="preview"
+                        showLabels={false}
+                        className={previewClassName}
+                        style={previewStyle}
+                      />
+                    )}
+                  </div>
                 </CardContent>
                 <CardFooter className="flex-wrap gap-2 pt-0">
                   <Button
