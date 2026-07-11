@@ -409,7 +409,7 @@ function PlaylistEditor({
       const { data, error } = await supabase
         .from("playlist_items")
         .select(
-          "id, playlist_id, media_file_id, position, duration, transition, media:media_files(id, name, type)",
+          "id, playlist_id, item_type, media_file_id, template_id, position, duration, transition, media:media_files(id, name, type), template:templates(id, name, type)",
         )
         .eq("playlist_id", playlist.id)
         .order("position");
@@ -417,6 +417,7 @@ function PlaylistEditor({
       return (data ?? []).map((r: any) => ({
         ...r,
         media: Array.isArray(r.media) ? r.media[0] : r.media,
+        template: Array.isArray(r.template) ? r.template[0] : r.template,
       })) as PlaylistItem[];
     },
   });
@@ -432,6 +433,24 @@ function PlaylistEditor({
         .order("created_at", { ascending: false });
       if (error) throw error;
       return (data ?? []) as MediaFile[];
+    },
+  });
+
+  const templatesQ = useQuery({
+    queryKey: ["templates-all", orgId],
+    enabled: open && !!orgId,
+    queryFn: async (): Promise<TemplateLite[]> => {
+      const { data, error } = await supabase
+        .from("templates")
+        .select("id, name, type, organization_id, is_system")
+        .or(`organization_id.eq.${orgId},is_system.eq.true`)
+        .order("name");
+      if (error) throw error;
+      return (data ?? []).map((t: any) => ({
+        id: t.id,
+        name: t.name,
+        type: t.type ?? null,
+      })) as TemplateLite[];
     },
   });
 
@@ -463,19 +482,38 @@ function PlaylistEditor({
   });
 
   const addItem = useMutation({
-    mutationFn: async (mediaId: string) => {
-      const media = mediaQ.data?.find((m) => m.id === mediaId);
-      const isImage = (media?.type ?? "").toLowerCase().startsWith("image");
+    mutationFn: async (
+      input:
+        | { kind: "media"; id: string }
+        | { kind: "template"; id: string },
+    ) => {
       const nextPos =
         items.length > 0 ? Math.max(...items.map((i) => i.position)) + 1 : 0;
-      const { error } = await supabase.from("playlist_items").insert({
-        playlist_id: playlist.id,
-        media_file_id: mediaId,
-        position: nextPos,
-        duration: isImage ? 10 : null,
-        transition: "fade",
-      });
-      if (error) throw error;
+      if (input.kind === "media") {
+        const media = mediaQ.data?.find((m) => m.id === input.id);
+        const isImage = (media?.type ?? "").toLowerCase().startsWith("image");
+        const { error } = await supabase.from("playlist_items").insert({
+          playlist_id: playlist.id,
+          item_type: "media",
+          media_file_id: input.id,
+          template_id: null,
+          position: nextPos,
+          duration: isImage ? 10 : null,
+          transition: "fade",
+        });
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from("playlist_items").insert({
+          playlist_id: playlist.id,
+          item_type: "template",
+          media_file_id: null,
+          template_id: input.id,
+          position: nextPos,
+          duration: 10,
+          transition: "fade",
+        });
+        if (error) throw error;
+      }
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["playlist_items", playlist.id] });
@@ -546,7 +584,11 @@ function PlaylistEditor({
   };
 
   const availableMedia = useMemo(() => mediaQ.data ?? [], [mediaQ.data]);
-  const [addMediaId, setAddMediaId] = useState<string>("");
+  const availableTemplates = useMemo(
+    () => templatesQ.data ?? [],
+    [templatesQ.data],
+  );
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   const toggleDay = (d: number) => {
     setScheduleDays((prev) =>
@@ -580,7 +622,9 @@ function PlaylistEditor({
       items.map((it, idx) => ({
         id: it.id,
         playlist_id: it.playlist_id,
+        item_type: it.item_type,
         media_file_id: it.media_file_id,
+        template_id: it.template_id,
         position: idx,
         duration: it.duration,
         transition: it.transition,
