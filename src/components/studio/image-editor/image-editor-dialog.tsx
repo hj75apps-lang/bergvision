@@ -189,8 +189,8 @@ export function ImageEditorDialog({
           onOpenChange(v);
         }}
       >
-        <DialogContent className="max-h-[92vh] max-w-6xl overflow-hidden rounded-2xl p-0">
-          <DialogHeader className="border-b border-border/60 px-5 py-3">
+        <DialogContent className="flex h-[95vh] max-h-[95vh] w-[96vw] max-w-6xl flex-col overflow-hidden rounded-2xl p-0 sm:h-[92vh]">
+          <DialogHeader className="shrink-0 border-b border-border/60 px-4 py-3 sm:px-5">
             <DialogTitle className="flex items-center gap-2 text-base">
               <Wand2 className="h-4 w-4 text-primary" />
               Editor de imagem
@@ -201,9 +201,9 @@ export function ImageEditorDialog({
             </DialogDescription>
           </DialogHeader>
 
-          <div className="grid grid-cols-1 md:grid-cols-[1fr_320px]">
+          <div className="flex min-h-0 flex-1 flex-col md:grid md:grid-cols-[1fr_320px]">
             {/* Canvas */}
-            <div className="relative flex min-h-[520px] items-center justify-center overflow-auto bg-[repeating-conic-gradient(#0000_0deg_90deg,#ffffff10_90deg_180deg)] bg-[length:20px_20px] p-4">
+            <div className="relative flex min-h-[240px] flex-1 items-center justify-center overflow-auto bg-[repeating-conic-gradient(#0000_0deg_90deg,#ffffff10_90deg_180deg)] bg-[length:20px_20px] p-2 sm:p-4 md:min-h-0">
               {loadingSource || !currentUrl ? (
                 <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
               ) : tab === "crop" ? (
@@ -214,13 +214,13 @@ export function ImageEditorDialog({
                 <img
                   src={currentUrl}
                   alt=""
-                  className="max-h-[70vh] max-w-full object-contain shadow-lg"
+                  className="max-h-full max-w-full object-contain shadow-lg"
                 />
               )}
             </div>
 
             {/* Sidebar */}
-            <div className="flex flex-col border-l border-border/60 bg-card/40">
+            <div className="flex max-h-[45vh] flex-col border-t border-border/60 bg-card/40 md:max-h-none md:border-l md:border-t-0">
               <div className="flex items-center gap-1 border-b border-border/60 px-3 py-2">
                 <Button
                   size="icon"
@@ -322,7 +322,7 @@ export function ImageEditorDialog({
             </div>
           </div>
 
-          <DialogFooter className="border-t border-border/60 px-5 py-3">
+          <DialogFooter className="shrink-0 gap-2 border-t border-border/60 px-4 py-3 sm:px-5">
             <Button variant="ghost" onClick={() => onOpenChange(false)}>
               Cancelar
             </Button>
@@ -486,7 +486,7 @@ function CropStage({
             ref={imgRef}
             src={url}
             alt=""
-            className="max-h-[65vh] max-w-full object-contain"
+            className="max-h-[55vh] max-w-full object-contain md:max-h-[65vh]"
           />
         </ReactCrop>
       </div>
