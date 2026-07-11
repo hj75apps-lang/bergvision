@@ -775,6 +775,13 @@ function WidgetContent({
   const clampSize = (v: number) => Math.max(3, Math.min(90, Math.round(v)));
   const defaultSize = widgetType === "clock" || widgetType === "weather" ? 28 : 14;
   const currentSize = clampSize((config.sizePercent as number) ?? defaultSize);
+  const defaultBgOpacity =
+    widgetType === "clock" ? 0 : widgetType === "weather" ? 0.3 : 0.4;
+  const bgColor = (config.bgColor as string) ?? "#000000";
+  const bgOpacity =
+    typeof config.bgOpacity === "number"
+      ? Math.max(0, Math.min(1, config.bgOpacity as number))
+      : defaultBgOpacity;
   const resetSize = () => {
     setCfg({ sizePercent: defaultSize });
     // Also clear custom label so the layer name reverts to the widget default
@@ -839,6 +846,46 @@ function WidgetContent({
         <span className="text-[10px] text-muted-foreground">
           Percentual da altura do widget usado como tamanho da fonte.
         </span>
+      </div>
+
+      <Separator />
+
+      <div className="flex flex-col gap-2">
+        <ColorField
+          label="Cor de fundo"
+          value={bgColor}
+          disabled={disabled}
+          onChange={(v) => setCfg({ bgColor: v })}
+        />
+        <div className="flex flex-col gap-1">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+              Opacidade do fundo ({Math.round(bgOpacity * 100)}%)
+            </span>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-6 gap-1 px-2 text-[10px]"
+              disabled={disabled}
+              onClick={() => setCfg({ bgOpacity: 0 })}
+              title="Deixar 100% transparente"
+            >
+              Transparente
+            </Button>
+          </div>
+          <Slider
+            value={[Math.round(bgOpacity * 100)]}
+            min={0}
+            max={100}
+            step={1}
+            disabled={disabled}
+            onValueChange={([v]) => setCfg({ bgOpacity: v / 100 })}
+          />
+          <span className="text-[10px] text-muted-foreground">
+            0% = fundo totalmente transparente. 100% = totalmente opaco.
+          </span>
+        </div>
       </div>
 
       {widgetType === "clock" && (
