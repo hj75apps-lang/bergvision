@@ -1477,6 +1477,7 @@ export const LOWER_THIRDS_PRESETS: Record<LowerThirdsPresetId, LowerThirdsPreset
 };
 
 function LowerThirdsWidget({ config }: { config: Record<string, unknown> }) {
+  // (definido acima do componente para reuso entre layouts)
   const presetId = ((config.preset as string) ?? "broadcast") as LowerThirdsPresetId;
   const preset = LOWER_THIRDS_PRESETS[presetId] ?? LOWER_THIRDS_PRESETS.broadcast;
 
