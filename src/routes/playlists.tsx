@@ -22,6 +22,7 @@ import {
   ImageIcon,
   ListMusic,
   Loader2,
+  LayoutTemplate,
   Plus,
   Trash2,
   Video,
@@ -50,6 +51,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Select,
   SelectContent,
@@ -112,14 +114,23 @@ type MediaFile = {
   type: MediaKind;
 };
 
+type TemplateLite = {
+  id: string;
+  name: string;
+  type: string | null;
+};
+
 type PlaylistItem = {
   id: string;
   playlist_id: string;
-  media_file_id: string;
+  item_type: "media" | "template";
+  media_file_id: string | null;
+  template_id: string | null;
   position: number;
   duration: number | null;
   transition: string | null;
   media?: MediaFile | null;
+  template?: TemplateLite | null;
 };
 
 const DAYS = [
@@ -398,7 +409,7 @@ function PlaylistEditor({
       const { data, error } = await supabase
         .from("playlist_items")
         .select(
-          "id, playlist_id, media_file_id, position, duration, transition, media:media_files(id, name, type)",
+          "id, playlist_id, item_type, media_file_id, template_id, position, duration, transition, media:media_files(id, name, type), template:templates(id, name, type)",
         )
         .eq("playlist_id", playlist.id)
         .order("position");
@@ -406,6 +417,7 @@ function PlaylistEditor({
       return (data ?? []).map((r: any) => ({
         ...r,
         media: Array.isArray(r.media) ? r.media[0] : r.media,
+        template: Array.isArray(r.template) ? r.template[0] : r.template,
       })) as PlaylistItem[];
     },
   });
@@ -421,6 +433,24 @@ function PlaylistEditor({
         .order("created_at", { ascending: false });
       if (error) throw error;
       return (data ?? []) as MediaFile[];
+    },
+  });
+
+  const templatesQ = useQuery({
+    queryKey: ["templates-all", orgId],
+    enabled: open && !!orgId,
+    queryFn: async (): Promise<TemplateLite[]> => {
+      const { data, error } = await supabase
+        .from("templates")
+        .select("id, name, type, organization_id, is_system")
+        .or(`organization_id.eq.${orgId},is_system.eq.true`)
+        .order("name");
+      if (error) throw error;
+      return (data ?? []).map((t: any) => ({
+        id: t.id,
+        name: t.name,
+        type: t.type ?? null,
+      })) as TemplateLite[];
     },
   });
 
@@ -452,19 +482,38 @@ function PlaylistEditor({
   });
 
   const addItem = useMutation({
-    mutationFn: async (mediaId: string) => {
-      const media = mediaQ.data?.find((m) => m.id === mediaId);
-      const isImage = (media?.type ?? "").toLowerCase().startsWith("image");
+    mutationFn: async (
+      input:
+        | { kind: "media"; id: string }
+        | { kind: "template"; id: string },
+    ) => {
       const nextPos =
         items.length > 0 ? Math.max(...items.map((i) => i.position)) + 1 : 0;
-      const { error } = await supabase.from("playlist_items").insert({
-        playlist_id: playlist.id,
-        media_file_id: mediaId,
-        position: nextPos,
-        duration: isImage ? 10 : null,
-        transition: "fade",
-      });
-      if (error) throw error;
+      if (input.kind === "media") {
+        const media = mediaQ.data?.find((m) => m.id === input.id);
+        const isImage = (media?.type ?? "").toLowerCase().startsWith("image");
+        const { error } = await supabase.from("playlist_items").insert({
+          playlist_id: playlist.id,
+          item_type: "media",
+          media_file_id: input.id,
+          template_id: null,
+          position: nextPos,
+          duration: isImage ? 10 : null,
+          transition: "fade",
+        });
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from("playlist_items").insert({
+          playlist_id: playlist.id,
+          item_type: "template",
+          media_file_id: null,
+          template_id: input.id,
+          position: nextPos,
+          duration: 10,
+          transition: "fade",
+        });
+        if (error) throw error;
+      }
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["playlist_items", playlist.id] });
@@ -535,7 +584,11 @@ function PlaylistEditor({
   };
 
   const availableMedia = useMemo(() => mediaQ.data ?? [], [mediaQ.data]);
-  const [addMediaId, setAddMediaId] = useState<string>("");
+  const availableTemplates = useMemo(
+    () => templatesQ.data ?? [],
+    [templatesQ.data],
+  );
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   const toggleDay = (d: number) => {
     setScheduleDays((prev) =>
@@ -569,7 +622,9 @@ function PlaylistEditor({
       items.map((it, idx) => ({
         id: it.id,
         playlist_id: it.playlist_id,
+        item_type: it.item_type,
         media_file_id: it.media_file_id,
+        template_id: it.template_id,
         position: idx,
         duration: it.duration,
         transition: it.transition,
@@ -672,42 +727,19 @@ function PlaylistEditor({
             <div className="flex items-center justify-between gap-2">
               <div className="text-sm font-semibold">Itens da playlist</div>
               {canManage && (
-                <div className="flex items-center gap-2">
-                  <Select value={addMediaId} onValueChange={setAddMediaId}>
-                    <SelectTrigger className="h-9 w-48 rounded-xl text-xs">
-                      <SelectValue
-                        placeholder={
-                          availableMedia.length === 0
-                            ? "Sem mídias"
-                            : "Selecionar mídia"
-                        }
-                      />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {availableMedia.map((m) => (
-                        <SelectItem key={m.id} value={m.id}>
-                          {m.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Button
-                    size="sm"
-                    className="h-9 rounded-xl"
-                    disabled={!addMediaId || addItem.isPending}
-                    onClick={() => {
-                      addItem.mutate(addMediaId);
-                      setAddMediaId("");
-                    }}
-                  >
-                    {addItem.isPending ? (
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    ) : (
-                      <Plus className="mr-2 h-4 w-4" />
-                    )}
-                    Adicionar
-                  </Button>
-                </div>
+                <Button
+                  size="sm"
+                  className="h-9 rounded-xl"
+                  onClick={() => setPickerOpen(true)}
+                  disabled={addItem.isPending}
+                >
+                  {addItem.isPending ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Plus className="mr-2 h-4 w-4" />
+                  )}
+                  Adicionar
+                </Button>
               )}
             </div>
 
@@ -749,6 +781,26 @@ function PlaylistEditor({
               </DndContext>
             )}
           </div>
+
+          <AddItemDialog
+            open={pickerOpen}
+            onOpenChange={setPickerOpen}
+            media={availableMedia}
+            templates={availableTemplates}
+            loading={addItem.isPending}
+            onPickMedia={(id) => {
+              addItem.mutate(
+                { kind: "media", id },
+                { onSuccess: () => setPickerOpen(false) },
+              );
+            }}
+            onPickTemplate={(id) => {
+              addItem.mutate(
+                { kind: "template", id },
+                { onSuccess: () => setPickerOpen(false) },
+              );
+            }}
+          />
         </div>
 
         <DialogFooter className="mt-6">
@@ -806,9 +858,12 @@ function SortableItem({
     opacity: isDragging ? 0.6 : 1,
   };
 
+  const isTemplate = item.item_type === "template";
   const kind = (item.media?.type ?? "").toLowerCase();
-  const isImage = kind.startsWith("image");
-  const isVideo = kind.startsWith("video");
+  const isImage = !isTemplate && kind.startsWith("image");
+  const isVideo = !isTemplate && kind.startsWith("video");
+  // Template: sempre precisa de duração (como imagem)
+  const needsDuration = isImage || isTemplate;
   const [duration, setDuration] = useState<string>(String(item.duration ?? ""));
 
   useEffect(() => {
@@ -833,18 +888,33 @@ function SortableItem({
         </button>
       )}
       <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-muted/50 text-muted-foreground">
-        {isVideo ? <Video className="h-4 w-4" /> : <ImageIcon className="h-4 w-4" />}
+        {isTemplate ? (
+          <LayoutTemplate className="h-4 w-4" />
+        ) : isVideo ? (
+          <Video className="h-4 w-4" />
+        ) : (
+          <ImageIcon className="h-4 w-4" />
+        )}
       </div>
       <div className="min-w-0 flex-1">
         <div className="truncate text-sm font-medium">
-          {item.media?.name ?? "Mídia removida"}
+          {isTemplate
+            ? item.template?.name ?? "Template removido"
+            : item.media?.name ?? "Mídia removida"}
         </div>
         <div className="text-[11px] text-muted-foreground">
-          #{item.position + 1} · {isVideo ? "vídeo" : isImage ? "imagem" : kind || "—"}
+          #{item.position + 1} ·{" "}
+          {isTemplate
+            ? `template${item.template?.type ? ` (${item.template.type})` : ""}`
+            : isVideo
+              ? "vídeo"
+              : isImage
+                ? "imagem"
+                : kind || "—"}
         </div>
       </div>
       <div className="flex items-center gap-2">
-        {isImage ? (
+        {needsDuration ? (
           <div className="flex items-center gap-1.5">
             <Input
               type="number"
@@ -854,7 +924,7 @@ function SortableItem({
               onBlur={() => {
                 const n = Number(duration);
                 if (!n || n < 1) {
-                  toast.error("Duração obrigatória para imagens.");
+                  toast.error("Duração obrigatória.");
                   setDuration(String(item.duration ?? 10));
                   return;
                 }
@@ -896,5 +966,151 @@ function SortableItem({
         )}
       </div>
     </li>
+  );
+}
+
+function AddItemDialog({
+  open,
+  onOpenChange,
+  media,
+  templates,
+  loading,
+  onPickMedia,
+  onPickTemplate,
+}: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  media: MediaFile[];
+  templates: TemplateLite[];
+  loading: boolean;
+  onPickMedia: (id: string) => void;
+  onPickTemplate: (id: string) => void;
+}) {
+  const [tab, setTab] = useState<"media" | "template">("media");
+  const [q, setQ] = useState("");
+
+  useEffect(() => {
+    if (open) setQ("");
+  }, [open]);
+
+  const filteredMedia = useMemo(() => {
+    const s = q.trim().toLowerCase();
+    return s ? media.filter((m) => m.name.toLowerCase().includes(s)) : media;
+  }, [media, q]);
+  const filteredTemplates = useMemo(() => {
+    const s = q.trim().toLowerCase();
+    return s
+      ? templates.filter((t) => t.name.toLowerCase().includes(s))
+      : templates;
+  }, [templates, q]);
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-h-[80vh] w-[92vw] max-w-lg overflow-hidden rounded-2xl p-6">
+        <DialogHeader>
+          <DialogTitle>Adicionar à playlist</DialogTitle>
+          <DialogDescription>
+            Escolha uma mídia ou um template criado no Studio.
+          </DialogDescription>
+        </DialogHeader>
+
+        <Tabs
+          value={tab}
+          onValueChange={(v) => setTab(v as "media" | "template")}
+          className="mt-2"
+        >
+          <TabsList className="grid w-full grid-cols-2 rounded-xl">
+            <TabsTrigger value="media" className="rounded-lg">
+              Mídia
+            </TabsTrigger>
+            <TabsTrigger value="template" className="rounded-lg">
+              Template
+            </TabsTrigger>
+          </TabsList>
+
+          <div className="mt-3">
+            <Input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Filtrar por nome…"
+              className="h-9 rounded-xl"
+            />
+          </div>
+
+          <TabsContent value="media" className="mt-3">
+            <div className="max-h-[52vh] space-y-1.5 overflow-y-auto pr-1">
+              {filteredMedia.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-border/60 py-8 text-center text-sm text-muted-foreground">
+                  Nenhuma mídia encontrada.
+                </div>
+              ) : (
+                filteredMedia.map((m) => {
+                  const isVideo = (m.type ?? "").toLowerCase().startsWith("video");
+                  return (
+                    <button
+                      key={m.id}
+                      type="button"
+                      disabled={loading}
+                      onClick={() => onPickMedia(m.id)}
+                      className="flex w-full items-center gap-3 rounded-xl border border-border/60 bg-card/50 p-2.5 text-left transition-colors hover:bg-accent/40 disabled:opacity-60"
+                    >
+                      <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-muted/60 text-muted-foreground">
+                        {isVideo ? (
+                          <Video className="h-4 w-4" />
+                        ) : (
+                          <ImageIcon className="h-4 w-4" />
+                        )}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-sm font-medium">
+                          {m.name}
+                        </div>
+                        <div className="text-[11px] text-muted-foreground">
+                          {isVideo ? "vídeo" : "imagem"}
+                        </div>
+                      </div>
+                      <Plus className="h-4 w-4 text-muted-foreground" />
+                    </button>
+                  );
+                })
+              )}
+            </div>
+          </TabsContent>
+
+          <TabsContent value="template" className="mt-3">
+            <div className="max-h-[52vh] space-y-1.5 overflow-y-auto pr-1">
+              {filteredTemplates.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-border/60 py-8 text-center text-sm text-muted-foreground">
+                  Nenhum template disponível.
+                </div>
+              ) : (
+                filteredTemplates.map((t) => (
+                  <button
+                    key={t.id}
+                    type="button"
+                    disabled={loading}
+                    onClick={() => onPickTemplate(t.id)}
+                    className="flex w-full items-center gap-3 rounded-xl border border-border/60 bg-card/50 p-2.5 text-left transition-colors hover:bg-accent/40 disabled:opacity-60"
+                  >
+                    <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-muted/60 text-muted-foreground">
+                      <LayoutTemplate className="h-4 w-4" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-sm font-medium">
+                        {t.name}
+                      </div>
+                      <div className="text-[11px] text-muted-foreground">
+                        template{t.type ? ` · ${t.type}` : ""}
+                      </div>
+                    </div>
+                    <Plus className="h-4 w-4 text-muted-foreground" />
+                  </button>
+                ))
+              )}
+            </div>
+          </TabsContent>
+        </Tabs>
+      </DialogContent>
+    </Dialog>
   );
 }

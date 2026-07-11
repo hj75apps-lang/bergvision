@@ -113,15 +113,43 @@ async function loadPlaylist(playlistId: string) {
   if (iErr) throw iErr;
   if (!playlist) return null;
 
-  const mediaIds = (items ?? [])
-    .map((it: any) => it.media_file_id)
+  const rows = (items ?? []) as any[];
+  const mediaIds = rows
+    .filter((it) => (it.item_type ?? "media") === "media")
+    .map((it) => it.media_file_id)
     .filter(Boolean);
-  const media = await signMediaMap(await fetchMediaMap(mediaIds));
+  const templateIds = Array.from(
+    new Set(
+      rows
+        .filter((it) => it.item_type === "template" && it.template_id)
+        .map((it) => it.template_id as string),
+    ),
+  );
 
-  const enriched = (items ?? []).map((it: any) => ({
-    ...it,
-    media_file: it.media_file_id ? media.get(it.media_file_id) ?? null : null,
-  }));
+  const [media, templatePayloads] = await Promise.all([
+    signMediaMap(await fetchMediaMap(mediaIds)),
+    Promise.all(templateIds.map((id) => loadTemplate(id))),
+  ]);
+  const templateMap = new Map<string, any>();
+  templateIds.forEach((id, idx) => {
+    const p = templatePayloads[idx];
+    if (p) templateMap.set(id, p);
+  });
+
+  const enriched = rows.map((it) => {
+    if (it.item_type === "template" && it.template_id) {
+      return {
+        ...it,
+        media_file: null,
+        template_payload: templateMap.get(it.template_id) ?? null,
+      };
+    }
+    return {
+      ...it,
+      media_file: it.media_file_id ? media.get(it.media_file_id) ?? null : null,
+      template_payload: null,
+    };
+  });
 
   return { ...(playlist as any), items: enriched };
 }
