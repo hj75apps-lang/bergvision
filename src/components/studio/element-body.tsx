@@ -581,12 +581,6 @@ function RssWidget({ config }: { config: Record<string, unknown> }) {
       style={wrapperStyle}
     >
       <span
-        style={{ fontSize: `${sizeCqh * 0.55}cqh`, opacity: 0.6 }}
-        className="uppercase tracking-wider"
-      >
-        Notícia {idx + 1}/{items.length}
-      </span>
-      <span
         key={motion === "fade" ? idx : "static"}
         style={{
           fontSize: `${sizeCqh}cqh`,
