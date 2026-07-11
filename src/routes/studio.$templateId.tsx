@@ -572,6 +572,37 @@ function EditorPage() {
   }, []);
 
   const [editorElementId, setEditorElementId] = useState<string | null>(null);
+  const editorElement = useMemo(
+    () => elements.find((e) => e.id === editorElementId) ?? null,
+    [elements, editorElementId],
+  );
+  const editorSource = useMemo(() => {
+    if (!editorElement) return null;
+    const c = (editorElement.content ?? {}) as Record<string, unknown>;
+    const mediaFileId = c.mediaFileId as string | undefined;
+    const storagePath = c.mediaStoragePath as string | undefined;
+    if (!mediaFileId || !storagePath) return null;
+    return {
+      mediaFileId,
+      storagePath,
+      thumbnailPath: (c.mediaThumbnailPath as string | undefined) ?? null,
+      name: (c.mediaFileName as string | undefined) ?? "imagem",
+    };
+  }, [editorElement]);
+
+  const openImageEditor = useCallback(
+    (elId: string) => {
+      const el = elements.find((e) => e.id === elId);
+      if (!el || !isImageEditable(el)) return;
+      const c = (el.content ?? {}) as Record<string, unknown>;
+      if (!c.mediaFileId || !c.mediaStoragePath) {
+        toast.info("Selecione uma imagem para este elemento antes de editar.");
+        return;
+      }
+      setEditorElementId(elId);
+    },
+    [elements, isImageEditable],
+  );
 
   const toggleFullscreen = useCallback(
     async (id: string) => {
