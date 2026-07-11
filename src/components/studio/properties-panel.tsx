@@ -1235,6 +1235,76 @@ function WidgetContent({
 
       {widgetType === "clock" && (
         <>
+          <div className="flex items-center justify-between">
+            <Label className="text-xs">Mostrar segundos</Label>
+            <Switch
+              checked={(config.showSeconds as boolean | undefined) ?? true}
+              disabled={disabled}
+              onCheckedChange={(v) => setCfg({ showSeconds: v })}
+            />
+          </div>
+          <div className="flex items-center justify-between">
+            <Label className="text-xs">Mostrar data</Label>
+            <Switch
+              checked={(config.showDate as boolean | undefined) ?? false}
+              disabled={disabled}
+              onCheckedChange={(v) => setCfg({ showDate: v })}
+            />
+          </div>
+          <div className="flex items-center justify-between">
+            <Label className="text-xs">Mostrar dia da semana</Label>
+            <Switch
+              checked={(config.showWeekday as boolean | undefined) ?? false}
+              disabled={disabled}
+              onCheckedChange={(v) => setCfg({ showWeekday: v })}
+            />
+          </div>
+          {(config.showDate as boolean | undefined) && (
+            <label className="flex flex-col gap-1">
+              <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                Formato da data
+              </span>
+              <Select
+                value={(config.dateFormat as string) ?? "dd/MM/yyyy"}
+                onValueChange={(v) => setCfg({ dateFormat: v })}
+                disabled={disabled}
+              >
+                <SelectTrigger className="h-8 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="dd/MM/yyyy">31/12/2026</SelectItem>
+                  <SelectItem value="dd/MM">31/12</SelectItem>
+                  <SelectItem value="long">31 de dezembro de 2026</SelectItem>
+                  <SelectItem value="yyyy-MM-dd">2026-12-31</SelectItem>
+                </SelectContent>
+              </Select>
+            </label>
+          )}
+          <label className="flex flex-col gap-1">
+            <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+              Layout
+            </span>
+            <Select
+              value={(config.layout as string) ?? "stack"}
+              onValueChange={(v) => setCfg({ layout: v })}
+              disabled={disabled}
+            >
+              <SelectTrigger className="h-8 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="stack">Empilhado (hora + data)</SelectItem>
+                <SelectItem value="inline">Em linha (lado a lado)</SelectItem>
+              </SelectContent>
+            </Select>
+          </label>
+          <ColorField
+            label="Cor do texto"
+            value={(config.color as string) ?? "#FFFFFF"}
+            disabled={disabled}
+            onChange={(v) => setCfg({ color: v })}
+          />
           <label className="flex flex-col gap-1">
             <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
               Formato
