@@ -545,6 +545,276 @@ function TextContent({
   );
 }
 
+function TickerConfig({
+  config,
+  setCfg,
+  disabled,
+}: {
+  config: Record<string, unknown>;
+  setCfg: (p: Record<string, unknown>) => void;
+  disabled: boolean;
+}) {
+  const presetId = ((config.preset as string) ?? "classic") as TickerPresetId;
+  const preset = TICKER_PRESETS[presetId] ?? TICKER_PRESETS.classic;
+  const direction = ((config.direction as string) ?? "left") as "left" | "right";
+  const speed = Math.max(5, Math.min(300, (config.speed as number) ?? 40));
+  const size = Math.max(3, Math.min(90, (config.sizePercent as number) ?? 40));
+  const uppercase =
+    typeof config.uppercase === "boolean"
+      ? (config.uppercase as boolean)
+      : preset.uppercase ?? false;
+  const showBadge =
+    typeof config.showBadge === "boolean"
+      ? (config.showBadge as boolean)
+      : presetId === "breaking";
+
+  return (
+    <div className="flex flex-col gap-3">
+      <Separator />
+
+      <div className="flex flex-col gap-1.5">
+        <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+          Estilo ({Object.keys(TICKER_PRESETS).length} opções)
+        </span>
+        <div className="grid grid-cols-2 gap-1.5">
+          {(Object.values(TICKER_PRESETS)).map((p) => {
+            const active = p.id === presetId;
+            return (
+              <button
+                key={p.id}
+                type="button"
+                disabled={disabled}
+                onClick={() =>
+                  setCfg({
+                    preset: p.id,
+                    // reset overrides so the preset can shine
+                    textColor: undefined,
+                    bgColor: undefined,
+                    accentColor: undefined,
+                    separator: undefined,
+                    uppercase: undefined,
+                    showBadge: undefined,
+                  })
+                }
+                className={cn(
+                  "flex flex-col gap-1 overflow-hidden rounded-md border p-1.5 text-left transition",
+                  active
+                    ? "border-primary ring-2 ring-primary/40"
+                    : "border-border/60 hover:border-border",
+                )}
+                title={p.label}
+              >
+                <div
+                  className="flex h-8 items-center overflow-hidden rounded"
+                  style={{
+                    background: p.bg === "transparent" ? "#1F2937" : p.bg,
+                    backgroundSize: p.id === "gradient" ? "300% 100%" : undefined,
+                    color: p.color,
+                    fontFamily: p.fontFamily,
+                    fontWeight: p.fontWeight,
+                    letterSpacing: p.letterSpacing,
+                    textTransform: p.uppercase ? "uppercase" : undefined,
+                    textShadow: p.textShadow,
+                    border: p.border,
+                    fontSize: "9px",
+                    padding: "0 6px",
+                  }}
+                >
+                  <span className="truncate">
+                    {p.id === "terminal" ? "> " : ""}Últimas notícias{" "}
+                    <span style={{ color: p.accent ?? p.color, opacity: 0.85 }}>
+                      {p.separator ?? "•"}
+                    </span>{" "}
+                    Ao vivo
+                  </span>
+                </div>
+                <span className="truncate text-[10px] text-muted-foreground">
+                  {p.label}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <Separator />
+
+      <label className="flex flex-col gap-1">
+        <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+          URL do feed RSS (opcional)
+        </span>
+        <Input
+          type="url"
+          value={(config.feedUrl as string) ?? ""}
+          disabled={disabled}
+          onChange={(e) => setCfg({ feedUrl: e.target.value })}
+          placeholder="https://g1.globo.com/rss/g1/"
+          className="h-8 text-xs"
+        />
+      </label>
+
+      <label className="flex flex-col gap-1">
+        <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+          Texto personalizado (usado se não houver feed)
+        </span>
+        <Textarea
+          value={(config.customText as string) ?? ""}
+          disabled={disabled}
+          onChange={(e) => setCfg({ customText: e.target.value })}
+          rows={2}
+          placeholder="Promoção 20% off | Novo horário | Grátis para membros"
+          className="text-xs"
+        />
+        <span className="text-[10px] text-muted-foreground">
+          Separe as mensagens com <code>|</code> (barra vertical).
+        </span>
+      </label>
+
+      <NumberField
+        label="Itens do feed"
+        value={(config.maxItems as number) ?? 8}
+        min={1}
+        max={20}
+        step={1}
+        disabled={disabled}
+        onCommit={(v) => setCfg({ maxItems: v })}
+      />
+
+      <label className="flex flex-col gap-1">
+        <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+          Direção
+        </span>
+        <div className="grid grid-cols-2 gap-1 rounded-lg border border-border/60 p-0.5">
+          {(
+            [
+              { v: "left", label: "→ Esquerda" },
+              { v: "right", label: "Direita ←" },
+            ] as const
+          ).map(({ v, label }) => (
+            <button
+              key={v}
+              type="button"
+              disabled={disabled}
+              onClick={() => setCfg({ direction: v })}
+              className={cn(
+                "rounded-md py-1.5 text-xs transition",
+                direction === v
+                  ? "bg-primary/20 text-primary"
+                  : "hover:bg-muted/60 text-muted-foreground",
+              )}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </label>
+
+      <div className="flex flex-col gap-1">
+        <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+          Velocidade ({speed}s por ciclo)
+        </span>
+        <Slider
+          value={[speed]}
+          min={10}
+          max={180}
+          step={5}
+          disabled={disabled}
+          onValueChange={([v]) => setCfg({ speed: v })}
+        />
+        <span className="text-[10px] text-muted-foreground">
+          Menor = mais rápido.
+        </span>
+      </div>
+
+      <div className="flex flex-col gap-1">
+        <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+          Tamanho da fonte ({size}%)
+        </span>
+        <Slider
+          value={[size]}
+          min={10}
+          max={90}
+          step={1}
+          disabled={disabled}
+          onValueChange={([v]) => setCfg({ sizePercent: v })}
+        />
+      </div>
+
+      <label className="flex flex-col gap-1">
+        <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+          Separador
+        </span>
+        <Input
+          value={(config.separator as string) ?? preset.separator ?? "  •  "}
+          disabled={disabled}
+          maxLength={12}
+          onChange={(e) => setCfg({ separator: e.target.value })}
+          className="h-8 text-xs font-mono"
+        />
+      </label>
+
+      <div className="flex items-center justify-between rounded-md border border-border/50 bg-muted/30 px-2 py-1.5">
+        <span className="text-[11px] font-medium">Texto em MAIÚSCULAS</span>
+        <Switch
+          checked={uppercase}
+          disabled={disabled}
+          onCheckedChange={(v) => setCfg({ uppercase: v })}
+        />
+      </div>
+
+      <div className="flex items-center justify-between rounded-md border border-border/50 bg-muted/30 px-2 py-1.5">
+        <span className="text-[11px] font-medium">Mostrar badge lateral</span>
+        <Switch
+          checked={showBadge}
+          disabled={disabled}
+          onCheckedChange={(v) => setCfg({ showBadge: v })}
+        />
+      </div>
+      {showBadge && (
+        <label className="flex flex-col gap-1">
+          <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+            Texto do badge
+          </span>
+          <Input
+            value={(config.badgeText as string) ?? preset.badgeText ?? "BREAKING"}
+            disabled={disabled}
+            maxLength={24}
+            onChange={(e) => setCfg({ badgeText: e.target.value })}
+            className="h-8 text-xs"
+          />
+        </label>
+      )}
+
+      <Separator />
+
+      <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+        Personalização de cores (sobrescreve o estilo)
+      </span>
+      <ColorField
+        label="Cor do texto"
+        value={(config.textColor as string) ?? preset.color}
+        disabled={disabled}
+        onChange={(v) => setCfg({ textColor: v })}
+      />
+      <ColorField
+        label="Cor de fundo"
+        value={
+          (config.bgColor as string) ??
+          (preset.bg.startsWith("#") ? preset.bg : "#0F172A")
+        }
+        disabled={disabled}
+        onChange={(v) => setCfg({ bgColor: v })}
+      />
+      <ColorField
+        label="Cor de destaque (separador / badge)"
+        value={(config.accentColor as string) ?? preset.accent ?? "#3B82F6"}
+        disabled={disabled}
+        onChange={(v) => setCfg({ accentColor: v })}
+      />
+    </div>
+  );
+}
+
 function MediaContent({
   c,
   patch,
