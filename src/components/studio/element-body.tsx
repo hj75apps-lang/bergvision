@@ -1136,7 +1136,11 @@ export type LowerThirdsPresetId =
   | "glass"
   | "editorial"
   | "esports"
-  | "talkshow";
+  | "talkshow"
+  | "global24"
+  | "orangeNotch"
+  | "stackedBars"
+  | "dualBadge";
 
 type LowerThirdsPreset = {
   id: LowerThirdsPresetId;
@@ -1159,6 +1163,18 @@ type LowerThirdsPreset = {
   kickerText?: string;
   accentBarWidth?: string; // vertical bar left/right
   showAccentBar?: boolean;
+  /** Layout de renderização. 'classic' = barra horizontal padrão. */
+  layout?: "classic" | "angled" | "notched" | "stacked" | "dual";
+  /** Skew aplicado aos blocos angulares (ex.: "-12deg"). */
+  skew?: string;
+  /** Badge quadrado direito (usado por layout 'dual'). */
+  rightBadgeBg?: string;
+  rightBadgeColor?: string;
+  rightBadgeText?: string;
+  /** Fundo da faixa de subtítulo (layouts stacked/dual). */
+  subtitleBg?: string;
+  /** Itálico opcional para títulos estilo broadcast clássico. */
+  titleItalic?: boolean;
 };
 
 export const LOWER_THIRDS_PRESETS: Record<LowerThirdsPresetId, LowerThirdsPreset> = {
@@ -1380,14 +1396,140 @@ export const LOWER_THIRDS_PRESETS: Record<LowerThirdsPresetId, LowerThirdsPreset
     showAccentBar: true,
     accentBarWidth: "5px",
   },
+  global24: {
+    id: "global24",
+    label: "Global 24",
+    bg: "#FFFFFF",
+    titleColor: "#0F172A",
+    subtitleColor: "#FFFFFF",
+    accent: "#DC2626",
+    fontFamily: "'Playfair Display', Georgia, serif",
+    titleWeight: 700,
+    subtitleWeight: 500,
+    titleItalic: true,
+    letterSpacing: "0.01em",
+    kickerBg: "#DC2626",
+    kickerColor: "#FFFFFF",
+    kickerText: "Global 24",
+    subtitleBg: "#DC2626",
+    layout: "angled",
+    skew: "-14deg",
+  },
+  orangeNotch: {
+    id: "orangeNotch",
+    label: "24 News (laranja)",
+    bg: "#0F172A",
+    titleColor: "#FFFFFF",
+    subtitleColor: "#F8FAFC",
+    accent: "#F59E0B",
+    fontFamily: "'Space Grotesk', Inter, sans-serif",
+    titleWeight: 800,
+    subtitleWeight: 500,
+    titleItalic: true,
+    letterSpacing: "0.02em",
+    kickerBg: "#F59E0B",
+    kickerColor: "#0F172A",
+    kickerText: "24 News",
+    subtitleBg: "rgba(15,23,42,0.55)",
+    layout: "notched",
+    skew: "-16deg",
+  },
+  stackedBars: {
+    id: "stackedBars",
+    label: "Barras empilhadas",
+    bg: "#0EA5E9",
+    titleColor: "#FFFFFF",
+    subtitleColor: "#0F172A",
+    accent: "#0284C7",
+    fontFamily: "'Space Grotesk', Inter, sans-serif",
+    titleWeight: 800,
+    subtitleWeight: 500,
+    titleItalic: true,
+    letterSpacing: "0.02em",
+    kickerBg: "#0F172A",
+    kickerColor: "#FFFFFF",
+    kickerText: "24",
+    subtitleBg: "#FFFFFF",
+    layout: "stacked",
+    skew: "-12deg",
+  },
+  dualBadge: {
+    id: "dualBadge",
+    label: "Duplo badge",
+    bg: "#FFFFFF",
+    titleColor: "#0F172A",
+    subtitleColor: "#F8FAFC",
+    accent: "#7C3AED",
+    fontFamily: "'Space Grotesk', Inter, sans-serif",
+    titleWeight: 800,
+    subtitleWeight: 500,
+    titleItalic: true,
+    letterSpacing: "0.02em",
+    kickerBg: "#7C3AED",
+    kickerColor: "#FFFFFF",
+    kickerText: "24 News",
+    rightBadgeBg: "#7C3AED",
+    rightBadgeColor: "#FFFFFF",
+    rightBadgeText: "24\nNews",
+    subtitleBg: "rgba(15,23,42,0.75)",
+    layout: "dual",
+  },
 };
 
 function LowerThirdsWidget({ config }: { config: Record<string, unknown> }) {
   const presetId = ((config.preset as string) ?? "broadcast") as LowerThirdsPresetId;
   const preset = LOWER_THIRDS_PRESETS[presetId] ?? LOWER_THIRDS_PRESETS.broadcast;
 
-  const title = ((config.title as string) ?? "Título da matéria").slice(0, 200);
-  const subtitle = ((config.subtitle as string) ?? "Legenda ou fonte").slice(0, 200);
+  const staticTitle = ((config.title as string) ?? "Título da matéria").slice(0, 200);
+  const staticSubtitle = ((config.subtitle as string) ?? "Legenda ou fonte").slice(0, 200);
+
+  // ---- RSS opcional ----
+  const feedUrl = ((config.feedUrl as string) ?? "").trim();
+  const rotationSec = Math.max(
+    3,
+    Math.min(120, (config.rotationSeconds as number) ?? 8),
+  );
+  const maxItems = Math.max(1, Math.min(20, (config.maxItems as number) ?? 6));
+
+  const rssQ = useQuery({
+    queryKey: ["widget-lowerthirds-rss", feedUrl, maxItems],
+    enabled: feedUrl.length > 0,
+    staleTime: 5 * 60 * 1000,
+    refetchInterval: 10 * 60 * 1000,
+    queryFn: async () => {
+      const { data, error } = await supabase.functions.invoke("widget-rss", {
+        body: { url: feedUrl, max: maxItems },
+      });
+      if (error) throw error;
+      return data as { items: { title: string; pubDate?: string }[] };
+    },
+  });
+
+  const rssItems = feedUrl ? (rssQ.data?.items ?? []).filter((i) => i.title) : [];
+  const [rssIdx, setRssIdx] = useState(0);
+  useEffect(() => {
+    if (rssItems.length <= 1) return;
+    const id = window.setInterval(
+      () => setRssIdx((i) => (i + 1) % rssItems.length),
+      rotationSec * 1000,
+    );
+    return () => window.clearInterval(id);
+  }, [rssItems.length, rotationSec]);
+
+  let title = staticTitle;
+  let subtitle = staticSubtitle;
+  if (feedUrl && rssItems.length > 0) {
+    const item = rssItems[rssIdx % rssItems.length];
+    title = item.title.slice(0, 200);
+    if (item.pubDate) subtitle = item.pubDate.slice(0, 200);
+  } else if (feedUrl && rssQ.isLoading) {
+    title = "Carregando feed...";
+    subtitle = "";
+  } else if (feedUrl && (rssQ.isError || rssItems.length === 0)) {
+    title = "Feed indisponível";
+    subtitle = "";
+  }
+
   const align = ((config.align as string) ?? "left") as "left" | "right";
   const anim = ((config.animation as string) ?? "slide") as
     | "none"
@@ -1417,6 +1559,10 @@ function LowerThirdsWidget({ config }: { config: Record<string, unknown> }) {
   const subtitleSize = Math.max(4, Math.min(40, (config.subtitleSize as number) ?? 14));
 
   const titleColor = (config.titleColor as string) || preset.titleColor;
+  const titleItalic =
+    typeof config.titleItalic === "boolean"
+      ? (config.titleItalic as boolean)
+      : preset.titleItalic ?? false;
   const subtitleColor = (config.subtitleColor as string) || preset.subtitleColor;
   const bgOverride = (config.bgColor as string) || null;
   const bgOpacity =
@@ -1445,6 +1591,33 @@ function LowerThirdsWidget({ config }: { config: Record<string, unknown> }) {
         : anim === "reveal"
           ? "bv-lt-reveal"
           : undefined;
+
+  const layout = preset.layout ?? "classic";
+
+  // Layouts especializados (broadcast estilizado)
+  if (layout !== "classic") {
+    return (
+      <BroadcastLayout
+        preset={preset}
+        layout={layout}
+        title={title}
+        subtitle={subtitle}
+        showSubtitle={showSubtitle}
+        showKicker={showKicker}
+        kickerText={kickerText}
+        titleColor={titleColor}
+        subtitleColor={subtitleColor}
+        accentColor={accentColor}
+        titleUppercase={titleUppercase}
+        subtitleUppercase={subtitleUppercase}
+        titleItalic={titleItalic}
+        titleSize={titleSize}
+        subtitleSize={subtitleSize}
+        align={align}
+        animName={animName}
+      />
+    );
+  }
 
   return (
     <div
@@ -1513,6 +1686,7 @@ function LowerThirdsWidget({ config }: { config: Record<string, unknown> }) {
             fontWeight: preset.titleWeight as number,
             letterSpacing: preset.letterSpacing,
             textTransform: titleUppercase ? "uppercase" : undefined,
+            fontStyle: titleItalic ? "italic" : undefined,
             lineHeight: 1.05,
           }}
         >
@@ -1545,6 +1719,310 @@ function LowerThirdsWidget({ config }: { config: Record<string, unknown> }) {
             borderRadius: "2px",
           }}
         />
+      )}
+    </div>
+  );
+}
+
+type BroadcastLayoutProps = {
+  preset: LowerThirdsPreset;
+  layout: "angled" | "notched" | "stacked" | "dual";
+  title: string;
+  subtitle: string;
+  showSubtitle: boolean;
+  showKicker: boolean;
+  kickerText: string;
+  titleColor: string;
+  subtitleColor: string;
+  accentColor: string;
+  titleUppercase: boolean;
+  subtitleUppercase: boolean;
+  titleItalic: boolean;
+  titleSize: number;
+  subtitleSize: number;
+  align: "left" | "right";
+  animName: string | undefined;
+};
+
+function BroadcastLayout(props: BroadcastLayoutProps) {
+  const {
+    preset,
+    layout,
+    title,
+    subtitle,
+    showSubtitle,
+    showKicker,
+    kickerText,
+    titleColor,
+    subtitleColor,
+    accentColor,
+    titleUppercase,
+    subtitleUppercase,
+    titleItalic,
+    titleSize,
+    subtitleSize,
+    align,
+    animName,
+  } = props;
+
+  const skew = preset.skew ?? "-12deg";
+  const titleBg = preset.bg;
+  const kickerBg = preset.kickerBg ?? accentColor;
+  const kickerColor = preset.kickerColor ?? "#FFFFFF";
+  const subtitleBg = preset.subtitleBg ?? accentColor;
+  const rightBadgeBg = preset.rightBadgeBg ?? accentColor;
+  const rightBadgeColor = preset.rightBadgeColor ?? "#FFFFFF";
+  const rightBadgeText = preset.rightBadgeText ?? "24\nNews";
+
+  const commonTitleStyle: React.CSSProperties = {
+    color: titleColor,
+    fontSize: `${titleSize}cqh`,
+    fontFamily: preset.fontFamily,
+    fontWeight: preset.titleWeight as number,
+    letterSpacing: preset.letterSpacing,
+    textTransform: titleUppercase ? "uppercase" : undefined,
+    fontStyle: titleItalic ? "italic" : undefined,
+    lineHeight: 1.05,
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+  };
+  const commonSubtitleStyle: React.CSSProperties = {
+    color: subtitleColor,
+    fontSize: `${subtitleSize}cqh`,
+    fontFamily: preset.fontFamily,
+    fontWeight: preset.subtitleWeight as number,
+    letterSpacing: preset.letterSpacing,
+    textTransform: subtitleUppercase ? "uppercase" : undefined,
+    lineHeight: 1.2,
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+  };
+  const kickerStyle: React.CSSProperties = {
+    background: kickerBg,
+    color: kickerColor,
+    fontSize: `${Math.max(subtitleSize * 1.1, 8)}cqh`,
+    fontFamily: preset.fontFamily,
+    fontWeight: 800,
+    letterSpacing: "0.06em",
+    padding: "0.35em 1.1em",
+    lineHeight: 1,
+  };
+
+  const rowGap = "0.4cqh";
+  const isRight = align === "right";
+
+  const containerStyle: React.CSSProperties = {
+    containerType: "size",
+    animation: animName
+      ? `${animName} 0.7s cubic-bezier(0.22,1,0.36,1)`
+      : undefined,
+    justifyContent: isRight ? "flex-end" : "flex-start",
+  };
+
+  return (
+    <div
+      className="relative flex h-full w-full flex-col overflow-hidden"
+      style={containerStyle}
+    >
+      <style>{`
+        @keyframes bv-lt-slide-l{from{transform:translateX(-100%);opacity:0}to{transform:translateX(0);opacity:1}}
+        @keyframes bv-lt-slide-r{from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}}
+        @keyframes bv-lt-fade{from{opacity:0}to{opacity:1}}
+        @keyframes bv-lt-reveal{from{clip-path:inset(0 100% 0 0)}to{clip-path:inset(0 0 0 0)}}
+      `}</style>
+
+      {(layout === "angled" || layout === "notched") && (
+        <div
+          className="flex h-full w-full flex-col justify-end"
+          style={{ gap: rowGap, alignItems: isRight ? "flex-end" : "flex-start" }}
+        >
+          {showKicker && (
+            <div
+              style={{
+                transform: `skewX(${skew})`,
+                marginLeft: isRight ? 0 : "2%",
+                marginRight: isRight ? "2%" : 0,
+              }}
+            >
+              <span
+                className="inline-block"
+                style={{
+                  ...kickerStyle,
+                  display: "inline-block",
+                  transform: `skewX(calc(-1 * ${skew}))`,
+                }}
+              >
+                {kickerText}
+              </span>
+            </div>
+          )}
+          <div
+            style={{
+              background: titleBg,
+              transform: `skewX(${skew})`,
+              padding: "0.6em 1.4em",
+              maxWidth: "96%",
+              boxShadow:
+                layout === "notched"
+                  ? "0 4px 12px rgba(0,0,0,0.35)"
+                  : undefined,
+            }}
+          >
+            <span
+              className="block"
+              style={{
+                ...commonTitleStyle,
+                transform: `skewX(calc(-1 * ${skew}))`,
+                display: "inline-block",
+              }}
+            >
+              {title}
+            </span>
+          </div>
+          {showSubtitle && subtitle && (
+            <div
+              style={{
+                background: subtitleBg,
+                padding: "0.35em 1.2em",
+                maxWidth: "94%",
+              }}
+            >
+              <span className="block" style={commonSubtitleStyle}>
+                {subtitle}
+              </span>
+            </div>
+          )}
+        </div>
+      )}
+
+      {layout === "stacked" && (
+        <div
+          className="flex h-full w-full flex-col justify-end"
+          style={{ gap: rowGap, alignItems: isRight ? "flex-end" : "flex-start" }}
+        >
+          <div
+            className="flex items-center"
+            style={{ gap: "0.5em", marginLeft: isRight ? 0 : "2%" }}
+          >
+            {showKicker && (
+              <div style={{ transform: `skewX(${skew})` }}>
+                <span
+                  style={{
+                    ...kickerStyle,
+                    display: "inline-block",
+                    transform: `skewX(calc(-1 * ${skew}))`,
+                  }}
+                >
+                  {kickerText}
+                </span>
+              </div>
+            )}
+          </div>
+          <div
+            style={{
+              background: titleBg,
+              transform: `skewX(${skew})`,
+              padding: "0.55em 1.4em",
+              maxWidth: "96%",
+              boxShadow: "0 6px 14px rgba(0,0,0,0.25)",
+            }}
+          >
+            <span
+              className="block"
+              style={{
+                ...commonTitleStyle,
+                transform: `skewX(calc(-1 * ${skew}))`,
+                display: "inline-block",
+              }}
+            >
+              {title}
+            </span>
+          </div>
+          {showSubtitle && subtitle && (
+            <div
+              style={{
+                background: subtitleBg,
+                transform: `skewX(${skew})`,
+                padding: "0.3em 1.2em",
+                maxWidth: "90%",
+              }}
+            >
+              <span
+                className="block"
+                style={{
+                  ...commonSubtitleStyle,
+                  transform: `skewX(calc(-1 * ${skew}))`,
+                  display: "inline-block",
+                }}
+              >
+                {subtitle}
+              </span>
+            </div>
+          )}
+        </div>
+      )}
+
+      {layout === "dual" && (
+        <div
+          className="flex h-full w-full flex-col justify-end"
+          style={{ gap: rowGap }}
+        >
+          <div className="flex w-full items-stretch" style={{ gap: "0.5cqh" }}>
+            {showKicker && (
+              <div
+                className="flex items-center"
+                style={{
+                  ...kickerStyle,
+                  padding: "0.5em 1em",
+                }}
+              >
+                {kickerText}
+              </div>
+            )}
+            <div
+              className="flex flex-1 items-center"
+              style={{
+                background: titleBg,
+                padding: "0.55em 1.4em",
+                boxShadow: "0 4px 10px rgba(0,0,0,0.25)",
+              }}
+            >
+              <span className="block" style={commonTitleStyle}>
+                {title}
+              </span>
+            </div>
+            <div
+              className="flex items-center justify-center text-center"
+              style={{
+                background: rightBadgeBg,
+                color: rightBadgeColor,
+                fontFamily: preset.fontFamily,
+                fontWeight: 800,
+                fontSize: `${Math.max(subtitleSize * 1.2, 9)}cqh`,
+                lineHeight: 1.05,
+                padding: "0.4em 0.9em",
+                whiteSpace: "pre-line",
+              }}
+            >
+              {rightBadgeText}
+            </div>
+          </div>
+          {showSubtitle && subtitle && (
+            <div
+              style={{
+                background: subtitleBg,
+                padding: "0.35em 1.2em",
+                width: "100%",
+              }}
+            >
+              <span className="block" style={commonSubtitleStyle}>
+                {subtitle}
+              </span>
+            </div>
+          )}
+        </div>
       )}
     </div>
   );

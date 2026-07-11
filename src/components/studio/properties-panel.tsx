@@ -986,6 +986,61 @@ function LowerThirdsConfig({
         />
       </label>
 
+      <Separator />
+
+      <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+        Feed RSS (opcional — sobrescreve título/legenda)
+      </span>
+      <label className="flex flex-col gap-1">
+        <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+          URL do feed
+        </span>
+        <Input
+          value={(config.feedUrl as string) ?? ""}
+          disabled={disabled}
+          maxLength={500}
+          onChange={(e) => setCfg({ feedUrl: e.target.value })}
+          placeholder="https://exemplo.com/rss.xml"
+          className="h-8 text-xs"
+        />
+      </label>
+      <div className="grid grid-cols-2 gap-2">
+        <label className="flex flex-col gap-1">
+          <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+            Itens (máx.)
+          </span>
+          <Input
+            type="number"
+            min={1}
+            max={20}
+            value={(config.maxItems as number) ?? 6}
+            disabled={disabled}
+            onChange={(e) =>
+              setCfg({ maxItems: Math.max(1, Math.min(20, Number(e.target.value) || 6)) })
+            }
+            className="h-8 text-xs"
+          />
+        </label>
+        <label className="flex flex-col gap-1">
+          <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+            Rotação (s)
+          </span>
+          <Input
+            type="number"
+            min={3}
+            max={120}
+            value={(config.rotationSeconds as number) ?? 8}
+            disabled={disabled}
+            onChange={(e) =>
+              setCfg({
+                rotationSeconds: Math.max(3, Math.min(120, Number(e.target.value) || 8)),
+              })
+            }
+            className="h-8 text-xs"
+          />
+        </label>
+      </div>
+
       <div className="flex items-center justify-between rounded-md border border-border/50 bg-muted/30 px-2 py-1.5">
         <span className="text-[11px] font-medium">Mostrar legenda</span>
         <Switch
