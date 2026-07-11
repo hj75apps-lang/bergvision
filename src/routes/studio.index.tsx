@@ -277,6 +277,7 @@ function StudioPage() {
           {templates.map((t) => {
             const w = t.canvas_width ?? 1920;
             const h = t.canvas_height ?? 1080;
+            const isPortrait = h > w;
             return (
               <Card
                 key={t.id}
@@ -290,7 +291,11 @@ function StudioPage() {
               >
                 <div className="flex h-56 w-full items-center justify-center overflow-hidden border-b border-border/60 bg-neutral-950/60 p-3">
                   <div
-                    className="h-full max-h-full w-auto max-w-full rounded-md shadow-md ring-1 ring-white/5"
+                    className={
+                      isPortrait
+                        ? "h-full w-auto rounded-md shadow-md ring-1 ring-white/5"
+                        : "w-full h-auto rounded-md shadow-md ring-1 ring-white/5"
+                    }
                     style={{
                       aspectRatio: `${w} / ${h}`,
                       backgroundColor: t.background_color ?? "#0F172A",
