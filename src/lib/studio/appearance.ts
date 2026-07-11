@@ -156,7 +156,7 @@ export function getAppearanceStyle(
   let cssMask: string | undefined;
   if (mask === "custom") {
     const trimmed = maskUrl.trim();
-    if (/^https?:\/\//i.test(trimmed)) {
+    if (/^(https?:|data:image\/)/i.test(trimmed)) {
       cssMask = `url("${trimmed.replace(/"/g, '\\"')}")`;
     }
   } else {
