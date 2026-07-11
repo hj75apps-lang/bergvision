@@ -1435,6 +1435,7 @@ function WidgetContent({
             <SelectItem value="rss">RSS</SelectItem>
             <SelectItem value="news">Notícias</SelectItem>
             <SelectItem value="ticker">News Ticker</SelectItem>
+            <SelectItem value="lowerthirds">Lower Thirds</SelectItem>
           </SelectContent>
         </Select>
       </label>
@@ -1798,6 +1799,10 @@ function WidgetContent({
       {widgetType === "ticker" && (
         <TickerConfig config={config} setCfg={setCfg} disabled={disabled} />
       )}
+
+      {widgetType === "lowerthirds" && (
+        <LowerThirdsConfig config={config} setCfg={setCfg} disabled={disabled} />
+      )}
     </div>
   );
 }
@@ -1820,6 +1825,19 @@ function defaultWidgetConfig(type: string): Record<string, unknown> {
         direction: "left",
         speed: 40,
         sizePercent: 40,
+      };
+    case "lowerthirds":
+      return {
+        preset: "broadcast",
+        title: "Título da matéria",
+        subtitle: "Legenda ou fonte",
+        showKicker: true,
+        kickerText: "AO VIVO",
+        showSubtitle: true,
+        align: "left",
+        animation: "slide",
+        titleSize: 26,
+        subtitleSize: 14,
       };
     default:
       return {};
