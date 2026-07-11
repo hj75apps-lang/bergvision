@@ -772,6 +772,9 @@ function WidgetContent({
       widgetConfig: { ...config, ...p },
       widget_config: { ...config, ...p },
     });
+  const clampSize = (v: number) => Math.max(3, Math.min(90, Math.round(v)));
+  const defaultSize = widgetType === "clock" || widgetType === "weather" ? 28 : 14;
+  const currentSize = clampSize((config.sizePercent as number) ?? defaultSize);
   return (
     <div className="flex flex-col gap-3">
       <label className="flex flex-col gap-1">
@@ -804,15 +807,15 @@ function WidgetContent({
 
       <div className="flex flex-col gap-1">
         <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-          Tamanho da fonte ({Math.round((config.sizePercent as number) ?? (widgetType === "clock" || widgetType === "weather" ? 28 : 14))}%)
+          Tamanho da fonte ({currentSize}%)
         </span>
         <Slider
-          value={[(config.sizePercent as number) ?? (widgetType === "clock" || widgetType === "weather" ? 28 : 14)]}
+          value={[currentSize]}
           min={3}
           max={90}
           step={1}
           disabled={disabled}
-          onValueChange={([v]) => setCfg({ sizePercent: v })}
+          onValueChange={([v]) => setCfg({ sizePercent: clampSize(v) })}
         />
         <span className="text-[10px] text-muted-foreground">
           Percentual da altura do widget usado como tamanho da fonte.
