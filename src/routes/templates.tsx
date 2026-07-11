@@ -56,6 +56,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { GridSkeleton } from "@/components/layout/grid-skeleton";
 import { TemplateCanvas } from "@/components/template/template-canvas";
+import { aspectRatioCss } from "@/lib/template-utils";
 import { LayoutEditorDialog } from "@/components/template/layout-editor-dialog";
 import { PreviewPanel } from "@/components/preview/preview-panel";
 import {
