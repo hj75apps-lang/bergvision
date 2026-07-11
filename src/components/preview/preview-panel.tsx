@@ -458,17 +458,17 @@ function ResolutionStage({
   children: React.ReactNode;
 }) {
   const ratio = `${width} / ${height}`;
-  const isPortrait = height > width;
   return (
-    <div className="grid h-full w-full place-items-center">
+    <div
+      className="grid h-full w-full place-items-center"
+      style={{ containerType: "size" }}
+    >
       <div
         className="relative overflow-hidden rounded-lg bg-black shadow-[0_10px_40px_-10px_rgba(0,0,0,0.9)] ring-1 ring-white/10"
         style={{
           aspectRatio: ratio,
-          maxWidth: "100%",
-          maxHeight: "100%",
-          width: isPortrait ? "auto" : "100%",
-          height: isPortrait ? "100%" : "auto",
+          width: `min(100cqw, calc(100cqh * ${width} / ${height}))`,
+          height: `min(100cqh, calc(100cqw * ${height} / ${width}))`,
         }}
       >
         {children}
