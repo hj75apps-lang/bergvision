@@ -858,9 +858,12 @@ function SortableItem({
     opacity: isDragging ? 0.6 : 1,
   };
 
+  const isTemplate = item.item_type === "template";
   const kind = (item.media?.type ?? "").toLowerCase();
-  const isImage = kind.startsWith("image");
-  const isVideo = kind.startsWith("video");
+  const isImage = !isTemplate && kind.startsWith("image");
+  const isVideo = !isTemplate && kind.startsWith("video");
+  // Template: sempre precisa de duração (como imagem)
+  const needsDuration = isImage || isTemplate;
   const [duration, setDuration] = useState<string>(String(item.duration ?? ""));
 
   useEffect(() => {
@@ -885,18 +888,33 @@ function SortableItem({
         </button>
       )}
       <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-muted/50 text-muted-foreground">
-        {isVideo ? <Video className="h-4 w-4" /> : <ImageIcon className="h-4 w-4" />}
+        {isTemplate ? (
+          <LayoutTemplate className="h-4 w-4" />
+        ) : isVideo ? (
+          <Video className="h-4 w-4" />
+        ) : (
+          <ImageIcon className="h-4 w-4" />
+        )}
       </div>
       <div className="min-w-0 flex-1">
         <div className="truncate text-sm font-medium">
-          {item.media?.name ?? "Mídia removida"}
+          {isTemplate
+            ? item.template?.name ?? "Template removido"
+            : item.media?.name ?? "Mídia removida"}
         </div>
         <div className="text-[11px] text-muted-foreground">
-          #{item.position + 1} · {isVideo ? "vídeo" : isImage ? "imagem" : kind || "—"}
+          #{item.position + 1} ·{" "}
+          {isTemplate
+            ? `template${item.template?.type ? ` (${item.template.type})` : ""}`
+            : isVideo
+              ? "vídeo"
+              : isImage
+                ? "imagem"
+                : kind || "—"}
         </div>
       </div>
       <div className="flex items-center gap-2">
-        {isImage ? (
+        {needsDuration ? (
           <div className="flex items-center gap-1.5">
             <Input
               type="number"
@@ -906,7 +924,7 @@ function SortableItem({
               onBlur={() => {
                 const n = Number(duration);
                 if (!n || n < 1) {
-                  toast.error("Duração obrigatória para imagens.");
+                  toast.error("Duração obrigatória.");
                   setDuration(String(item.duration ?? 10));
                   return;
                 }
@@ -948,5 +966,151 @@ function SortableItem({
         )}
       </div>
     </li>
+  );
+}
+
+function AddItemDialog({
+  open,
+  onOpenChange,
+  media,
+  templates,
+  loading,
+  onPickMedia,
+  onPickTemplate,
+}: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  media: MediaFile[];
+  templates: TemplateLite[];
+  loading: boolean;
+  onPickMedia: (id: string) => void;
+  onPickTemplate: (id: string) => void;
+}) {
+  const [tab, setTab] = useState<"media" | "template">("media");
+  const [q, setQ] = useState("");
+
+  useEffect(() => {
+    if (open) setQ("");
+  }, [open]);
+
+  const filteredMedia = useMemo(() => {
+    const s = q.trim().toLowerCase();
+    return s ? media.filter((m) => m.name.toLowerCase().includes(s)) : media;
+  }, [media, q]);
+  const filteredTemplates = useMemo(() => {
+    const s = q.trim().toLowerCase();
+    return s
+      ? templates.filter((t) => t.name.toLowerCase().includes(s))
+      : templates;
+  }, [templates, q]);
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-h-[80vh] w-[92vw] max-w-lg overflow-hidden rounded-2xl p-6">
+        <DialogHeader>
+          <DialogTitle>Adicionar à playlist</DialogTitle>
+          <DialogDescription>
+            Escolha uma mídia ou um template criado no Studio.
+          </DialogDescription>
+        </DialogHeader>
+
+        <Tabs
+          value={tab}
+          onValueChange={(v) => setTab(v as "media" | "template")}
+          className="mt-2"
+        >
+          <TabsList className="grid w-full grid-cols-2 rounded-xl">
+            <TabsTrigger value="media" className="rounded-lg">
+              Mídia
+            </TabsTrigger>
+            <TabsTrigger value="template" className="rounded-lg">
+              Template
+            </TabsTrigger>
+          </TabsList>
+
+          <div className="mt-3">
+            <Input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Filtrar por nome…"
+              className="h-9 rounded-xl"
+            />
+          </div>
+
+          <TabsContent value="media" className="mt-3">
+            <div className="max-h-[52vh] space-y-1.5 overflow-y-auto pr-1">
+              {filteredMedia.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-border/60 py-8 text-center text-sm text-muted-foreground">
+                  Nenhuma mídia encontrada.
+                </div>
+              ) : (
+                filteredMedia.map((m) => {
+                  const isVideo = (m.type ?? "").toLowerCase().startsWith("video");
+                  return (
+                    <button
+                      key={m.id}
+                      type="button"
+                      disabled={loading}
+                      onClick={() => onPickMedia(m.id)}
+                      className="flex w-full items-center gap-3 rounded-xl border border-border/60 bg-card/50 p-2.5 text-left transition-colors hover:bg-accent/40 disabled:opacity-60"
+                    >
+                      <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-muted/60 text-muted-foreground">
+                        {isVideo ? (
+                          <Video className="h-4 w-4" />
+                        ) : (
+                          <ImageIcon className="h-4 w-4" />
+                        )}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-sm font-medium">
+                          {m.name}
+                        </div>
+                        <div className="text-[11px] text-muted-foreground">
+                          {isVideo ? "vídeo" : "imagem"}
+                        </div>
+                      </div>
+                      <Plus className="h-4 w-4 text-muted-foreground" />
+                    </button>
+                  );
+                })
+              )}
+            </div>
+          </TabsContent>
+
+          <TabsContent value="template" className="mt-3">
+            <div className="max-h-[52vh] space-y-1.5 overflow-y-auto pr-1">
+              {filteredTemplates.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-border/60 py-8 text-center text-sm text-muted-foreground">
+                  Nenhum template disponível.
+                </div>
+              ) : (
+                filteredTemplates.map((t) => (
+                  <button
+                    key={t.id}
+                    type="button"
+                    disabled={loading}
+                    onClick={() => onPickTemplate(t.id)}
+                    className="flex w-full items-center gap-3 rounded-xl border border-border/60 bg-card/50 p-2.5 text-left transition-colors hover:bg-accent/40 disabled:opacity-60"
+                  >
+                    <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-muted/60 text-muted-foreground">
+                      <LayoutTemplate className="h-4 w-4" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-sm font-medium">
+                        {t.name}
+                      </div>
+                      <div className="text-[11px] text-muted-foreground">
+                        template{t.type ? ` · ${t.type}` : ""}
+                      </div>
+                    </div>
+                    <Plus className="h-4 w-4 text-muted-foreground" />
+                  </button>
+                ))
+              )}
+            </div>
+          </TabsContent>
+        </Tabs>
+      </DialogContent>
+    </Dialog>
   );
 }
