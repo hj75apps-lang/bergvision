@@ -149,6 +149,7 @@ export function ElementBody({ el }: { el: TemplateElement }) {
       if (widgetType === "weather") return <WeatherWidget config={cfg} />;
       if (widgetType === "rss" || widgetType === "news")
         return <RssWidget config={cfg} />;
+      if (widgetType === "ticker") return <TickerWidget config={cfg} />;
       return <PlaceholderBadge label="Widget" />;
     }
     case "playlist": {
@@ -708,6 +709,414 @@ function MediaImage({
     />
   );
 }
+
+// ---------- News Ticker Widget ----------
+
+export type TickerPresetId =
+  | "classic"
+  | "breaking"
+  | "neon"
+  | "led"
+  | "minimal"
+  | "gradient"
+  | "pills"
+  | "stock"
+  | "newspaper"
+  | "terminal"
+  | "glass"
+  | "bold-caps"
+  | "ribbon"
+  | "cinema";
+
+type TickerPreset = {
+  id: TickerPresetId;
+  label: string;
+  bg: string; // css background
+  color: string;
+  fontFamily: string;
+  fontWeight: number | string;
+  uppercase?: boolean;
+  letterSpacing?: string;
+  border?: string;
+  textShadow?: string;
+  itemStyle?: React.CSSProperties; // per-item wrapping (pills)
+  separator?: string;
+  badgeBg?: string;
+  badgeColor?: string;
+  badgeText?: string;
+  accent?: string;
+};
+
+export const TICKER_PRESETS: Record<TickerPresetId, TickerPreset> = {
+  classic: {
+    id: "classic",
+    label: "Clássico",
+    bg: "#0F172A",
+    color: "#FFFFFF",
+    fontFamily: "Inter, system-ui, sans-serif",
+    fontWeight: 600,
+    separator: "  •  ",
+    accent: "#3B82F6",
+  },
+  breaking: {
+    id: "breaking",
+    label: "Breaking News",
+    bg: "#DC2626",
+    color: "#FFFFFF",
+    fontFamily: "Inter, system-ui, sans-serif",
+    fontWeight: 700,
+    uppercase: true,
+    letterSpacing: "0.03em",
+    separator: "  ◆  ",
+    badgeBg: "#000000",
+    badgeColor: "#FFFFFF",
+    badgeText: "BREAKING",
+    accent: "#FBBF24",
+  },
+  neon: {
+    id: "neon",
+    label: "Neon",
+    bg: "#050510",
+    color: "#22D3EE",
+    fontFamily: "Inter, system-ui, sans-serif",
+    fontWeight: 700,
+    textShadow:
+      "0 0 4px #22D3EE, 0 0 12px #22D3EE, 0 0 24px rgba(34,211,238,0.7)",
+    separator: "  ✦  ",
+    accent: "#22D3EE",
+  },
+  led: {
+    id: "led",
+    label: "Painel LED",
+    bg: "#0A0A0A",
+    color: "#F59E0B",
+    fontFamily: "'JetBrains Mono', 'Courier New', monospace",
+    fontWeight: 700,
+    uppercase: true,
+    letterSpacing: "0.15em",
+    textShadow: "0 0 6px rgba(245,158,11,0.85)",
+    separator: "  ▪  ",
+    accent: "#F59E0B",
+  },
+  minimal: {
+    id: "minimal",
+    label: "Minimalista",
+    bg: "transparent",
+    color: "#F8FAFC",
+    fontFamily: "Inter, system-ui, sans-serif",
+    fontWeight: 500,
+    letterSpacing: "0.02em",
+    separator: "     /     ",
+    accent: "#F8FAFC",
+  },
+  gradient: {
+    id: "gradient",
+    label: "Gradiente animado",
+    bg: "linear-gradient(90deg,#6366F1,#8B5CF6,#EC4899,#6366F1)",
+    color: "#FFFFFF",
+    fontFamily: "Inter, system-ui, sans-serif",
+    fontWeight: 700,
+    separator: "  ⬥  ",
+    accent: "#FFFFFF",
+  },
+  pills: {
+    id: "pills",
+    label: "Pílulas",
+    bg: "#111827",
+    color: "#F9FAFB",
+    fontFamily: "Inter, system-ui, sans-serif",
+    fontWeight: 600,
+    separator: "   ",
+    accent: "#3B82F6",
+    itemStyle: {
+      padding: "0.35em 0.9em",
+      borderRadius: "9999px",
+      background: "rgba(59,130,246,0.18)",
+      border: "1px solid rgba(59,130,246,0.45)",
+      marginRight: "0.6em",
+    },
+  },
+  stock: {
+    id: "stock",
+    label: "Bolsa de valores",
+    bg: "#000000",
+    color: "#10B981",
+    fontFamily: "'JetBrains Mono', 'Courier New', monospace",
+    fontWeight: 600,
+    letterSpacing: "0.05em",
+    separator: "  │  ",
+    accent: "#10B981",
+  },
+  newspaper: {
+    id: "newspaper",
+    label: "Jornal",
+    bg: "#F5EFE0",
+    color: "#1C1917",
+    fontFamily: "Georgia, 'Playfair Display', serif",
+    fontWeight: 600,
+    separator: "   —   ",
+    border: "2px solid #1C1917",
+    accent: "#1C1917",
+  },
+  terminal: {
+    id: "terminal",
+    label: "Terminal",
+    bg: "#020617",
+    color: "#4ADE80",
+    fontFamily: "'JetBrains Mono', 'Courier New', monospace",
+    fontWeight: 500,
+    separator: "   ",
+    accent: "#4ADE80",
+    // "> " prefixado por item via itemStyle::before não é trivial; usamos separator custom
+  },
+  glass: {
+    id: "glass",
+    label: "Glass",
+    bg: "rgba(255,255,255,0.08)",
+    color: "#F8FAFC",
+    fontFamily: "Inter, system-ui, sans-serif",
+    fontWeight: 600,
+    separator: "  •  ",
+    accent: "#F8FAFC",
+  },
+  "bold-caps": {
+    id: "bold-caps",
+    label: "Bold Caps",
+    bg: "#FBBF24",
+    color: "#0A0A0A",
+    fontFamily: "'Space Grotesk', Inter, sans-serif",
+    fontWeight: 800,
+    uppercase: true,
+    letterSpacing: "0.06em",
+    separator: "  ★  ",
+    accent: "#0A0A0A",
+  },
+  ribbon: {
+    id: "ribbon",
+    label: "Fita corporativa",
+    bg: "#1E3A8A",
+    color: "#FFFFFF",
+    fontFamily: "Inter, system-ui, sans-serif",
+    fontWeight: 600,
+    letterSpacing: "0.04em",
+    separator: "  ›  ",
+    border: "1px solid rgba(255,255,255,0.15)",
+    accent: "#FBBF24",
+  },
+  cinema: {
+    id: "cinema",
+    label: "Marquee cinema",
+    bg: "#7F1D1D",
+    color: "#FEF3C7",
+    fontFamily: "Georgia, serif",
+    fontWeight: 700,
+    uppercase: true,
+    letterSpacing: "0.08em",
+    textShadow: "0 0 8px rgba(254,243,199,0.5)",
+    separator: "  ✺  ",
+    border: "3px double #FEF3C7",
+    accent: "#FEF3C7",
+  },
+};
+
+function hexToRgba(hex: string, alpha: number): string {
+  const m = hex.replace("#", "");
+  const full =
+    m.length === 3
+      ? m
+          .split("")
+          .map((x) => x + x)
+          .join("")
+      : m;
+  const r = parseInt(full.slice(0, 2), 16);
+  const g = parseInt(full.slice(2, 4), 16);
+  const b = parseInt(full.slice(4, 6), 16);
+  if ([r, g, b].some((n) => Number.isNaN(n))) return hex;
+  return `rgba(${r},${g},${b},${Math.max(0, Math.min(1, alpha))})`;
+}
+
+function TickerWidget({ config }: { config: Record<string, unknown> }) {
+  const presetId = ((config.preset as string) ?? "classic") as TickerPresetId;
+  const preset = TICKER_PRESETS[presetId] ?? TICKER_PRESETS.classic;
+
+  const url = ((config.feedUrl as string) ?? "").trim();
+  const customText = ((config.customText as string) ?? "").trim();
+  const max = Math.max(1, Math.min(20, (config.maxItems as number) ?? 8));
+  const direction = ((config.direction as string) ?? "left") as "left" | "right";
+  const speed = Math.max(5, Math.min(300, (config.speed as number) ?? 40));
+  const sizeCqh = Math.max(3, Math.min(90, (config.sizePercent as number) ?? 40));
+  const uppercase =
+    typeof config.uppercase === "boolean"
+      ? (config.uppercase as boolean)
+      : preset.uppercase ?? false;
+
+  // Overrides opcionais
+  const textColor = (config.textColor as string) || preset.color;
+  const bgOverride = (config.bgColor as string) || null;
+  const bgOpacity =
+    typeof config.bgOpacity === "number"
+      ? Math.max(0, Math.min(1, config.bgOpacity as number))
+      : 1;
+  const accentColor = (config.accentColor as string) || preset.accent || textColor;
+  const separator =
+    typeof config.separator === "string" && (config.separator as string).length > 0
+      ? (config.separator as string)
+      : preset.separator ?? "  •  ";
+
+  const showBadge =
+    typeof config.showBadge === "boolean"
+      ? (config.showBadge as boolean)
+      : presetId === "breaking";
+  const badgeText =
+    ((config.badgeText as string) || preset.badgeText || "BREAKING").slice(0, 24);
+
+  const q = useQuery({
+    queryKey: ["widget-ticker", url, max],
+    enabled: url.length > 0,
+    staleTime: 5 * 60 * 1000,
+    refetchInterval: 10 * 60 * 1000,
+    queryFn: async () => {
+      const { data, error } = await supabase.functions.invoke("widget-rss", {
+        body: { url, max },
+      });
+      if (error) throw error;
+      return data as { items: { title: string }[] };
+    },
+  });
+
+  const titles: string[] = url
+    ? (q.data?.items ?? []).map((i) => i.title).filter(Boolean)
+    : customText
+      ? customText.split(/\s*\|\s*/).filter(Boolean)
+      : [];
+
+  // Fundo: gradiente animado só se preset gradient E sem override
+  const isGradient = presetId === "gradient" && !bgOverride;
+  const backgroundStyle: React.CSSProperties = bgOverride
+    ? { background: hexToRgba(bgOverride, bgOpacity) }
+    : preset.bg === "transparent"
+      ? { background: "transparent" }
+      : { background: preset.bg };
+
+  const containerStyle: React.CSSProperties = {
+    ...backgroundStyle,
+    color: textColor,
+    fontFamily: preset.fontFamily,
+    fontWeight: preset.fontWeight,
+    letterSpacing: preset.letterSpacing,
+    textTransform: uppercase ? "uppercase" : undefined,
+    textShadow: preset.textShadow,
+    border: preset.border,
+    containerType: "size",
+    backgroundSize: isGradient ? "300% 100%" : undefined,
+    animation: isGradient
+      ? `bv-ticker-gradient ${Math.max(6, speed / 3)}s ease infinite`
+      : undefined,
+  };
+
+  const wrapper = (children: React.ReactNode) => (
+    <div
+      className="relative flex h-full w-full items-center overflow-hidden"
+      style={containerStyle}
+    >
+      <style>{`
+        @keyframes bv-ticker-x-left{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+        @keyframes bv-ticker-x-right{from{transform:translateX(-50%)}to{transform:translateX(0)}}
+        @keyframes bv-ticker-gradient{0%{background-position:0% 50%}50%{background-position:100% 50%}100%{background-position:0% 50%}}
+      `}</style>
+      {showBadge && (
+        <div
+          className="z-10 flex h-full shrink-0 items-center px-3"
+          style={{
+            background: preset.badgeBg || accentColor,
+            color: preset.badgeColor || "#FFFFFF",
+            fontSize: `${Math.max(sizeCqh * 0.7, 8)}cqh`,
+            fontWeight: 800,
+            letterSpacing: "0.08em",
+            fontFamily: preset.fontFamily,
+            textTransform: "uppercase",
+          }}
+        >
+          {badgeText}
+        </div>
+      )}
+      {children}
+    </div>
+  );
+
+  if (!url && !customText) {
+    return wrapper(
+      <span
+        className="px-3 opacity-70"
+        style={{ fontSize: `${Math.min(sizeCqh, 14)}cqh` }}
+      >
+        Configure a URL do feed ou texto personalizado
+      </span>,
+    );
+  }
+
+  if (url && q.isLoading) {
+    return wrapper(
+      <Loader2 className="mx-3 h-4 w-4 animate-spin opacity-70" />,
+    );
+  }
+
+  if (url && (q.isError || titles.length === 0)) {
+    return wrapper(
+      <span
+        className="px-3 opacity-70"
+        style={{ fontSize: `${Math.min(sizeCqh, 14)}cqh` }}
+      >
+        Feed indisponível
+      </span>,
+    );
+  }
+
+  const animName =
+    direction === "left" ? "bv-ticker-x-left" : "bv-ticker-x-right";
+
+  const renderItems = (items: string[]) =>
+    items.map((t, i) => {
+      if (preset.itemStyle) {
+        return (
+          <span key={i} style={preset.itemStyle}>
+            {t}
+          </span>
+        );
+      }
+      return (
+        <span key={i}>
+          {presetId === "terminal" ? `> ${t}` : t}
+          <span
+            style={{
+              color: accentColor,
+              opacity: 0.9,
+              margin: "0 0.15em",
+              display: "inline",
+            }}
+          >
+            {separator}
+          </span>
+        </span>
+      );
+    });
+
+  return wrapper(
+    <div
+      className="flex shrink-0 whitespace-nowrap"
+      style={{
+        animation: `${animName} ${speed}s linear infinite`,
+        fontSize: `${sizeCqh}cqh`,
+        paddingLeft: showBadge ? "1.5rem" : "2rem",
+        alignItems: "center",
+      }}
+    >
+      <div className="flex items-center">{renderItems(titles)}</div>
+      <div className="flex items-center">{renderItems(titles)}</div>
+    </div>,
+  );
+}
+
 
 function MediaVideo({
   path,
