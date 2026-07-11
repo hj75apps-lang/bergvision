@@ -341,7 +341,7 @@ function PresetVertical({
   accent: string;
   animated: boolean;
 }) {
-  const days = d.forecast.slice(0, 4);
+  const days = (d.forecast ?? []).slice(0, 4);
   return (
     <div
       className="flex h-full w-full flex-col items-center gap-[2cqh] p-[5cqmin] text-center"
