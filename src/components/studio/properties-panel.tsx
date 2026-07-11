@@ -2952,19 +2952,11 @@ function WidgetContent({
 
       {widgetType === "weather" && (
         <>
-          <label className="flex flex-col gap-1">
-            <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-              Cidade
-            </span>
-            <Input
-              value={(config.city as string) ?? ""}
-              disabled={disabled}
-              maxLength={120}
-              onChange={(e) => setCfg({ city: e.target.value })}
-              placeholder="São Paulo, BR"
-              className="h-8 text-xs"
-            />
-          </label>
+          <WeatherCitiesEditor
+            config={config}
+            setCfg={setCfg}
+            disabled={disabled}
+          />
           <label className="flex flex-col gap-1">
             <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
               Layout
