@@ -22,6 +22,7 @@ import {
   ImageIcon,
   ListMusic,
   Loader2,
+  LayoutTemplate,
   Plus,
   Trash2,
   Video,
@@ -50,6 +51,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Select,
   SelectContent,
@@ -112,14 +114,23 @@ type MediaFile = {
   type: MediaKind;
 };
 
+type TemplateLite = {
+  id: string;
+  name: string;
+  type: string | null;
+};
+
 type PlaylistItem = {
   id: string;
   playlist_id: string;
-  media_file_id: string;
+  item_type: "media" | "template";
+  media_file_id: string | null;
+  template_id: string | null;
   position: number;
   duration: number | null;
   transition: string | null;
   media?: MediaFile | null;
+  template?: TemplateLite | null;
 };
 
 const DAYS = [
