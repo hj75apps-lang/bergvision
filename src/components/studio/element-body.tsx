@@ -73,21 +73,55 @@ export function ElementBody({ el }: { el: TemplateElement }) {
     }
     case "shape": {
       const shape = (c.shapeType as string) ?? "rectangle";
+      const fillColor = (c.fill as string) ?? "#3B82F6";
+      const fillOpacity =
+        typeof c.fillOpacity === "number"
+          ? Math.max(0, Math.min(1, c.fillOpacity as number))
+          : 1;
+      const alphaHex = Math.round(fillOpacity * 255).toString(16).padStart(2, "0");
+      const motion = ((c.motion as string) ?? "none") as
+        | "none"
+        | "pulse"
+        | "spin"
+        | "float"
+        | "fade";
+      const speed = Math.max(1, Math.min(60, (c.motionSpeed as number) ?? 6));
+      const animation =
+        motion === "pulse"
+          ? `bv-shape-pulse ${speed}s ease-in-out infinite`
+          : motion === "spin"
+            ? `bv-shape-spin ${speed}s linear infinite`
+            : motion === "float"
+              ? `bv-shape-float ${speed}s ease-in-out infinite`
+              : motion === "fade"
+                ? `bv-shape-fade ${speed}s ease-in-out infinite`
+                : undefined;
       return (
-        <div
-          className="h-full w-full"
-          style={{
-            backgroundColor: (c.fill as string) ?? "#3B82F6",
-            borderRadius:
-              shape === "circle"
-                ? "50%"
-                : `${(c.borderRadius as number) ?? 0}px`,
-            border:
-              (c.borderWidth as number) && c.borderColor
-                ? `${c.borderWidth}px solid ${c.borderColor}`
-                : undefined,
-          }}
-        />
+        <>
+          <style>{`
+            @keyframes bv-shape-pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.08)}}
+            @keyframes bv-shape-spin{from{transform:rotate(0)}to{transform:rotate(360deg)}}
+            @keyframes bv-shape-float{0%,100%{transform:translateY(0)}50%{transform:translateY(-6%)}}
+            @keyframes bv-shape-fade{0%,100%{opacity:1}50%{opacity:.35}}
+          `}</style>
+          <div
+            className="h-full w-full"
+            style={{
+              backgroundColor: `${fillColor}${alphaHex}`,
+              borderRadius:
+                shape === "circle"
+                  ? "50%"
+                  : `${(c.borderRadius as number) ?? 0}px`,
+              border:
+                (c.borderWidth as number) && c.borderColor
+                  ? `${c.borderWidth}px solid ${c.borderColor}`
+                  : undefined,
+              animation,
+              transformOrigin: "center",
+              willChange: motion === "none" ? undefined : "transform, opacity",
+            }}
+          />
+        </>
       );
     }
     case "image":
