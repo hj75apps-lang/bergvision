@@ -66,6 +66,12 @@ import { useAuth } from "@/hooks/use-auth";
 import { LayersPanel } from "@/components/studio/layers-panel";
 import { PropertiesPanel } from "@/components/studio/properties-panel";
 import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu";
+import {
   clampPct,
   commonGroupPrefix,
   getGroupPath,
@@ -544,6 +550,72 @@ function EditorPage() {
       await qc.invalidateQueries({ queryKey: ["studio_elements", templateId] });
     },
     [persistUpdate, qc, snapshot, templateId],
+  );
+
+  const isFullscreenable = useCallback((el: TemplateElement) => {
+    return (
+      el.element_type === "image" ||
+      el.element_type === "video" ||
+      el.element_type === "widget"
+    );
+  }, []);
+
+  const isFullscreenGeom = (el: TemplateElement) =>
+    el.x <= 0.01 &&
+    el.y <= 0.01 &&
+    el.width >= 99.99 &&
+    el.height >= 99.99;
+
+  const toggleFullscreen = useCallback(
+    async (id: string) => {
+      const el = elements.find((e) => e.id === id);
+      if (!el) return;
+      if (el.locked) return;
+      if (!isFullscreenable(el)) return;
+      snapshot();
+      const content = { ...((el.content ?? {}) as Record<string, unknown>) };
+      const prev = content._prevGeom as
+        | { x: number; y: number; width: number; height: number }
+        | undefined;
+      let patch: Partial<
+        Pick<
+          TemplateElement,
+          "x" | "y" | "width" | "height" | "z_index"
+        >
+      > & { content?: Record<string, unknown> };
+      if (isFullscreenGeom(el) && prev) {
+        delete content._prevGeom;
+        patch = {
+          x: clampPct(prev.x),
+          y: clampPct(prev.y),
+          width: clampPct(prev.width),
+          height: clampPct(prev.height),
+          content,
+        };
+      } else {
+        content._prevGeom = {
+          x: el.x,
+          y: el.y,
+          width: el.width,
+          height: el.height,
+        };
+        const maxZ = elements.reduce(
+          (m, e) => Math.max(m, e.z_index ?? 0),
+          0,
+        );
+        patch = {
+          x: 0,
+          y: 0,
+          width: 100,
+          height: 100,
+          z_index: maxZ + 1,
+          content,
+        };
+      }
+      await persistUpdate(id, patch);
+      await qc.invalidateQueries({ queryKey: ["studio_elements", templateId] });
+    },
+    [elements, isFullscreenable, persistUpdate, qc, snapshot, templateId],
   );
 
   const nudge = useCallback(
@@ -1264,6 +1336,15 @@ function EditorPage() {
                 onMouseDown={(e) => {
                   if (e.target === e.currentTarget) setSelectedIds([]);
                 }}
+                onDoubleClick={(e) => {
+                  if (!canEdit) return;
+                  const t = (e.target as HTMLElement).closest(
+                    "[data-el-id]",
+                  ) as HTMLElement | null;
+                  if (!t) return;
+                  const id = t.dataset.elId;
+                  if (id) void toggleFullscreen(id);
+                }}
               >
                 <TemplateBackground
                   color={bg}
@@ -1274,6 +1355,10 @@ function EditorPage() {
                     key={el.id}
                     el={el}
                     selected={selectedIds.includes(el.id)}
+                    canEdit={canEdit}
+                    fullscreenable={isFullscreenable(el)}
+                    isFullscreen={isFullscreenGeom(el)}
+                    onToggleFullscreen={() => void toggleFullscreen(el.id)}
                   />
                 ))}
 
@@ -1398,6 +1483,15 @@ function EditorPage() {
             disabled={!canEdit}
             canvasWidth={template.canvas_width}
             canvasHeight={template.canvas_height}
+            fullscreenable={
+              activeElement ? isFullscreenable(activeElement) : false
+            }
+            isFullscreen={
+              activeElement ? isFullscreenGeom(activeElement) : false
+            }
+            onToggleFullscreen={() => {
+              if (activeElement) void toggleFullscreen(activeElement.id);
+            }}
             onGeomChange={(patch) => {
               if (!activeElement) return;
               void commitElementUpdate(activeElement.id, patch);
@@ -1487,9 +1581,17 @@ function EditorPage() {
 function ElementView({
   el,
   selected,
+  canEdit,
+  fullscreenable,
+  isFullscreen,
+  onToggleFullscreen,
 }: {
   el: TemplateElement;
   selected: boolean;
+  canEdit: boolean;
+  fullscreenable: boolean;
+  isFullscreen: boolean;
+  onToggleFullscreen: () => void;
 }) {
   const visible = el.visible ?? true;
   const style: React.CSSProperties = {
@@ -1509,7 +1611,7 @@ function ElementView({
     pointerEvents: el.locked ? "none" : "auto",
   };
 
-  return (
+  const body = (
     <div
       data-el-id={el.id}
       data-rot={String(el.rotation ?? 0)}
@@ -1517,5 +1619,18 @@ function ElementView({
     >
       <StudioElementBody el={el} />
     </div>
+  );
+
+  if (!canEdit || !fullscreenable) return body;
+
+  return (
+    <ContextMenu>
+      <ContextMenuTrigger asChild>{body}</ContextMenuTrigger>
+      <ContextMenuContent className="w-56">
+        <ContextMenuItem onSelect={() => onToggleFullscreen()}>
+          {isFullscreen ? "Restaurar tamanho original" : "Ocupar tela toda"}
+        </ContextMenuItem>
+      </ContextMenuContent>
+    </ContextMenu>
   );
 }
