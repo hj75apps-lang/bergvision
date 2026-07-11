@@ -1122,6 +1122,18 @@ function TickerWidget({ config }: { config: Record<string, unknown> }) {
 
 // ---------- News Lower Thirds Widget ----------
 
+// Keyframes compartilhados por LowerThirdsWidget e BroadcastLayout.
+// Mantidos em um único lugar para que animações de entrada e de rotação RSS
+// usem exatamente o mesmo timing/curva.
+const LT_KEYFRAMES_CSS = `
+@keyframes bv-lt-slide-l{from{transform:translateX(-100%);opacity:0}to{transform:translateX(0);opacity:1}}
+@keyframes bv-lt-slide-r{from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}}
+@keyframes bv-lt-fade{from{opacity:0}to{opacity:1}}
+@keyframes bv-lt-reveal{from{clip-path:inset(0 100% 0 0)}to{clip-path:inset(0 0 0 0)}}
+@keyframes bv-lt-zoom{from{transform:scale(0.85);opacity:0}to{transform:scale(1);opacity:1}}
+@keyframes bv-lt-flip{from{transform:perspective(600px) rotateX(90deg);opacity:0;transform-origin:bottom}to{transform:perspective(600px) rotateX(0);opacity:1;transform-origin:bottom}}
+`;
+
 export type LowerThirdsPresetId =
   | "broadcast"
   | "breaking"
