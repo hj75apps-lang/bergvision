@@ -26,8 +26,12 @@ import {
   Plus,
   Trash2,
   Video,
+  Calendar as CalendarIcon,
+  MonitorPlay,
 } from "lucide-react";
 import { toast } from "sonner";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -52,6 +56,13 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Calendar } from "@/components/ui/calendar";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
 import {
   Select,
   SelectContent,
@@ -103,6 +114,8 @@ type Playlist = {
   schedule_start: string | null;
   schedule_end: string | null;
   schedule_days: number[] | null;
+  schedule_date_start: string | null;
+  schedule_date_end: string | null;
   created_at: string | null;
   items_count?: { count: number }[];
 };
