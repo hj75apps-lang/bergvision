@@ -1,7 +1,21 @@
+import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
+
+import { supabase } from "@/integrations/supabase/client";
 import { useSignedUrl } from "@/lib/studio/use-signed-url";
 import { ELEMENT_LABELS, type TemplateElement } from "@/lib/studio/types";
-import { useEffect, useState } from "react";
+
+function getWidgetType(c: Record<string, unknown>) {
+  return ((c.widgetType ?? c.widget_type) as string | undefined) ?? "clock";
+}
+
+function getWidgetConfig(c: Record<string, unknown>) {
+  const cfg = c.widgetConfig ?? c.widget_config;
+  return cfg && typeof cfg === "object" && !Array.isArray(cfg)
+    ? (cfg as Record<string, unknown>)
+    : {};
+}
 
 export function ElementBody({ el }: { el: TemplateElement }) {
   const c = (el.content ?? {}) as Record<string, unknown>;
