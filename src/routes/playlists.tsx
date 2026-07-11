@@ -986,7 +986,11 @@ function SortableItem({
         ) : null}
         <Select
           value={item.transition ?? "fade"}
-          onValueChange={onTransitionChange}
+          onValueChange={(value) => {
+            if (value === "fade" || value === "cut" || value === "slide") {
+              onTransitionChange(value);
+            }
+          }}
           disabled={!canManage}
         >
           <SelectTrigger className="h-9 w-24 rounded-xl text-xs">
@@ -996,8 +1000,6 @@ function SortableItem({
             <SelectItem value="fade">Fade</SelectItem>
             <SelectItem value="cut">Cut</SelectItem>
             <SelectItem value="slide">Slide</SelectItem>
-            <SelectItem value="zoom-in">Zoom in</SelectItem>
-            <SelectItem value="zoom-out">Zoom out</SelectItem>
           </SelectContent>
         </Select>
         {canManage && (
