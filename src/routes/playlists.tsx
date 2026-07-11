@@ -727,42 +727,19 @@ function PlaylistEditor({
             <div className="flex items-center justify-between gap-2">
               <div className="text-sm font-semibold">Itens da playlist</div>
               {canManage && (
-                <div className="flex items-center gap-2">
-                  <Select value={addMediaId} onValueChange={setAddMediaId}>
-                    <SelectTrigger className="h-9 w-48 rounded-xl text-xs">
-                      <SelectValue
-                        placeholder={
-                          availableMedia.length === 0
-                            ? "Sem mídias"
-                            : "Selecionar mídia"
-                        }
-                      />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {availableMedia.map((m) => (
-                        <SelectItem key={m.id} value={m.id}>
-                          {m.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Button
-                    size="sm"
-                    className="h-9 rounded-xl"
-                    disabled={!addMediaId || addItem.isPending}
-                    onClick={() => {
-                      addItem.mutate(addMediaId);
-                      setAddMediaId("");
-                    }}
-                  >
-                    {addItem.isPending ? (
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    ) : (
-                      <Plus className="mr-2 h-4 w-4" />
-                    )}
-                    Adicionar
-                  </Button>
-                </div>
+                <Button
+                  size="sm"
+                  className="h-9 rounded-xl"
+                  onClick={() => setPickerOpen(true)}
+                  disabled={addItem.isPending}
+                >
+                  {addItem.isPending ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Plus className="mr-2 h-4 w-4" />
+                  )}
+                  Adicionar
+                </Button>
               )}
             </div>
 
@@ -804,6 +781,26 @@ function PlaylistEditor({
               </DndContext>
             )}
           </div>
+
+          <AddItemDialog
+            open={pickerOpen}
+            onOpenChange={setPickerOpen}
+            media={availableMedia}
+            templates={availableTemplates}
+            loading={addItem.isPending}
+            onPickMedia={(id) => {
+              addItem.mutate(
+                { kind: "media", id },
+                { onSuccess: () => setPickerOpen(false) },
+              );
+            }}
+            onPickTemplate={(id) => {
+              addItem.mutate(
+                { kind: "template", id },
+                { onSuccess: () => setPickerOpen(false) },
+              );
+            }}
+          />
         </div>
 
         <DialogFooter className="mt-6">
