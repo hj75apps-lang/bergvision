@@ -371,14 +371,31 @@ function ItemStage({
     else v.pause();
   }, [playing, videoRef]);
 
+  const transition = (item.transition ?? "fade").toLowerCase();
+  const animClass = transitionClass(transition);
+
   if (item.item_type === "template") {
-    return <TemplateFrame item={item} />;
+    return (
+      <>
+        <TransitionStyles />
+        <div className={cn("h-full w-full", animClass)}>
+          <TemplateFrame item={item} />
+        </div>
+      </>
+    );
   }
 
   const url = item.media_file?.url ?? null;
   if (isImage(item)) {
     return url ? (
-      <img src={url} alt="" className="h-full w-full object-contain animate-in fade-in duration-500" />
+      <>
+        <TransitionStyles />
+        <img
+          src={url}
+          alt=""
+          className={cn("h-full w-full object-contain", animClass)}
+        />
+      </>
     ) : (
       <div className="grid h-full w-full place-items-center text-white/60">
         Mídia indisponível
@@ -387,15 +404,18 @@ function ItemStage({
   }
   if (isVideo(item)) {
     return url ? (
-      <video
-        ref={videoRef}
-        src={url}
-        autoPlay={playing}
-        muted
-        playsInline
-        onEnded={onVideoEnded}
-        className="h-full w-full object-contain"
-      />
+      <>
+        <TransitionStyles />
+        <video
+          ref={videoRef}
+          src={url}
+          autoPlay={playing}
+          muted
+          playsInline
+          onEnded={onVideoEnded}
+          className={cn("h-full w-full object-contain", animClass)}
+        />
+      </>
     ) : (
       <div className="grid h-full w-full place-items-center text-white/60">
         Vídeo indisponível
@@ -406,6 +426,53 @@ function ItemStage({
     <div className="grid h-full w-full place-items-center text-white/60">
       Tipo não suportado
     </div>
+  );
+}
+
+function transitionClass(t: string): string {
+  switch (t) {
+    case "cut":
+      return "";
+    case "slide":
+    case "slide-left":
+      return "bv-anim-slide-left";
+    case "slide-right":
+      return "bv-anim-slide-right";
+    case "slide-up":
+      return "bv-anim-slide-up";
+    case "slide-down":
+      return "bv-anim-slide-down";
+    case "zoom-in":
+      return "bv-anim-zoom-in";
+    case "zoom-out":
+      return "bv-anim-zoom-out";
+    case "fade":
+    default:
+      return "bv-anim-fade";
+  }
+}
+
+function TransitionStyles() {
+  return (
+    <style>{`
+      @keyframes bv-fade-in { from { opacity: 0 } to { opacity: 1 } }
+      @keyframes bv-slide-left { from { transform: translateX(100%); opacity: 0 } to { transform: translateX(0); opacity: 1 } }
+      @keyframes bv-slide-right { from { transform: translateX(-100%); opacity: 0 } to { transform: translateX(0); opacity: 1 } }
+      @keyframes bv-slide-up { from { transform: translateY(100%); opacity: 0 } to { transform: translateY(0); opacity: 1 } }
+      @keyframes bv-slide-down { from { transform: translateY(-100%); opacity: 0 } to { transform: translateY(0); opacity: 1 } }
+      @keyframes bv-zoom-in { from { transform: scale(0.85); opacity: 0 } to { transform: scale(1); opacity: 1 } }
+      @keyframes bv-zoom-out { from { transform: scale(1.15); opacity: 0 } to { transform: scale(1); opacity: 1 } }
+      .bv-anim-fade { animation: bv-fade-in 500ms ease-out both; will-change: opacity }
+      .bv-anim-slide-left { animation: bv-slide-left 550ms cubic-bezier(.22,.61,.36,1) both; will-change: transform, opacity }
+      .bv-anim-slide-right { animation: bv-slide-right 550ms cubic-bezier(.22,.61,.36,1) both; will-change: transform, opacity }
+      .bv-anim-slide-up { animation: bv-slide-up 550ms cubic-bezier(.22,.61,.36,1) both; will-change: transform, opacity }
+      .bv-anim-slide-down { animation: bv-slide-down 550ms cubic-bezier(.22,.61,.36,1) both; will-change: transform, opacity }
+      .bv-anim-zoom-in { animation: bv-zoom-in 550ms ease-out both; will-change: transform, opacity }
+      .bv-anim-zoom-out { animation: bv-zoom-out 550ms ease-out both; will-change: transform, opacity }
+      @media (prefers-reduced-motion: reduce) {
+        .bv-anim-fade, .bv-anim-slide-left, .bv-anim-slide-right, .bv-anim-slide-up, .bv-anim-slide-down, .bv-anim-zoom-in, .bv-anim-zoom-out { animation: none !important }
+      }
+    `}</style>
   );
 }
 
