@@ -125,7 +125,10 @@ export function ElementBody({ el }: { el: TemplateElement }) {
       );
     }
     case "image":
-    case "logo":
+    case "logo": {
+      if (el.element_type === "image" && c.imageSubtype === "sequence") {
+        return <ImageSequenceBody c={c} />;
+      }
       return (
         <MediaImage
           path={(c.mediaStoragePath as string) ?? null}
@@ -133,6 +136,7 @@ export function ElementBody({ el }: { el: TemplateElement }) {
           label={ELEMENT_LABELS[el.element_type]}
         />
       );
+    }
     case "video":
       return (
         <MediaVideo
@@ -707,6 +711,81 @@ function MediaImage({
       className="h-full w-full"
       style={{
         objectFit: (fit as React.CSSProperties["objectFit"]) ?? "cover",
+      }}
+    />
+  );
+}
+
+// ---------- Image Sequence (frame-by-frame) ----------
+
+function ImageSequenceBody({ c }: { c: Record<string, unknown> }) {
+  const rawFrames = Array.isArray(c.frames) ? (c.frames as unknown[]) : [];
+  const frames = useMemo(
+    () =>
+      rawFrames
+        .map((f) => f as { storagePath?: string })
+        .filter((f): f is { storagePath: string } => typeof f?.storagePath === "string"),
+    [rawFrames],
+  );
+  const fps = Math.max(1, Math.min(60, (c.fps as number) ?? 12));
+  const loop = (c.loop as boolean | undefined) ?? true;
+  const fit = (c.fit as string) ?? "contain";
+
+  const [idx, setIdx] = useState(0);
+
+  useEffect(() => {
+    if (frames.length <= 1) return;
+    const interval = 1000 / fps;
+    const id = window.setInterval(() => {
+      setIdx((prev) => {
+        const next = prev + 1;
+        if (next >= frames.length) return loop ? 0 : prev;
+        return next;
+      });
+    }, interval);
+    return () => window.clearInterval(id);
+  }, [frames.length, fps, loop]);
+
+  useEffect(() => {
+    setIdx(0);
+  }, [frames.length]);
+
+  if (frames.length === 0) return <PlaceholderBadge label="Sequência" />;
+
+  return (
+    <div className="relative h-full w-full">
+      {frames.map((f, i) => (
+        <SequenceFrame
+          key={i}
+          path={f.storagePath}
+          fit={fit}
+          active={i === idx}
+        />
+      ))}
+    </div>
+  );
+}
+
+function SequenceFrame({
+  path,
+  fit,
+  active,
+}: {
+  path: string;
+  fit: string;
+  active: boolean;
+}) {
+  const url = useSignedUrl(path);
+  if (!url) return null;
+  return (
+    <img
+      src={url}
+      alt=""
+      draggable={false}
+      className="absolute inset-0 h-full w-full"
+      style={{
+        objectFit: (fit as React.CSSProperties["objectFit"]) ?? "contain",
+        opacity: active ? 1 : 0,
       }}
     />
   );

@@ -107,6 +107,7 @@ export function MediaPickerDialog({
   onPick,
   requiredWidth,
   requiredHeight,
+  acceptExtensions,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
@@ -116,6 +117,9 @@ export function MediaPickerDialog({
    *  Se informado, arquivos com resolução nativa menor recebem aviso. */
   requiredWidth?: number;
   requiredHeight?: number;
+  /** Se informado, restringe a lista e o upload a arquivos cuja extensão (sem ponto)
+   *  esteja incluída. Ex.: ["gif"], ["apng","png"]. */
+  acceptExtensions?: string[];
 }) {
   const { membership, user } = useAuth();
   const orgId = membership?.organization_id ?? null;
@@ -144,9 +148,19 @@ export function MediaPickerDialog({
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return filesQ.data ?? [];
-    return (filesQ.data ?? []).filter((f) => f.name.toLowerCase().includes(q));
-  }, [filesQ.data, search]);
+    const exts = (acceptExtensions ?? []).map((e) => e.toLowerCase().replace(/^\./, ""));
+    const base = filesQ.data ?? [];
+    const byExt = exts.length
+      ? base.filter((f) => {
+          const name = f.name.toLowerCase();
+          const dot = name.lastIndexOf(".");
+          const ext = dot >= 0 ? name.slice(dot + 1) : "";
+          return exts.includes(ext);
+        })
+      : base;
+    if (!q) return byExt;
+    return byExt.filter((f) => f.name.toLowerCase().includes(q));
+  }, [filesQ.data, search, acceptExtensions]);
 
   const handleUpload = async (files: FileList | null) => {
     if (!files || !files.length || !orgId) return;
@@ -162,6 +176,18 @@ export function MediaPickerDialog({
       );
       return;
     }
+      if (acceptExtensions && acceptExtensions.length) {
+        const exts = acceptExtensions.map((e) => e.toLowerCase().replace(/^\./, ""));
+        const name = file.name.toLowerCase();
+        const dot = name.lastIndexOf(".");
+        const ext = dot >= 0 ? name.slice(dot + 1) : "";
+        if (!exts.includes(ext)) {
+          toast.error(
+            `Formato inválido. Envie: ${exts.map((e) => "." + e).join(", ")}.`,
+          );
+          return;
+        }
+      }
     setUploadName(file.name);
     setUploadProgress(5);
     try {
@@ -283,7 +309,15 @@ export function MediaPickerDialog({
               <input
                 ref={inputRef}
                 type="file"
-                accept={filter === "image" ? "image/*" : "video/*"}
+                accept={
+                  acceptExtensions && acceptExtensions.length
+                    ? acceptExtensions
+                        .map((e) => "." + e.toLowerCase().replace(/^\./, ""))
+                        .join(",")
+                    : filter === "image"
+                      ? "image/*"
+                      : "video/*"
+                }
                 className="hidden"
                 onChange={(e) => {
                   handleUpload(e.target.files);

@@ -319,7 +319,19 @@ function ContentBlock({
     case "text":
       return <TextContent c={c} patch={patch} disabled={disabled} />;
     case "image":
-    case "logo":
+    case "logo": {
+      const subtype = (c.imageSubtype as string) ?? "static";
+      if (subtype === "sequence" && element.element_type === "image") {
+        return (
+          <ImageSequenceContent c={c} patch={patch} disabled={disabled} />
+        );
+      }
+      const acceptExtensions =
+        subtype === "gif"
+          ? ["gif"]
+          : subtype === "apng"
+            ? ["apng", "png"]
+            : undefined;
       return (
         <MediaContent
           c={c}
@@ -329,8 +341,17 @@ function ContentBlock({
           allowFill={element.element_type === "image"}
           requiredWidth={requiredWidth}
           requiredHeight={requiredHeight}
+          acceptExtensions={acceptExtensions}
+          hint={
+            subtype === "gif"
+              ? "Envie um GIF animado (com transparência opcional)."
+              : subtype === "apng"
+                ? "Envie um APNG (PNG animado com transparência)."
+                : undefined
+          }
         />
       );
+    }
     case "video":
       return (
         <VideoContent
@@ -1345,6 +1366,8 @@ function MediaContent({
   allowFill,
   requiredWidth,
   requiredHeight,
+  acceptExtensions,
+  hint,
 }: {
   c: Record<string, unknown>;
   patch: (p: Record<string, unknown>) => void;
@@ -1353,6 +1376,8 @@ function MediaContent({
   allowFill: boolean;
   requiredWidth?: number;
   requiredHeight?: number;
+  acceptExtensions?: string[];
+  hint?: string;
 }) {
   const [pickerOpen, setPickerOpen] = useState(false);
   const mediaName = (c.mediaFileName as string) ?? null;
@@ -1382,6 +1407,11 @@ function MediaContent({
 
   return (
     <div className="flex flex-col gap-3">
+      {hint && (
+        <p className="rounded-lg border border-border/60 bg-muted/40 p-2 text-[11px] text-muted-foreground">
+          {hint}
+        </p>
+      )}
       <div className="flex flex-col gap-1">
         <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
           Mídia
@@ -1447,6 +1477,7 @@ function MediaContent({
         filter={kind}
         requiredWidth={requiredWidth}
         requiredHeight={requiredHeight}
+        acceptExtensions={acceptExtensions}
         onPick={(f: PickerMediaFile) =>
           patch({
             mediaFileId: f.id,
@@ -1455,6 +1486,184 @@ function MediaContent({
             mediaThumbnailPath: f.thumbnail_path,
           })
         }
+      />
+    </div>
+  );
+}
+
+// ---------- Image Sequence (frame-by-frame) ----------
+
+type SequenceFrame = {
+  id: string;
+  storagePath: string;
+  mediaFileId?: string | null;
+  name?: string | null;
+};
+
+function ImageSequenceContent({
+  c,
+  patch,
+  disabled,
+}: {
+  c: Record<string, unknown>;
+  patch: (p: Record<string, unknown>) => void;
+  disabled: boolean;
+}) {
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const rawFrames = Array.isArray(c.frames) ? (c.frames as unknown[]) : [];
+  const frames: SequenceFrame[] = rawFrames
+    .map((f) => f as Partial<SequenceFrame>)
+    .filter((f): f is SequenceFrame => !!f && typeof f.storagePath === "string")
+    .map((f) => ({
+      id: f.id ?? Math.random().toString(36).slice(2),
+      storagePath: f.storagePath,
+      mediaFileId: f.mediaFileId ?? null,
+      name: f.name ?? null,
+    }));
+  const fps = typeof c.fps === "number" ? (c.fps as number) : 12;
+  const loop = (c.loop as boolean | undefined) ?? true;
+  const fit = (c.fit as string) ?? "contain";
+
+  const setFrames = (next: SequenceFrame[]) => patch({ frames: next });
+
+  return (
+    <div className="flex flex-col gap-3">
+      <p className="rounded-lg border border-border/60 bg-muted/40 p-2 text-[11px] text-muted-foreground">
+        Adicione múltiplos quadros (PNG/JPG/WEBP) que serão reproduzidos em ordem
+        na taxa de FPS definida.
+      </p>
+
+      <div className="flex flex-col gap-1">
+        <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+          Quadros ({frames.length})
+        </span>
+        <div className="flex flex-col gap-1.5">
+          {frames.map((f, i) => (
+            <div
+              key={f.id}
+              className="flex items-center gap-2 rounded-md border border-border/60 bg-card/40 px-2 py-1 text-xs"
+            >
+              <span className="w-6 shrink-0 text-center font-mono text-[10px] text-muted-foreground">
+                {i + 1}
+              </span>
+              <span className="flex-1 truncate">{f.name ?? "quadro"}</span>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                disabled={disabled || i === 0}
+                className="h-6 w-6"
+                onClick={() => {
+                  const next = frames.slice();
+                  [next[i - 1], next[i]] = [next[i], next[i - 1]];
+                  setFrames(next);
+                }}
+                title="Mover para cima"
+              >
+                <ArrowUp className="h-3 w-3" />
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                disabled={disabled || i === frames.length - 1}
+                className="h-6 w-6"
+                onClick={() => {
+                  const next = frames.slice();
+                  [next[i + 1], next[i]] = [next[i], next[i + 1]];
+                  setFrames(next);
+                }}
+                title="Mover para baixo"
+              >
+                <ArrowDown className="h-3 w-3" />
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                disabled={disabled}
+                className="h-6 w-6 text-destructive hover:text-destructive"
+                onClick={() => setFrames(frames.filter((_, j) => j !== i))}
+                title="Remover"
+              >
+                <Trash2 className="h-3 w-3" />
+              </Button>
+            </div>
+          ))}
+        </div>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          disabled={disabled}
+          onClick={() => setPickerOpen(true)}
+          className="mt-1 justify-start"
+        >
+          <Plus className="mr-2 h-3.5 w-3.5" />
+          Adicionar quadro
+        </Button>
+      </div>
+
+      <label className="flex flex-col gap-1">
+        <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+          FPS ({fps})
+        </span>
+        <Slider
+          value={[fps]}
+          min={1}
+          max={60}
+          step={1}
+          disabled={disabled}
+          onValueChange={(v) => patch({ fps: v[0] })}
+        />
+      </label>
+
+      <label className="flex items-center justify-between gap-2 rounded-md border border-border/60 bg-card/40 px-2 py-1.5 text-xs">
+        <span>Repetir em loop</span>
+        <Switch
+          checked={loop}
+          disabled={disabled}
+          onCheckedChange={(v) => patch({ loop: v })}
+        />
+      </label>
+
+      <label className="flex flex-col gap-1">
+        <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+          Ajuste
+        </span>
+        <Select
+          value={fit}
+          onValueChange={(v) => patch({ fit: v })}
+          disabled={disabled}
+        >
+          <SelectTrigger className="h-8 text-xs capitalize">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {["contain", "cover", "fill"].map((f) => (
+              <SelectItem key={f} value={f} className="capitalize">
+                {f}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </label>
+
+      <MediaPickerDialog
+        open={pickerOpen}
+        onOpenChange={setPickerOpen}
+        filter="image"
+        onPick={(f: PickerMediaFile) => {
+          setFrames([
+            ...frames,
+            {
+              id: Math.random().toString(36).slice(2),
+              storagePath: f.storage_path,
+              mediaFileId: f.id,
+              name: f.name,
+            },
+          ]);
+        }}
       />
     </div>
   );
