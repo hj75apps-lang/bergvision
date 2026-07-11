@@ -924,3 +924,322 @@ function SliderRow({
 function canvasToBlob(canvas: HTMLCanvasElement): Promise<Blob | null> {
   return new Promise((resolve) => canvas.toBlob((b) => resolve(b), "image/png"));
 }
+
+// ============================================================
+// LASSO / CANETA (seleção poligonal estilo Photoshop)
+// ============================================================
+
+type Pt = { x: number; y: number };
+
+function LassoStage({
+  url,
+  onApply,
+}: {
+  url: string;
+  onApply: (b: Blob) => void;
+}) {
+  const imgRef = useRef<HTMLImageElement | null>(null);
+  const overlayRef = useRef<HTMLCanvasElement | null>(null);
+  const [points, setPoints] = useState<Pt[]>([]);
+  const [hover, setHover] = useState<Pt | null>(null);
+  const [closed, setClosed] = useState(false);
+  const [natural, setNatural] = useState<{ w: number; h: number }>({
+    w: 0,
+    h: 0,
+  });
+  const [feather, setFeather] = useState(0);
+
+  // Sincroniza tamanho do overlay ao da imagem renderizada
+  useEffect(() => {
+    const img = imgRef.current;
+    const overlay = overlayRef.current;
+    if (!img || !overlay) return;
+    const sync = () => {
+      const r = img.getBoundingClientRect();
+      overlay.width = r.width;
+      overlay.height = r.height;
+      redraw();
+    };
+    sync();
+    const ro = new ResizeObserver(sync);
+    ro.observe(img);
+    return () => ro.disconnect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [natural.w, natural.h]);
+
+  // Redesenha overlay quando pontos mudam
+  useEffect(() => {
+    redraw();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [points, hover, closed]);
+
+  const redraw = () => {
+    const overlay = overlayRef.current;
+    if (!overlay) return;
+    const ctx = overlay.getContext("2d");
+    if (!ctx) return;
+    ctx.clearRect(0, 0, overlay.width, overlay.height);
+    if (points.length === 0) return;
+
+    // Camada semi-transparente do polígono
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(points[0].x, points[0].y);
+    for (let i = 1; i < points.length; i++) ctx.lineTo(points[i].x, points[i].y);
+    if (closed) ctx.closePath();
+    else if (hover) ctx.lineTo(hover.x, hover.y);
+    ctx.fillStyle = "rgba(59,130,246,0.15)";
+    if (closed) ctx.fill();
+    ctx.strokeStyle = "rgba(59,130,246,0.95)";
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash(closed ? [] : [6, 4]);
+    ctx.stroke();
+    ctx.restore();
+
+    // Âncoras
+    points.forEach((p, i) => {
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, i === 0 ? 5 : 4, 0, Math.PI * 2);
+      ctx.fillStyle = i === 0 ? "#22d3ee" : "#fff";
+      ctx.fill();
+      ctx.strokeStyle = "#0f172a";
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+    });
+  };
+
+  const posFromEvent = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    const overlay = overlayRef.current!;
+    const rect = overlay.getBoundingClientRect();
+    return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+  };
+
+  const onPointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (closed) return;
+    const p = posFromEvent(e);
+    // Fecha ao clicar no primeiro ponto
+    if (points.length >= 3) {
+      const first = points[0];
+      const dx = p.x - first.x;
+      const dy = p.y - first.y;
+      if (Math.hypot(dx, dy) < 10) {
+        setClosed(true);
+        setHover(null);
+        return;
+      }
+    }
+    setPoints((prev) => [...prev, p]);
+  };
+  const onPointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (closed) return;
+    setHover(posFromEvent(e));
+  };
+  const onDoubleClick = () => {
+    if (points.length >= 3) {
+      setClosed(true);
+      setHover(null);
+    }
+  };
+
+  const clear = () => {
+    setPoints([]);
+    setHover(null);
+    setClosed(false);
+  };
+  const undoPoint = () => {
+    setPoints((prev) => prev.slice(0, -1));
+    setClosed(false);
+  };
+
+  // Atalhos
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => {
+      if (e.key === "Escape") clear();
+      else if (e.key === "Enter" && points.length >= 3) setClosed(true);
+    };
+    window.addEventListener("keydown", h);
+    return () => window.removeEventListener("keydown", h);
+  }, [points.length]);
+
+  // Aplica operação: 'inside' remove interior, 'outside' remove exterior, 'crop' recorta ao bounding box
+  const apply = async (mode: "inside" | "outside" | "crop") => {
+    const img = imgRef.current;
+    const overlay = overlayRef.current;
+    if (!img || !overlay || !closed || points.length < 3) return;
+
+    // Converte pontos do overlay (px CSS) para px naturais da imagem
+    const rect = img.getBoundingClientRect();
+    const scaleX = img.naturalWidth / rect.width;
+    const scaleY = img.naturalHeight / rect.height;
+    const poly = points.map((p) => ({ x: p.x * scaleX, y: p.y * scaleY }));
+
+    const canvas = document.createElement("canvas");
+    canvas.width = img.naturalWidth;
+    canvas.height = img.naturalHeight;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    const buildPath = () => {
+      ctx.beginPath();
+      ctx.moveTo(poly[0].x, poly[0].y);
+      for (let i = 1; i < poly.length; i++) ctx.lineTo(poly[i].x, poly[i].y);
+      ctx.closePath();
+    };
+
+    if (mode === "inside") {
+      // Mantém imagem, apaga interior
+      ctx.drawImage(img, 0, 0);
+      if (feather > 0) ctx.filter = `blur(${feather}px)`;
+      ctx.globalCompositeOperation = "destination-out";
+      buildPath();
+      ctx.fill();
+    } else {
+      // 'outside' e 'crop' — usam clip
+      ctx.save();
+      buildPath();
+      ctx.clip();
+      if (feather > 0) ctx.filter = `blur(${feather}px)`;
+      ctx.drawImage(img, 0, 0);
+      ctx.restore();
+      if (mode === "crop") {
+        // Recorta ao bounding box da seleção
+        let minX = Infinity,
+          minY = Infinity,
+          maxX = -Infinity,
+          maxY = -Infinity;
+        for (const p of poly) {
+          if (p.x < minX) minX = p.x;
+          if (p.y < minY) minY = p.y;
+          if (p.x > maxX) maxX = p.x;
+          if (p.y > maxY) maxY = p.y;
+        }
+        const w = Math.max(1, Math.round(maxX - minX));
+        const h = Math.max(1, Math.round(maxY - minY));
+        const out = document.createElement("canvas");
+        out.width = w;
+        out.height = h;
+        const octx = out.getContext("2d");
+        if (!octx) return;
+        octx.drawImage(canvas, minX, minY, w, h, 0, 0, w, h);
+        const blob = await canvasToBlob(out);
+        if (blob) {
+          onApply(blob);
+          clear();
+        }
+        return;
+      }
+    }
+
+    const blob = await canvasToBlob(canvas);
+    if (blob) {
+      onApply(blob);
+      clear();
+    }
+  };
+
+  return (
+    <div className="flex max-h-full w-full flex-col items-center gap-3">
+      <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border/60 bg-card/60 p-2 text-[11px]">
+        <span className="px-1 text-muted-foreground">
+          {points.length} ponto{points.length === 1 ? "" : "s"}
+          {closed && " · fechado"}
+        </span>
+        <div className="h-4 w-px bg-border" />
+        <div className="flex items-center gap-1">
+          <span className="text-muted-foreground">Suavizar</span>
+          <Slider
+            value={[feather]}
+            min={0}
+            max={20}
+            step={1}
+            onValueChange={([v]) => setFeather(v)}
+            className="w-24"
+          />
+          <span className="w-5 tabular-nums text-muted-foreground">
+            {feather}
+          </span>
+        </div>
+        <div className="h-4 w-px bg-border" />
+        <Button
+          size="sm"
+          variant="outline"
+          className="h-7 px-2"
+          onClick={undoPoint}
+          disabled={points.length === 0}
+        >
+          <Undo2 className="mr-1 h-3 w-3" /> Ponto
+        </Button>
+        <Button
+          size="sm"
+          variant="outline"
+          className="h-7 px-2"
+          onClick={clear}
+          disabled={points.length === 0}
+        >
+          Limpar
+        </Button>
+        <Button
+          size="sm"
+          variant="outline"
+          className="h-7 px-2"
+          onClick={() => points.length >= 3 && setClosed(true)}
+          disabled={points.length < 3 || closed}
+        >
+          Fechar
+        </Button>
+        <div className="h-4 w-px bg-border" />
+        <Button
+          size="sm"
+          variant="destructive"
+          className="h-7 px-2"
+          disabled={!closed}
+          onClick={() => void apply("inside")}
+        >
+          Remover dentro
+        </Button>
+        <Button
+          size="sm"
+          variant="outline"
+          className="h-7 px-2"
+          disabled={!closed}
+          onClick={() => void apply("outside")}
+        >
+          Remover fora
+        </Button>
+        <Button
+          size="sm"
+          className="h-7 px-2"
+          disabled={!closed}
+          onClick={() => void apply("crop")}
+        >
+          Recortar
+        </Button>
+      </div>
+      <div className="relative flex-1 overflow-auto">
+        <div className="relative inline-block">
+          <img
+            ref={imgRef}
+            src={url}
+            alt=""
+            draggable={false}
+            onLoad={(e) => {
+              const t = e.currentTarget;
+              setNatural({ w: t.naturalWidth, h: t.naturalHeight });
+            }}
+            className="block max-h-[55vh] max-w-full object-contain shadow-lg select-none md:max-h-[65vh]"
+          />
+          <canvas
+            ref={overlayRef}
+            onPointerDown={onPointerDown}
+            onPointerMove={onPointerMove}
+            onDoubleClick={onDoubleClick}
+            className={cn(
+              "absolute inset-0 h-full w-full touch-none",
+              closed ? "cursor-default" : "cursor-crosshair",
+            )}
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
