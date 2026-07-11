@@ -2952,19 +2952,11 @@ function WidgetContent({
 
       {widgetType === "weather" && (
         <>
-          <label className="flex flex-col gap-1">
-            <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-              Cidade
-            </span>
-            <Input
-              value={(config.city as string) ?? ""}
-              disabled={disabled}
-              maxLength={120}
-              onChange={(e) => setCfg({ city: e.target.value })}
-              placeholder="São Paulo, BR"
-              className="h-8 text-xs"
-            />
-          </label>
+          <WeatherCitiesEditor
+            config={config}
+            setCfg={setCfg}
+            disabled={disabled}
+          />
           <label className="flex flex-col gap-1">
             <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
               Layout
@@ -3515,6 +3507,137 @@ function ShapeContent({
             Menor = mais rápido.
           </span>
         </div>
+      )}
+    </div>
+  );
+}
+function WeatherCitiesEditor({
+  config,
+  setCfg,
+  disabled,
+}: {
+  config: Record<string, unknown>;
+  setCfg: (p: Record<string, unknown>) => void;
+  disabled: boolean;
+}) {
+  const rawList = Array.isArray(config.cities)
+    ? (config.cities as unknown[]).filter((v): v is string => typeof v === "string")
+    : [];
+  const legacy =
+    typeof config.city === "string" && config.city.trim().length > 0 && rawList.length === 0
+      ? [config.city as string]
+      : [];
+  const cities: string[] = rawList.length > 0 ? rawList : legacy;
+  const rotationSeconds = Math.max(
+    3,
+    Math.min(300, (config.rotationSeconds as number | undefined) ?? 15),
+  );
+
+  const commit = (next: string[]) => {
+    setCfg({ cities: next, city: next[0] ?? "" });
+  };
+  const update = (i: number, v: string) => {
+    const next = cities.slice();
+    next[i] = v;
+    commit(next);
+  };
+  const remove = (i: number) => commit(cities.filter((_, j) => j !== i));
+  const add = () => commit([...cities, ""]);
+  const move = (i: number, dir: -1 | 1) => {
+    const j = i + dir;
+    if (j < 0 || j >= cities.length) return;
+    const next = cities.slice();
+    [next[i], next[j]] = [next[j], next[i]];
+    commit(next);
+  };
+
+  return (
+    <div className="flex flex-col gap-2 rounded-md border border-border/50 bg-muted/20 p-2">
+      <div className="flex items-center justify-between">
+        <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+          Cidades ({cities.length})
+        </span>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="h-6 px-2 text-[10px]"
+          disabled={disabled}
+          onClick={add}
+        >
+          <Plus className="mr-1 h-3 w-3" /> Adicionar
+        </Button>
+      </div>
+      {cities.length === 0 && (
+        <p className="text-[10px] text-muted-foreground">
+          Adicione uma ou mais cidades. Quando houver mais de uma, o widget alterna
+          entre elas automaticamente.
+        </p>
+      )}
+      <div className="flex flex-col gap-1.5">
+        {cities.map((c, i) => (
+          <div key={i} className="flex items-center gap-1">
+            <span className="w-5 shrink-0 text-center font-mono text-[10px] text-muted-foreground">
+              {i + 1}
+            </span>
+            <Input
+              value={c}
+              disabled={disabled}
+              maxLength={120}
+              onChange={(e) => update(i, e.target.value)}
+              placeholder="Ex.: São Paulo, BR"
+              className="h-7 flex-1 text-xs"
+            />
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6"
+              disabled={disabled || i === 0}
+              onClick={() => move(i, -1)}
+              title="Mover para cima"
+            >
+              <ArrowUp className="h-3 w-3" />
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6"
+              disabled={disabled || i === cities.length - 1}
+              onClick={() => move(i, 1)}
+              title="Mover para baixo"
+            >
+              <ArrowDown className="h-3 w-3" />
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6 text-destructive hover:text-destructive"
+              disabled={disabled}
+              onClick={() => remove(i)}
+              title="Remover"
+            >
+              <Trash2 className="h-3 w-3" />
+            </Button>
+          </div>
+        ))}
+      </div>
+      {cities.length > 1 && (
+        <label className="flex flex-col gap-1 pt-1">
+          <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+            Trocar de cidade a cada ({rotationSeconds}s)
+          </span>
+          <Slider
+            value={[rotationSeconds]}
+            min={3}
+            max={120}
+            step={1}
+            disabled={disabled}
+            onValueChange={([v]) => setCfg({ rotationSeconds: v })}
+          />
+        </label>
       )}
     </div>
   );

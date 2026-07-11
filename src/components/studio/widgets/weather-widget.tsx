@@ -1,4 +1,5 @@
-import { useQuery } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
+import { useQueries } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
 
 import { supabase } from "@/integrations/supabase/client";
@@ -63,12 +64,31 @@ function themeStyle(
 }
 
 export function WeatherWidget({ config }: { config: Record<string, unknown> }) {
-  const rawCity = ((config.city as string) ?? "").trim();
-  const city = rawCity
-    .replace(/[.\s]+$/g, "")
-    .replace(/\s*,\s*(BR|BRA|BRAZIL|BRASIL|US|USA|EUA|UK|PT|AR|CL)\.?$/i, "")
-    .replace(/[.\s]+$/g, "")
-    .trim();
+  const normalize = (raw: string) =>
+    raw
+      .trim()
+      .replace(/[.\s]+$/g, "")
+      .replace(/\s*,\s*(BR|BRA|BRAZIL|BRASIL|US|USA|EUA|UK|PT|AR|CL)\.?$/i, "")
+      .replace(/[.\s]+$/g, "")
+      .trim();
+  const rawList = Array.isArray(config.cities)
+    ? (config.cities as unknown[]).filter(
+        (v): v is string => typeof v === "string" && v.trim().length > 0,
+      )
+    : [];
+  const legacy =
+    typeof config.city === "string" && config.city.trim().length > 0
+      ? [config.city]
+      : [];
+  const cities = Array.from(
+    new Set(
+      (rawList.length > 0 ? rawList : legacy).map(normalize).filter((c) => c.length > 0),
+    ),
+  );
+  const rotationSeconds = Math.max(
+    3,
+    Math.min(300, (config.rotationSeconds as number | undefined) ?? 15),
+  );
   const units =
     (config.units as string) === "imperial" ? "imperial" : "metric";
   const preset = ((config.preset as Preset) ?? "complete") as Preset;
@@ -116,19 +136,34 @@ export function WeatherWidget({ config }: { config: Record<string, unknown> }) {
     );
   };
 
-  const q = useQuery({
-    queryKey: ["widget-weather", city, units],
-    enabled: city.length > 0,
-    staleTime: 10 * 60 * 1000,
-    refetchInterval: 15 * 60 * 1000,
-    queryFn: async () => {
-      const { data, error } = await supabase.functions.invoke("widget-weather", {
-        body: { city, units },
-      });
-      if (error) throw error;
-      return data as WeatherData;
-    },
+  const results = useQueries({
+    queries: cities.map((c) => ({
+      queryKey: ["widget-weather", c, units] as const,
+      staleTime: 10 * 60 * 1000,
+      refetchInterval: 15 * 60 * 1000,
+      queryFn: async () => {
+        const { data, error } = await supabase.functions.invoke("widget-weather", {
+          body: { city: c, units },
+        });
+        if (error) throw error;
+        return data as WeatherData;
+      },
+    })),
   });
+
+  const [index, setIndex] = useState(0);
+  useEffect(() => {
+    if (cities.length <= 1) return;
+    const id = window.setInterval(() => {
+      setIndex((i) => (i + 1) % cities.length);
+    }, rotationSeconds * 1000);
+    return () => window.clearInterval(id);
+  }, [cities.length, rotationSeconds]);
+  useEffect(() => {
+    if (index >= cities.length) setIndex(0);
+  }, [cities.length, index]);
+
+  const current = cities.length > 0 ? results[Math.min(index, results.length - 1)] : undefined;
 
   const shellBase: React.CSSProperties = {
     containerType: "size",
@@ -137,7 +172,7 @@ export function WeatherWidget({ config }: { config: Record<string, unknown> }) {
     overflow: "hidden",
   };
 
-  if (!city) {
+  if (cities.length === 0) {
     return (
       withBg(<div
         className="flex h-full w-full items-center justify-center text-white/70"
@@ -147,7 +182,7 @@ export function WeatherWidget({ config }: { config: Record<string, unknown> }) {
       </div>)
     );
   }
-  if (q.isLoading) {
+  if (!current || current.isLoading) {
     return (
       withBg(<div
         className="flex h-full w-full items-center justify-center text-white/70"
@@ -157,7 +192,7 @@ export function WeatherWidget({ config }: { config: Record<string, unknown> }) {
       </div>)
     );
   }
-  if (q.isError || !q.data) {
+  if (current.isError || !current.data) {
     return (
       withBg(<div
         className="flex h-full w-full items-center justify-center text-white/80"
@@ -168,7 +203,7 @@ export function WeatherWidget({ config }: { config: Record<string, unknown> }) {
     );
   }
 
-  const raw = q.data as Partial<WeatherData> & Record<string, unknown>;
+  const raw = current.data as Partial<WeatherData> & Record<string, unknown>;
   const d: WeatherData = {
     temp: typeof raw.temp === "number" ? raw.temp : 0,
     feelsLike: typeof raw.feelsLike === "number" ? raw.feelsLike : (typeof raw.temp === "number" ? raw.temp : 0),
@@ -179,7 +214,7 @@ export function WeatherWidget({ config }: { config: Record<string, unknown> }) {
     wind: typeof raw.wind === "number" ? raw.wind : 0,
     windUnit: typeof raw.windUnit === "string" ? raw.windUnit : "km/h",
     description: typeof raw.description === "string" ? raw.description : "—",
-    city: typeof raw.city === "string" ? raw.city : city,
+    city: typeof raw.city === "string" ? raw.city : cities[Math.min(index, cities.length - 1)] ?? "",
     country: typeof raw.country === "string" ? raw.country : "",
     forecast: Array.isArray(raw.forecast) ? (raw.forecast as WeatherData["forecast"]) : [],
   };

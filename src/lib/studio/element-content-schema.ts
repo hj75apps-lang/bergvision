@@ -90,7 +90,9 @@ export const ClockWidgetConfigSchema = z.object({
 });
 
 export const WeatherWidgetConfigSchema = z.object({
-  city: z.string().min(1).max(120),
+  city: z.string().min(1).max(120).optional(),
+  cities: z.array(z.string().min(1).max(120)).max(20).optional(),
+  rotationSeconds: z.number().int().min(3).max(300).default(15),
   units: z.enum(['metric', 'imperial']).default('metric'),
   showForecast: z.boolean().default(false),
   preset: z
