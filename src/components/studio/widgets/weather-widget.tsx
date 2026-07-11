@@ -110,15 +110,59 @@ export function WeatherWidget({ config }: { config: Record<string, unknown> }) {
     typeof config.backgroundImageBlur === "number"
       ? Math.max(0, Math.min(40, config.backgroundImageBlur as number))
       : 0;
+  const bgAnim = ((config.backgroundImageAnimation as string) ?? "none") as
+    | "none"
+    | "ken-burns"
+    | "zoom-in"
+    | "zoom-out"
+    | "pan-left"
+    | "pan-right"
+    | "pan-up"
+    | "pan-down";
+  const bgAnimDuration = Math.max(
+    5,
+    Math.min(120, (config.backgroundImageAnimationDuration as number | undefined) ?? 30),
+  );
 
   const withBg = (node: React.ReactNode) => {
     if (!bgUrl) return node;
+    // Escala inicial extra evita bordas expostas durante pan.
+    // Animações suaves (alternate) mantêm o loop imperceptível e
+    // gastam apenas transform+opacity — GPU-accelerated, sem repaint.
+    const animMap: Record<string, string | undefined> = {
+      none: undefined,
+      "ken-burns": `bv-wbg-kenburns ${bgAnimDuration}s ease-in-out infinite alternate`,
+      "zoom-in": `bv-wbg-zoom-in ${bgAnimDuration}s ease-in-out infinite alternate`,
+      "zoom-out": `bv-wbg-zoom-out ${bgAnimDuration}s ease-in-out infinite alternate`,
+      "pan-left": `bv-wbg-pan-left ${bgAnimDuration}s ease-in-out infinite alternate`,
+      "pan-right": `bv-wbg-pan-right ${bgAnimDuration}s ease-in-out infinite alternate`,
+      "pan-up": `bv-wbg-pan-up ${bgAnimDuration}s ease-in-out infinite alternate`,
+      "pan-down": `bv-wbg-pan-down ${bgAnimDuration}s ease-in-out infinite alternate`,
+    };
+    const animation = animMap[bgAnim];
+    // Base scale para cobrir a translação sem revelar bordas.
+    const baseScale = bgBlur > 0 ? 1.08 : 1;
     return (
       <div
         className="relative h-full w-full"
         style={{ borderRadius: "3cqmin", overflow: "hidden" }}
       >
+        {animation && (
+          <style>{`
+            @keyframes bv-wbg-kenburns{0%{transform:scale(1.05) translate(0,0)}100%{transform:scale(1.18) translate(-3%,-2%)}}
+            @keyframes bv-wbg-zoom-in{0%{transform:scale(1)}100%{transform:scale(1.2)}}
+            @keyframes bv-wbg-zoom-out{0%{transform:scale(1.2)}100%{transform:scale(1)}}
+            @keyframes bv-wbg-pan-left{0%{transform:scale(1.15) translateX(4%)}100%{transform:scale(1.15) translateX(-4%)}}
+            @keyframes bv-wbg-pan-right{0%{transform:scale(1.15) translateX(-4%)}100%{transform:scale(1.15) translateX(4%)}}
+            @keyframes bv-wbg-pan-up{0%{transform:scale(1.15) translateY(4%)}100%{transform:scale(1.15) translateY(-4%)}}
+            @keyframes bv-wbg-pan-down{0%{transform:scale(1.15) translateY(-4%)}100%{transform:scale(1.15) translateY(4%)}}
+            @media (prefers-reduced-motion: reduce){
+              [data-bv-wbg-anim]{animation:none !important;transform:none !important}
+            }
+          `}</style>
+        )}
         <div
+          data-bv-wbg-anim={animation ? bgAnim : undefined}
           aria-hidden
           className="pointer-events-none absolute inset-0"
           style={{
@@ -128,7 +172,10 @@ export function WeatherWidget({ config }: { config: Record<string, unknown> }) {
             backgroundRepeat: "no-repeat",
             opacity: bgOpacity,
             filter: bgBlur > 0 ? `blur(${bgBlur}px)` : undefined,
-            transform: bgBlur > 0 ? "scale(1.05)" : undefined,
+            transform: animation ? undefined : (baseScale !== 1 ? `scale(${baseScale})` : undefined),
+            animation,
+            willChange: animation ? "transform" : undefined,
+            backfaceVisibility: animation ? "hidden" : undefined,
           }}
         />
         <div className="relative h-full w-full">{node}</div>
