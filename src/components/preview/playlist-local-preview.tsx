@@ -12,18 +12,11 @@ import {
 
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-
-const PLAYER_PREVIEW_URL = (
-  import.meta.env.VITE_PLAYER_PREVIEW_URL ?? ""
-).replace(/\/+$/, "");
-const PLAYER_PREVIEW_ORIGIN = (() => {
-  try {
-    return PLAYER_PREVIEW_URL ? new URL(PLAYER_PREVIEW_URL).origin : "";
-  } catch {
-    return "";
-  }
-})();
-const PLAYER_CONFIGURED = Boolean(PLAYER_PREVIEW_URL);
+import {
+  ElementBody as StudioElementBody,
+  TemplateBackground,
+} from "@/components/studio/element-body";
+import type { TemplateElement } from "@/lib/studio/types";
 
 type MediaFile = {
   id: string;
