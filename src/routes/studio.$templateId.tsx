@@ -974,43 +974,28 @@ function EditorPage() {
           const isImageSubtype = (t: ToolDef) =>
             t.type === "image" &&
             typeof (t.defaultContent as Record<string, unknown>).imageSubtype === "string";
-          const imageMain = TOOLS.find(
+          const imageMainIdx = TOOLS.findIndex(
             (t) => t.type === "image" && !isImageSubtype(t),
           );
+          const imageMain = imageMainIdx >= 0 ? TOOLS[imageMainIdx] : null;
           const imageSubtypes = TOOLS.filter(isImageSubtype);
-          const others = TOOLS.filter(
-            (t) => t !== imageMain && !isImageSubtype(t),
-          );
-          const renderTool = (tool: ToolDef, key: string) => (
-            <Button
-              key={key}
-              variant="ghost"
-              size="sm"
-              className="rounded-lg"
-              disabled={!canEdit || addElement.isPending}
-              onClick={() => addElement.mutate(tool)}
-            >
-              <tool.icon className="mr-1.5 h-4 w-4" />
-              {tool.label}
-            </Button>
-          );
-          return (
-            <>
-              {others
-                .slice(0, others.findIndex((t) => t.type !== "text") + 1 || others.length)
-                .filter((t) => t.type === "text")
-                .map((t, i) => renderTool(t, `pre-${i}`))}
-              {imageMain && (
-                <div className="inline-flex items-center rounded-lg border border-transparent hover:border-border/60">
+          return TOOLS.map((tool, idx) => {
+            if (isImageSubtype(tool)) return null;
+            if (tool === imageMain) {
+              return (
+                <div
+                  key={`tool-${idx}`}
+                  className="inline-flex items-center rounded-lg"
+                >
                   <Button
                     variant="ghost"
                     size="sm"
                     className="rounded-l-lg rounded-r-none pr-2"
                     disabled={!canEdit || addElement.isPending}
-                    onClick={() => addElement.mutate(imageMain)}
+                    onClick={() => addElement.mutate(tool)}
                   >
-                    <imageMain.icon className="mr-1.5 h-4 w-4" />
-                    {imageMain.label}
+                    <tool.icon className="mr-1.5 h-4 w-4" />
+                    {tool.label}
                   </Button>
                   {imageSubtypes.length > 0 && (
                     <DropdownMenu>
@@ -1042,12 +1027,22 @@ function EditorPage() {
                     </DropdownMenu>
                   )}
                 </div>
-              )}
-              {others
-                .filter((t) => t.type !== "text")
-                .map((t, i) => renderTool(t, `post-${i}`))}
-            </>
-          );
+              );
+            }
+            return (
+              <Button
+                key={`tool-${idx}`}
+                variant="ghost"
+                size="sm"
+                className="rounded-lg"
+                disabled={!canEdit || addElement.isPending}
+                onClick={() => addElement.mutate(tool)}
+              >
+                <tool.icon className="mr-1.5 h-4 w-4" />
+                {tool.label}
+              </Button>
+            );
+          });
         })()}
       </div>
 
