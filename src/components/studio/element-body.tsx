@@ -154,7 +154,14 @@ function ClockWidget({ config }: { config: Record<string, unknown> }) {
 }
 
 function WeatherWidget({ config }: { config: Record<string, unknown> }) {
-  const city = ((config.city as string) ?? "").trim();
+  const rawCity = ((config.city as string) ?? "").trim();
+  // Open-Meteo geocoding aceita apenas o nome da cidade (sem sufixo de país
+  // ou pontuação final). Normaliza entradas como "São Paulo, BR." → "São Paulo".
+  const city = rawCity
+    .replace(/[.\s]+$/g, "")
+    .replace(/\s*,\s*(BR|BRA|BRAZIL|BRASIL|US|USA|EUA|UK|PT|AR|CL)\.?$/i, "")
+    .replace(/[.\s]+$/g, "")
+    .trim();
   const units =
     (config.units as string) === "imperial" ? "imperial" : "metric";
   const sizeCqh = Math.max(3, Math.min(90, (config.sizePercent as number) ?? 28));
