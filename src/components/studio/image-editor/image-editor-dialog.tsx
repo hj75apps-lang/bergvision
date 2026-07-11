@@ -7,6 +7,7 @@ import {
   Crop as CropIcon,
   Eraser,
   Loader2,
+  PenTool,
   Redo2,
   RotateCcw,
   Save,
@@ -86,7 +87,9 @@ export function ImageEditorDialog({
 
   const currentUrl = useObjectUrl(currentBlob);
   const [dims, setDims] = useState<{ w: number; h: number }>({ w: 0, h: 0 });
-  const [tab, setTab] = useState<"crop" | "bg" | "draw" | "adjust">("crop");
+  const [tab, setTab] = useState<
+    "crop" | "bg" | "lasso" | "draw" | "adjust"
+  >("crop");
   const [loadingSource, setLoadingSource] = useState(false);
   const [saveOpen, setSaveOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -210,6 +213,8 @@ export function ImageEditorDialog({
                 <CropStage url={currentUrl} onApply={pushBlob} />
               ) : tab === "draw" ? (
                 <DrawStage url={currentUrl} onApply={pushBlob} />
+              ) : tab === "lasso" ? (
+                <LassoStage url={currentUrl} onApply={pushBlob} />
               ) : (
                 <img
                   src={currentUrl}
@@ -264,12 +269,15 @@ export function ImageEditorDialog({
                 onValueChange={(v) => setTab(v as typeof tab)}
                 className="flex flex-1 flex-col"
               >
-                <TabsList className="mx-3 mt-3 grid grid-cols-4">
+                <TabsList className="mx-3 mt-3 grid grid-cols-5">
                   <TabsTrigger value="crop" title="Recortar">
                     <CropIcon className="h-4 w-4" />
                   </TabsTrigger>
                   <TabsTrigger value="bg" title="Remover fundo">
                     <Scissors className="h-4 w-4" />
+                  </TabsTrigger>
+                  <TabsTrigger value="lasso" title="Caneta (seleção)">
+                    <PenTool className="h-4 w-4" />
                   </TabsTrigger>
                   <TabsTrigger value="draw" title="Pincel">
                     <Brush className="h-4 w-4" />
@@ -303,6 +311,19 @@ export function ImageEditorDialog({
                         onApply={pushBlob}
                       />
                     )}
+                  </TabsContent>
+
+                  <TabsContent value="lasso" className="m-0 space-y-2">
+                    <p className="text-xs text-muted-foreground">
+                      Clique no canvas para adicionar pontos e desenhar uma
+                      seleção (como a caneta do Photoshop). Feche o traçado e
+                      escolha remover o que está dentro, fora, ou recortar
+                      pela área.
+                    </p>
+                    <p className="text-[10px] text-muted-foreground">
+                      Atalhos: duplo-clique fecha o traçado · Enter aplica ·
+                      Esc limpa.
+                    </p>
                   </TabsContent>
 
                   <TabsContent value="draw" className="m-0 space-y-2">
