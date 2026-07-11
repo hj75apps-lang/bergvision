@@ -402,11 +402,13 @@ function ItemStage({
   playing,
   onVideoEnded,
   videoRef,
+  animate = true,
 }: {
   item: Item;
   playing: boolean;
   onVideoEnded: () => void;
   videoRef: React.MutableRefObject<HTMLVideoElement | null>;
+  animate?: boolean;
 }) {
   useEffect(() => {
     const v = videoRef.current;
@@ -416,30 +418,24 @@ function ItemStage({
   }, [playing, videoRef]);
 
   const transition = (item.transition ?? "fade").toLowerCase();
-  const animClass = transitionClass(transition);
+  const animClass = animate ? transitionClass(transition) : "";
 
   if (item.item_type === "template") {
     return (
-      <>
-        <TransitionStyles />
-        <div className={cn("h-full w-full", animClass)}>
-          <TemplateFrame item={item} />
-        </div>
-      </>
+      <div className={cn("h-full w-full", animClass)}>
+        <TemplateFrame item={item} />
+      </div>
     );
   }
 
   const url = item.media_file?.url ?? null;
   if (isImage(item)) {
     return url ? (
-      <>
-        <TransitionStyles />
-        <img
-          src={url}
-          alt=""
-          className={cn("h-full w-full object-contain", animClass)}
-        />
-      </>
+      <img
+        src={url}
+        alt=""
+        className={cn("h-full w-full object-contain", animClass)}
+      />
     ) : (
       <div className="grid h-full w-full place-items-center text-white/60">
         Mídia indisponível
@@ -448,18 +444,15 @@ function ItemStage({
   }
   if (isVideo(item)) {
     return url ? (
-      <>
-        <TransitionStyles />
-        <video
-          ref={videoRef}
-          src={url}
-          autoPlay={playing}
-          muted
-          playsInline
-          onEnded={onVideoEnded}
-          className={cn("h-full w-full object-contain", animClass)}
-        />
-      </>
+      <video
+        ref={videoRef}
+        src={url}
+        autoPlay={playing}
+        muted
+        playsInline
+        onEnded={onVideoEnded}
+        className={cn("h-full w-full object-contain", animClass)}
+      />
     ) : (
       <div className="grid h-full w-full place-items-center text-white/60">
         Vídeo indisponível
