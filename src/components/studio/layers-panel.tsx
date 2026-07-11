@@ -2,6 +2,9 @@ import { Fragment, useMemo, useState } from "react";
 import {
   ChevronDown,
   ChevronRight,
+  ChevronsDown,
+  ChevronsUp,
+  Copy,
   Eye,
   EyeOff,
   FolderClosed,
@@ -12,9 +15,13 @@ import {
   Layers,
   ListMusic,
   Lock,
+  MoveDown,
+  MoveUp,
+  Pencil,
   Shapes,
   Sparkles,
   Square,
+  Trash2,
   Type as TypeIcon,
   Unlock,
   Video as VideoIcon,
@@ -24,6 +31,13 @@ import { cn } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu";
 import type { ElementType, TemplateElement } from "@/lib/studio/types";
 import {
   ELEMENT_LABELS,
@@ -136,6 +150,9 @@ export function LayersPanel({
   onToggleGroupVisible,
   onToggleGroupLocked,
   onMoveToGroup,
+  onDuplicate,
+  onDelete,
+  onDeleteGroup,
 }: {
   elements: TemplateElement[];
   selectedIds: string[];
@@ -152,6 +169,9 @@ export function LayersPanel({
   onToggleGroupVisible: (groupId: string) => void;
   onToggleGroupLocked: (groupId: string) => void;
   onMoveToGroup: (elementIds: string[], targetPath: GroupSeg[]) => void;
+  onDuplicate: (ids: string[]) => void;
+  onDelete: (ids: string[]) => void;
+  onDeleteGroup: (groupId: string) => void;
 }) {
   const ordered = useMemo(
     () => [...elements].sort((a, b) => b.z_index - a.z_index),
@@ -196,6 +216,54 @@ export function LayersPanel({
   const anyGrouped = elements.some((e) => getGroupPath(e).length > 0);
   const rootDropActive = !!dragIds && dropMode === "root";
 
+  const orderedIds = useMemo(() => ordered.map((e) => e.id), [ordered]);
+
+  const moveIds = (ids: string[], kind: "up" | "down" | "front" | "back") => {
+    if (ids.length === 0) return;
+    const set = new Set(ids);
+    const rest = orderedIds.filter((id) => !set.has(id));
+    const moving = orderedIds.filter((id) => set.has(id));
+    let next: string[] = orderedIds.slice();
+    if (kind === "front") {
+      next = [...moving, ...rest];
+    } else if (kind === "back") {
+      next = [...rest, ...moving];
+    } else if (kind === "up") {
+      next = orderedIds.slice();
+      // "up" = maior z_index = mover para índice menor
+      const positions = moving
+        .map((id) => next.indexOf(id))
+        .sort((a, b) => a - b);
+      for (const pos of positions) {
+        if (pos > 0 && !set.has(next[pos - 1])) {
+          const [x] = next.splice(pos, 1);
+          next.splice(pos - 1, 0, x);
+        }
+      }
+    } else if (kind === "down") {
+      next = orderedIds.slice();
+      const positions = moving
+        .map((id) => next.indexOf(id))
+        .sort((a, b) => b - a);
+      for (const pos of positions) {
+        if (pos < next.length - 1 && !set.has(next[pos + 1])) {
+          const [x] = next.splice(pos, 1);
+          next.splice(pos + 1, 0, x);
+        }
+      }
+    }
+    onReorder(next);
+  };
+
+  const ensureSelection = (id: string) => {
+    if (!selectedIds.includes(id)) onSelect(id, false);
+  };
+
+  const targetsFor = (id: string): string[] => {
+    if (selectedIds.includes(id) && selectedIds.length > 1) return selectedIds;
+    return [id];
+  };
+
   const renderNode = (
     node: TreeNode,
     depth: number,
@@ -218,6 +286,8 @@ export function LayersPanel({
       const isDropTarget = overKey === key && dropMode === "group";
       return (
         <Fragment key={key}>
+          <ContextMenu>
+          <ContextMenuTrigger asChild>
           <li
             onDragOver={(e) => {
               if (!dragIds) return;
@@ -331,6 +401,65 @@ export function LayersPanel({
               <FolderMinus className="h-3.5 w-3.5" />
             </button>
           </li>
+          </ContextMenuTrigger>
+          <ContextMenuContent className="w-56">
+            <ContextMenuItem
+              onSelect={() => onSelectMany(leafIds, false)}
+            >
+              <Layers className="mr-2 h-3.5 w-3.5" /> Selecionar elementos
+            </ContextMenuItem>
+            <ContextMenuItem
+              disabled={disabled}
+              onSelect={() => setEditingGroup(node.id)}
+            >
+              <Pencil className="mr-2 h-3.5 w-3.5" /> Renomear grupo
+            </ContextMenuItem>
+            <ContextMenuSeparator />
+            <ContextMenuItem
+              disabled={disabled}
+              onSelect={() => onToggleGroupVisible(node.id)}
+            >
+              {anyHidden ? (
+                <EyeOff className="mr-2 h-3.5 w-3.5" />
+              ) : (
+                <Eye className="mr-2 h-3.5 w-3.5" />
+              )}
+              {anyHidden ? "Mostrar grupo" : "Ocultar grupo"}
+            </ContextMenuItem>
+            <ContextMenuItem
+              disabled={disabled}
+              onSelect={() => onToggleGroupLocked(node.id)}
+            >
+              {anyLocked ? (
+                <Unlock className="mr-2 h-3.5 w-3.5" />
+              ) : (
+                <Lock className="mr-2 h-3.5 w-3.5" />
+              )}
+              {anyLocked ? "Desbloquear grupo" : "Bloquear grupo"}
+            </ContextMenuItem>
+            <ContextMenuSeparator />
+            <ContextMenuItem
+              disabled={disabled}
+              onSelect={() => onDuplicate(leafIds)}
+            >
+              <Copy className="mr-2 h-3.5 w-3.5" /> Duplicar elementos
+            </ContextMenuItem>
+            <ContextMenuItem
+              disabled={disabled}
+              onSelect={() => onUngroup(node.id)}
+            >
+              <FolderMinus className="mr-2 h-3.5 w-3.5" /> Desagrupar
+            </ContextMenuItem>
+            <ContextMenuSeparator />
+            <ContextMenuItem
+              disabled={disabled}
+              className="text-destructive focus:text-destructive"
+              onSelect={() => onDeleteGroup(node.id)}
+            >
+              <Trash2 className="mr-2 h-3.5 w-3.5" /> Excluir grupo
+            </ContextMenuItem>
+          </ContextMenuContent>
+          </ContextMenu>
           {!isCollapsed &&
             node.children.map((c) => renderNode(c, depth + 1, key))}
         </Fragment>
@@ -349,8 +478,10 @@ export function LayersPanel({
       !dragIds.includes(el.id) &&
       dropMode === "reorder";
     return (
+      <ContextMenu key={key}>
+      <ContextMenuTrigger asChild>
       <li
-        key={key}
+        onContextMenu={() => ensureSelection(el.id)}
         draggable={!disabled}
         onDragStart={() => {
           const ids = selected && selectedIds.length > 1 ? selectedIds : [el.id];
@@ -436,6 +567,84 @@ export function LayersPanel({
           )}
         </button>
       </li>
+      </ContextMenuTrigger>
+      <ContextMenuContent className="w-56">
+        <ContextMenuItem
+          disabled={disabled}
+          onSelect={() => moveIds(targetsFor(el.id), "up")}
+        >
+          <MoveUp className="mr-2 h-3.5 w-3.5" /> Mover para cima
+        </ContextMenuItem>
+        <ContextMenuItem
+          disabled={disabled}
+          onSelect={() => moveIds(targetsFor(el.id), "down")}
+        >
+          <MoveDown className="mr-2 h-3.5 w-3.5" /> Mover para baixo
+        </ContextMenuItem>
+        <ContextMenuItem
+          disabled={disabled}
+          onSelect={() => moveIds(targetsFor(el.id), "front")}
+        >
+          <ChevronsUp className="mr-2 h-3.5 w-3.5" /> Trazer para frente
+        </ContextMenuItem>
+        <ContextMenuItem
+          disabled={disabled}
+          onSelect={() => moveIds(targetsFor(el.id), "back")}
+        >
+          <ChevronsDown className="mr-2 h-3.5 w-3.5" /> Enviar para trás
+        </ContextMenuItem>
+        <ContextMenuSeparator />
+        <ContextMenuItem
+          disabled={disabled}
+          onSelect={() => setEditing(el.id)}
+        >
+          <Pencil className="mr-2 h-3.5 w-3.5" /> Renomear
+        </ContextMenuItem>
+        <ContextMenuItem
+          disabled={disabled}
+          onSelect={() => onDuplicate(targetsFor(el.id))}
+        >
+          <Copy className="mr-2 h-3.5 w-3.5" /> Duplicar
+        </ContextMenuItem>
+        <ContextMenuItem
+          disabled={disabled || selectedIds.length < 2 || !selectedIds.includes(el.id)}
+          onSelect={() => onGroup(selectedIds)}
+        >
+          <FolderClosed className="mr-2 h-3.5 w-3.5" /> Agrupar seleção
+        </ContextMenuItem>
+        <ContextMenuSeparator />
+        <ContextMenuItem
+          disabled={disabled}
+          onSelect={() => onToggleVisible(el.id)}
+        >
+          {visible ? (
+            <EyeOff className="mr-2 h-3.5 w-3.5" />
+          ) : (
+            <Eye className="mr-2 h-3.5 w-3.5" />
+          )}
+          {visible ? "Ocultar" : "Mostrar"}
+        </ContextMenuItem>
+        <ContextMenuItem
+          disabled={disabled}
+          onSelect={() => onToggleLocked(el.id)}
+        >
+          {locked ? (
+            <Unlock className="mr-2 h-3.5 w-3.5" />
+          ) : (
+            <Lock className="mr-2 h-3.5 w-3.5" />
+          )}
+          {locked ? "Desbloquear" : "Bloquear"}
+        </ContextMenuItem>
+        <ContextMenuSeparator />
+        <ContextMenuItem
+          disabled={disabled}
+          className="text-destructive focus:text-destructive"
+          onSelect={() => onDelete(targetsFor(el.id))}
+        >
+          <Trash2 className="mr-2 h-3.5 w-3.5" /> Excluir
+        </ContextMenuItem>
+      </ContextMenuContent>
+      </ContextMenu>
     );
   };
 
