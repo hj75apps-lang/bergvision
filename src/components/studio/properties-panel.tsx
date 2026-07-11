@@ -1729,8 +1729,39 @@ function AppearanceFields({
 }) {
   const { borderRadiusPercent, mask, maskUrl } = getAppearanceConfig(c);
   const isCustom = mask === "custom";
+  const trimmedMaskUrl = maskUrl.trim();
+  const isDataUrl = /^data:image\//i.test(trimmedMaskUrl);
   const invalidCustom =
-    isCustom && maskUrl.trim().length > 0 && !/^https?:\/\//i.test(maskUrl.trim());
+    isCustom &&
+    trimmedMaskUrl.length > 0 &&
+    !/^(https?:|data:image\/)/i.test(trimmedMaskUrl);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const handleMaskFile = async (file: File) => {
+    // Aceita imagens (svg, png, webp, jpg). Limite de 512KB para manter o
+    // JSON do template leve — a máscara é armazenada inline como data URL.
+    const okTypes = /^image\/(svg\+xml|png|webp|jpeg|gif)$/i;
+    if (!okTypes.test(file.type)) {
+      toast.error("Use uma imagem SVG, PNG, WebP, JPG ou GIF.");
+      return;
+    }
+    if (file.size > 512 * 1024) {
+      toast.error("Máscara muito grande (limite: 512 KB). Use um SVG otimizado.");
+      return;
+    }
+    try {
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result));
+        reader.onerror = () => reject(new Error("Falha ao ler o arquivo."));
+        reader.readAsDataURL(file);
+      });
+      patch({ maskUrl: dataUrl });
+      toast.success("Máscara personalizada carregada.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Falha ao carregar máscara.");
+    }
+  };
 
   return (
     <div className="flex flex-col gap-3 rounded-lg border border-border/60 bg-card/40 p-2.5">
@@ -1791,16 +1822,73 @@ function AppearanceFields({
       </label>
 
       {isCustom && (
-        <label className="flex flex-col gap-1">
+        <div className="flex flex-col gap-2">
           <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-            URL do SVG/PNG (fundo transparente, área branca = visível)
+            Máscara personalizada (fundo transparente, área branca = visível)
+          </span>
+          <div className="flex items-center gap-2">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/svg+xml,image/png,image/webp,image/jpeg,image/gif"
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) void handleMaskFile(f);
+                e.target.value = "";
+              }}
+            />
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={disabled}
+              className="h-8 flex-1 text-xs"
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <Upload className="mr-1.5 h-3 w-3" />
+              {isDataUrl ? "Trocar arquivo" : "Enviar arquivo"}
+            </Button>
+            {trimmedMaskUrl.length > 0 && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                disabled={disabled}
+                className="h-8 px-2 text-xs"
+                onClick={() => patch({ maskUrl: "" })}
+              >
+                Limpar
+              </Button>
+            )}
+          </div>
+          {isDataUrl && (
+            <div className="flex items-center gap-2 rounded-md border border-border/60 bg-background/40 p-2">
+              <div
+                className="h-10 w-10 rounded border border-border/60 bg-foreground/80"
+                style={{
+                  maskImage: `url("${trimmedMaskUrl}")`,
+                  WebkitMaskImage: `url("${trimmedMaskUrl}")`,
+                  maskSize: "100% 100%",
+                  WebkitMaskSize: "100% 100%",
+                  maskRepeat: "no-repeat",
+                  WebkitMaskRepeat: "no-repeat",
+                }}
+              />
+              <span className="text-[10px] text-muted-foreground">
+                Arquivo carregado (incorporado no template).
+              </span>
+            </div>
+          )}
+          <span className="text-[10px] text-muted-foreground">
+            ou cole uma URL pública (https://…)
           </span>
           <Input
             type="url"
             inputMode="url"
             placeholder="https://exemplo.com/mascara.svg"
-            value={maskUrl}
-            disabled={disabled}
+            value={isDataUrl ? "" : maskUrl}
+            disabled={disabled || isDataUrl}
             onChange={(e) => patch({ maskUrl: e.target.value })}
             className={cn(
               "h-8 text-xs",
@@ -1809,10 +1897,13 @@ function AppearanceFields({
           />
           {invalidCustom && (
             <span className="text-[10px] text-destructive">
-              Use uma URL absoluta iniciando com https://
+              Use uma URL absoluta iniciando com https:// ou envie um arquivo.
             </span>
           )}
-        </label>
+          <span className="text-[10px] text-muted-foreground">
+            Dica: SVG com áreas brancas define a região visível. Limite 512 KB.
+          </span>
+        </div>
       )}
     </div>
   );
