@@ -64,7 +64,7 @@ function getSupabaseErrorMessage(error: unknown, fallback: string): string {
   return parts.length ? parts.join(" ") : fallback;
 }
 
-async function insertMediaFileWithSchemaFallback(
+export async function insertMediaFileWithSchemaFallback(
   payload: Record<string, unknown>,
 ): Promise<PickerMediaFile> {
   const body = { ...payload };
