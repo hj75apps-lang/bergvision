@@ -2838,6 +2838,66 @@ function WidgetContent({
           </label>
           <label className="flex flex-col gap-1">
             <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+              Layout
+            </span>
+            <Select
+              value={(config.preset as string) ?? "complete"}
+              onValueChange={(v) => setCfg({ preset: v })}
+              disabled={disabled}
+            >
+              <SelectTrigger className="h-8 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="minimal">Minimal — ícone + temperatura</SelectItem>
+                <SelectItem value="complete">Completo — cidade, sensação, umidade e vento</SelectItem>
+                <SelectItem value="forecast">Previsão — hoje + próximos dias</SelectItem>
+                <SelectItem value="vertical">Vertical — para totens/portrait</SelectItem>
+              </SelectContent>
+            </Select>
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+              Tema
+            </span>
+            <Select
+              value={(config.theme as string) ?? "gradient"}
+              onValueChange={(v) => setCfg({ theme: v })}
+              disabled={disabled}
+            >
+              <SelectTrigger className="h-8 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="gradient">Cartão colorido (automático)</SelectItem>
+                <SelectItem value="dark">Escuro</SelectItem>
+                <SelectItem value="light">Claro</SelectItem>
+                <SelectItem value="glass">Vidro (transparente)</SelectItem>
+              </SelectContent>
+            </Select>
+          </label>
+          <label className="flex items-center justify-between gap-2">
+            <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+              Cor de destaque
+            </span>
+            <Input
+              type="color"
+              value={(config.accentColor as string) ?? "#FDE68A"}
+              disabled={disabled}
+              onChange={(e) => setCfg({ accentColor: e.target.value })}
+              className="h-8 w-14 cursor-pointer p-1"
+            />
+          </label>
+          <div className="flex items-center justify-between rounded-md border border-border/50 bg-muted/30 px-2 py-1.5">
+            <span className="text-[11px] font-medium">Ícones animados</span>
+            <Switch
+              checked={(config.showAnimatedIcons as boolean | undefined) ?? true}
+              disabled={disabled}
+              onCheckedChange={(v) => setCfg({ showAnimatedIcons: v })}
+            />
+          </div>
+          <label className="flex flex-col gap-1">
+            <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
               Unidade
             </span>
             <Select
@@ -2855,7 +2915,7 @@ function WidgetContent({
             </Select>
           </label>
           <p className="text-[10px] text-muted-foreground">
-            A chave da API é gerenciada no servidor — não configurável aqui.
+            Dados via Open-Meteo (gratuito, sem chave de API). Atualiza a cada 15 min.
           </p>
         </>
       )}
@@ -3014,7 +3074,13 @@ function defaultWidgetConfig(type: string): Record<string, unknown> {
     case "clock":
       return { format: "24h", timezone: "America/Sao_Paulo" };
     case "weather":
-      return { city: "", units: "metric" };
+      return {
+        city: "",
+        units: "metric",
+        preset: "complete",
+        theme: "gradient",
+        showAnimatedIcons: true,
+      };
     case "rss":
     case "news":
       return { feedUrl: "", maxItems: 5 };

@@ -93,6 +93,14 @@ export const WeatherWidgetConfigSchema = z.object({
   city: z.string().min(1).max(120),
   units: z.enum(['metric', 'imperial']).default('metric'),
   showForecast: z.boolean().default(false),
+  preset: z
+    .enum(['minimal', 'complete', 'forecast', 'vertical'])
+    .default('complete'),
+  theme: z
+    .enum(['gradient', 'dark', 'light', 'glass'])
+    .default('gradient'),
+  accentColor: hexColor.optional(),
+  showAnimatedIcons: z.boolean().default(true),
   // Nunca aceitar apiKey aqui — resolvido em Edge Function.
 });
 
