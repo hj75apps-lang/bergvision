@@ -85,6 +85,9 @@ export function PropertiesPanel({
   onContentChange,
   canvasWidth,
   canvasHeight,
+  fullscreenable,
+  isFullscreen,
+  onToggleFullscreen,
 }: {
   element: TemplateElement | null;
   disabled: boolean;
@@ -93,6 +96,9 @@ export function PropertiesPanel({
   onContentChange: (content: Record<string, unknown>) => void;
   canvasWidth: number;
   canvasHeight: number;
+  fullscreenable?: boolean;
+  isFullscreen?: boolean;
+  onToggleFullscreen?: () => void;
 }) {
   return (
     <div className="flex h-full flex-col">
@@ -125,6 +131,22 @@ export function PropertiesPanel({
               disabled={disabled}
               onChange={onFlagChange}
             />
+
+            {fullscreenable && onToggleFullscreen && (
+              <div className="flex items-center justify-between">
+                <div className="flex flex-col">
+                  <Label className="text-xs">Ocupar tela toda</Label>
+                  <span className="text-[10px] text-muted-foreground">
+                    Expande o elemento para 100% do canvas.
+                  </span>
+                </div>
+                <Switch
+                  checked={!!isFullscreen}
+                  onCheckedChange={() => onToggleFullscreen()}
+                  disabled={disabled}
+                />
+              </div>
+            )}
 
             <Separator />
 
