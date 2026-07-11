@@ -104,8 +104,20 @@ Deno.serve(async (req) => {
     const wUrl = new URL("https://api.open-meteo.com/v1/forecast");
     wUrl.searchParams.set("latitude", String(place.latitude));
     wUrl.searchParams.set("longitude", String(place.longitude));
-    wUrl.searchParams.set("current", "temperature_2m,weather_code");
+    wUrl.searchParams.set(
+      "current",
+      "temperature_2m,weather_code,relative_humidity_2m,wind_speed_10m,apparent_temperature,is_day",
+    );
+    wUrl.searchParams.set(
+      "daily",
+      "temperature_2m_max,temperature_2m_min,weather_code",
+    );
+    wUrl.searchParams.set("forecast_days", "4");
     wUrl.searchParams.set("temperature_unit", unit);
+    wUrl.searchParams.set(
+      "wind_speed_unit",
+      units === "imperial" ? "mph" : "kmh",
+    );
     wUrl.searchParams.set("timezone", "auto");
     const wRes = await fetch(wUrl);
     if (!wRes.ok) return json({ error: "weather_failed" }, 502);
@@ -114,14 +126,32 @@ Deno.serve(async (req) => {
     if (!cur) return json({ error: "no_current" }, 502);
 
     const code = Number(cur.weather_code ?? 0);
+    const daily = w?.daily ?? {};
+    const days: Array<{ date: string; max: number; min: number; code: number }> =
+      [];
+    const dates: string[] = daily.time ?? [];
+    for (let i = 0; i < dates.length; i++) {
+      days.push({
+        date: dates[i],
+        max: Math.round(Number(daily.temperature_2m_max?.[i] ?? 0)),
+        min: Math.round(Number(daily.temperature_2m_min?.[i] ?? 0)),
+        code: Number(daily.weather_code?.[i] ?? 0),
+      });
+    }
     return json(
       {
         temp: Math.round(Number(cur.temperature_2m)),
+        feelsLike: Math.round(Number(cur.apparent_temperature ?? cur.temperature_2m)),
         unit: units === "imperial" ? "°F" : "°C",
         code,
+        isDay: Number(cur.is_day ?? 1) === 1,
+        humidity: Math.round(Number(cur.relative_humidity_2m ?? 0)),
+        wind: Math.round(Number(cur.wind_speed_10m ?? 0)),
+        windUnit: units === "imperial" ? "mph" : "km/h",
         description: WMO[code] ?? "—",
         city: place.name,
         country: place.country_code ?? place.country ?? "",
+        forecast: days,
       },
       200,
     );
