@@ -150,6 +150,8 @@ export function ElementBody({ el }: { el: TemplateElement }) {
       if (widgetType === "rss" || widgetType === "news")
         return <RssWidget config={cfg} />;
       if (widgetType === "ticker") return <TickerWidget config={cfg} />;
+      if (widgetType === "lowerthirds")
+        return <LowerThirdsWidget config={cfg} />;
       return <PlaceholderBadge label="Widget" />;
     }
     case "playlist": {
@@ -1117,6 +1119,436 @@ function TickerWidget({ config }: { config: Record<string, unknown> }) {
   );
 }
 
+
+// ---------- News Lower Thirds Widget ----------
+
+export type LowerThirdsPresetId =
+  | "broadcast"
+  | "breaking"
+  | "sports"
+  | "corporate"
+  | "modern"
+  | "minimal"
+  | "neon"
+  | "cinema"
+  | "documentary"
+  | "gradient"
+  | "glass"
+  | "editorial"
+  | "esports"
+  | "talkshow";
+
+type LowerThirdsPreset = {
+  id: LowerThirdsPresetId;
+  label: string;
+  bg: string;
+  titleColor: string;
+  subtitleColor: string;
+  accent: string;
+  fontFamily: string;
+  titleWeight: number | string;
+  subtitleWeight: number | string;
+  titleUppercase?: boolean;
+  subtitleUppercase?: boolean;
+  letterSpacing?: string;
+  border?: string;
+  borderRadius?: string;
+  textShadow?: string;
+  kickerBg?: string;
+  kickerColor?: string;
+  kickerText?: string;
+  accentBarWidth?: string; // vertical bar left/right
+  showAccentBar?: boolean;
+};
+
+export const LOWER_THIRDS_PRESETS: Record<LowerThirdsPresetId, LowerThirdsPreset> = {
+  broadcast: {
+    id: "broadcast",
+    label: "Broadcast",
+    bg: "linear-gradient(90deg, rgba(15,23,42,0.96) 0%, rgba(15,23,42,0.75) 100%)",
+    titleColor: "#FFFFFF",
+    subtitleColor: "#93C5FD",
+    accent: "#3B82F6",
+    fontFamily: "Inter, system-ui, sans-serif",
+    titleWeight: 700,
+    subtitleWeight: 500,
+    subtitleUppercase: true,
+    letterSpacing: "0.02em",
+    kickerBg: "#3B82F6",
+    kickerColor: "#FFFFFF",
+    kickerText: "AO VIVO",
+    showAccentBar: true,
+    accentBarWidth: "6px",
+  },
+  breaking: {
+    id: "breaking",
+    label: "Breaking News",
+    bg: "#DC2626",
+    titleColor: "#FFFFFF",
+    subtitleColor: "#FEE2E2",
+    accent: "#FBBF24",
+    fontFamily: "Inter, system-ui, sans-serif",
+    titleWeight: 800,
+    subtitleWeight: 600,
+    titleUppercase: true,
+    subtitleUppercase: true,
+    letterSpacing: "0.03em",
+    kickerBg: "#000000",
+    kickerColor: "#FBBF24",
+    kickerText: "URGENTE",
+  },
+  sports: {
+    id: "sports",
+    label: "Esportes",
+    bg: "linear-gradient(90deg,#065F46 0%,#022C22 100%)",
+    titleColor: "#FFFFFF",
+    subtitleColor: "#6EE7B7",
+    accent: "#FBBF24",
+    fontFamily: "'Space Grotesk', Inter, sans-serif",
+    titleWeight: 800,
+    subtitleWeight: 600,
+    titleUppercase: true,
+    letterSpacing: "0.04em",
+    kickerBg: "#FBBF24",
+    kickerColor: "#022C22",
+    kickerText: "AO VIVO",
+    showAccentBar: true,
+    accentBarWidth: "8px",
+  },
+  corporate: {
+    id: "corporate",
+    label: "Corporativo",
+    bg: "#FFFFFF",
+    titleColor: "#0F172A",
+    subtitleColor: "#475569",
+    accent: "#1E3A8A",
+    fontFamily: "Inter, system-ui, sans-serif",
+    titleWeight: 700,
+    subtitleWeight: 500,
+    letterSpacing: "0.01em",
+    border: "1px solid rgba(15,23,42,0.08)",
+    showAccentBar: true,
+    accentBarWidth: "4px",
+  },
+  modern: {
+    id: "modern",
+    label: "Moderno",
+    bg: "rgba(15,23,42,0.85)",
+    titleColor: "#F8FAFC",
+    subtitleColor: "#94A3B8",
+    accent: "#EC4899",
+    fontFamily: "'Space Grotesk', Inter, sans-serif",
+    titleWeight: 700,
+    subtitleWeight: 500,
+    subtitleUppercase: true,
+    letterSpacing: "0.06em",
+    borderRadius: "8px",
+  },
+  minimal: {
+    id: "minimal",
+    label: "Minimalista",
+    bg: "transparent",
+    titleColor: "#FFFFFF",
+    subtitleColor: "rgba(255,255,255,0.75)",
+    accent: "#FFFFFF",
+    fontFamily: "Inter, system-ui, sans-serif",
+    titleWeight: 600,
+    subtitleWeight: 400,
+    letterSpacing: "0.01em",
+    textShadow: "0 2px 8px rgba(0,0,0,0.6)",
+    showAccentBar: true,
+    accentBarWidth: "3px",
+  },
+  neon: {
+    id: "neon",
+    label: "Neon",
+    bg: "#05050F",
+    titleColor: "#22D3EE",
+    subtitleColor: "#F0ABFC",
+    accent: "#22D3EE",
+    fontFamily: "'Space Grotesk', Inter, sans-serif",
+    titleWeight: 700,
+    subtitleWeight: 500,
+    titleUppercase: true,
+    letterSpacing: "0.08em",
+    textShadow:
+      "0 0 4px currentColor, 0 0 12px currentColor, 0 0 24px currentColor",
+    border: "1px solid rgba(34,211,238,0.4)",
+    borderRadius: "6px",
+  },
+  cinema: {
+    id: "cinema",
+    label: "Cinema",
+    bg: "linear-gradient(180deg, transparent 0%, rgba(0,0,0,0.85) 60%)",
+    titleColor: "#FEF3C7",
+    subtitleColor: "#FBBF24",
+    accent: "#FEF3C7",
+    fontFamily: "Georgia, 'Playfair Display', serif",
+    titleWeight: 700,
+    subtitleWeight: 400,
+    letterSpacing: "0.06em",
+    textShadow: "0 2px 6px rgba(0,0,0,0.9)",
+  },
+  documentary: {
+    id: "documentary",
+    label: "Documentário",
+    bg: "rgba(0,0,0,0.6)",
+    titleColor: "#FFFFFF",
+    subtitleColor: "#D1D5DB",
+    accent: "#F5EFE0",
+    fontFamily: "Georgia, serif",
+    titleWeight: 600,
+    subtitleWeight: 400,
+    letterSpacing: "0.01em",
+    showAccentBar: true,
+    accentBarWidth: "2px",
+  },
+  gradient: {
+    id: "gradient",
+    label: "Gradiente vibrante",
+    bg: "linear-gradient(90deg,#6366F1,#8B5CF6,#EC4899)",
+    titleColor: "#FFFFFF",
+    subtitleColor: "rgba(255,255,255,0.85)",
+    accent: "#FFFFFF",
+    fontFamily: "'Space Grotesk', Inter, sans-serif",
+    titleWeight: 700,
+    subtitleWeight: 500,
+    subtitleUppercase: true,
+    letterSpacing: "0.05em",
+    borderRadius: "10px",
+  },
+  glass: {
+    id: "glass",
+    label: "Glass",
+    bg: "rgba(255,255,255,0.1)",
+    titleColor: "#F8FAFC",
+    subtitleColor: "rgba(248,250,252,0.8)",
+    accent: "#F8FAFC",
+    fontFamily: "Inter, system-ui, sans-serif",
+    titleWeight: 600,
+    subtitleWeight: 400,
+    letterSpacing: "0.02em",
+    border: "1px solid rgba(255,255,255,0.2)",
+    borderRadius: "12px",
+  },
+  editorial: {
+    id: "editorial",
+    label: "Editorial",
+    bg: "#F5EFE0",
+    titleColor: "#1C1917",
+    subtitleColor: "#78716C",
+    accent: "#B91C1C",
+    fontFamily: "'Playfair Display', Georgia, serif",
+    titleWeight: 700,
+    subtitleWeight: 500,
+    subtitleUppercase: true,
+    letterSpacing: "0.06em",
+    border: "2px solid #1C1917",
+    kickerBg: "#B91C1C",
+    kickerColor: "#FFFFFF",
+    kickerText: "EXCLUSIVO",
+  },
+  esports: {
+    id: "esports",
+    label: "eSports",
+    bg: "linear-gradient(135deg,#7C3AED 0%,#0EA5E9 100%)",
+    titleColor: "#FFFFFF",
+    subtitleColor: "#E0F2FE",
+    accent: "#FBBF24",
+    fontFamily: "'Space Grotesk', Inter, sans-serif",
+    titleWeight: 800,
+    subtitleWeight: 600,
+    titleUppercase: true,
+    subtitleUppercase: true,
+    letterSpacing: "0.06em",
+    borderRadius: "4px",
+    kickerBg: "#0F172A",
+    kickerColor: "#FBBF24",
+    kickerText: "LIVE",
+  },
+  talkshow: {
+    id: "talkshow",
+    label: "Talk show",
+    bg: "linear-gradient(90deg,#7F1D1D 0%,#B91C1C 100%)",
+    titleColor: "#FFFFFF",
+    subtitleColor: "#FCA5A5",
+    accent: "#FBBF24",
+    fontFamily: "Georgia, serif",
+    titleWeight: 700,
+    subtitleWeight: 500,
+    letterSpacing: "0.02em",
+    showAccentBar: true,
+    accentBarWidth: "5px",
+  },
+};
+
+function LowerThirdsWidget({ config }: { config: Record<string, unknown> }) {
+  const presetId = ((config.preset as string) ?? "broadcast") as LowerThirdsPresetId;
+  const preset = LOWER_THIRDS_PRESETS[presetId] ?? LOWER_THIRDS_PRESETS.broadcast;
+
+  const title = ((config.title as string) ?? "Título da matéria").slice(0, 200);
+  const subtitle = ((config.subtitle as string) ?? "Legenda ou fonte").slice(0, 200);
+  const align = ((config.align as string) ?? "left") as "left" | "right";
+  const anim = ((config.animation as string) ?? "slide") as
+    | "none"
+    | "slide"
+    | "fade"
+    | "reveal";
+  const showKicker =
+    typeof config.showKicker === "boolean"
+      ? (config.showKicker as boolean)
+      : !!preset.kickerText;
+  const kickerText =
+    ((config.kickerText as string) || preset.kickerText || "AO VIVO").slice(0, 24);
+  const showSubtitle =
+    typeof config.showSubtitle === "boolean"
+      ? (config.showSubtitle as boolean)
+      : true;
+  const titleUppercase =
+    typeof config.titleUppercase === "boolean"
+      ? (config.titleUppercase as boolean)
+      : preset.titleUppercase ?? false;
+  const subtitleUppercase =
+    typeof config.subtitleUppercase === "boolean"
+      ? (config.subtitleUppercase as boolean)
+      : preset.subtitleUppercase ?? false;
+
+  const titleSize = Math.max(6, Math.min(60, (config.titleSize as number) ?? 26));
+  const subtitleSize = Math.max(4, Math.min(40, (config.subtitleSize as number) ?? 14));
+
+  const titleColor = (config.titleColor as string) || preset.titleColor;
+  const subtitleColor = (config.subtitleColor as string) || preset.subtitleColor;
+  const bgOverride = (config.bgColor as string) || null;
+  const bgOpacity =
+    typeof config.bgOpacity === "number"
+      ? Math.max(0, Math.min(1, config.bgOpacity as number))
+      : 1;
+  const accentColor = (config.accentColor as string) || preset.accent;
+  const showAccentBar =
+    typeof config.showAccentBar === "boolean"
+      ? (config.showAccentBar as boolean)
+      : preset.showAccentBar ?? false;
+
+  const backgroundStyle: React.CSSProperties = bgOverride
+    ? { background: hexToRgba(bgOverride, bgOpacity) }
+    : preset.bg === "transparent"
+      ? { background: "transparent" }
+      : { background: preset.bg };
+
+  const animName =
+    anim === "slide"
+      ? align === "right"
+        ? "bv-lt-slide-r"
+        : "bv-lt-slide-l"
+      : anim === "fade"
+        ? "bv-lt-fade"
+        : anim === "reveal"
+          ? "bv-lt-reveal"
+          : undefined;
+
+  return (
+    <div
+      className="relative flex h-full w-full overflow-hidden"
+      style={{
+        containerType: "size",
+        ...backgroundStyle,
+        border: preset.border,
+        borderRadius: preset.borderRadius,
+        fontFamily: preset.fontFamily,
+        justifyContent: align === "right" ? "flex-end" : "flex-start",
+        alignItems: "center",
+        animation: animName ? `${animName} 0.7s cubic-bezier(0.22,1,0.36,1)` : undefined,
+      }}
+    >
+      <style>{`
+        @keyframes bv-lt-slide-l{from{transform:translateX(-100%);opacity:0}to{transform:translateX(0);opacity:1}}
+        @keyframes bv-lt-slide-r{from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}}
+        @keyframes bv-lt-fade{from{opacity:0}to{opacity:1}}
+        @keyframes bv-lt-reveal{from{clip-path:inset(0 100% 0 0)}to{clip-path:inset(0 0 0 0)}}
+      `}</style>
+
+      {showAccentBar && align === "left" && (
+        <div
+          className="h-[75%] shrink-0 self-center"
+          style={{
+            background: accentColor,
+            width: preset.accentBarWidth ?? "4px",
+            marginLeft: "2%",
+            borderRadius: "2px",
+          }}
+        />
+      )}
+
+      <div
+        className="flex min-w-0 flex-1 flex-col justify-center gap-[0.3em] px-[3%] py-[2%]"
+        style={{
+          alignItems: align === "right" ? "flex-end" : "flex-start",
+          textAlign: align === "right" ? "right" : "left",
+          textShadow: preset.textShadow,
+        }}
+      >
+        {showKicker && (
+          <span
+            className="inline-block shrink-0"
+            style={{
+              background: preset.kickerBg || accentColor,
+              color: preset.kickerColor || "#FFFFFF",
+              fontSize: `${Math.max(subtitleSize * 0.9, 6)}cqh`,
+              fontWeight: 800,
+              letterSpacing: "0.1em",
+              textTransform: "uppercase",
+              padding: "0.25em 0.7em",
+              borderRadius: "3px",
+              lineHeight: 1,
+            }}
+          >
+            {kickerText}
+          </span>
+        )}
+        <span
+          className="block max-w-full truncate"
+          style={{
+            color: titleColor,
+            fontSize: `${titleSize}cqh`,
+            fontWeight: preset.titleWeight as number,
+            letterSpacing: preset.letterSpacing,
+            textTransform: titleUppercase ? "uppercase" : undefined,
+            lineHeight: 1.05,
+          }}
+        >
+          {title}
+        </span>
+        {showSubtitle && subtitle && (
+          <span
+            className="block max-w-full truncate"
+            style={{
+              color: subtitleColor,
+              fontSize: `${subtitleSize}cqh`,
+              fontWeight: preset.subtitleWeight as number,
+              letterSpacing: preset.letterSpacing,
+              textTransform: subtitleUppercase ? "uppercase" : undefined,
+              lineHeight: 1.15,
+            }}
+          >
+            {subtitle}
+          </span>
+        )}
+      </div>
+
+      {showAccentBar && align === "right" && (
+        <div
+          className="h-[75%] shrink-0 self-center"
+          style={{
+            background: accentColor,
+            width: preset.accentBarWidth ?? "4px",
+            marginRight: "2%",
+            borderRadius: "2px",
+          }}
+        />
+      )}
+    </div>
+  );
+}
 
 function MediaVideo({
   path,
