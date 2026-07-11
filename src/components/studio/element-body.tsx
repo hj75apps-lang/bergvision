@@ -279,37 +279,99 @@ function ClockWidget({ config }: { config: Record<string, unknown> }) {
   const format = (config.format as string) ?? "24h";
   const timezone = (config.timezone as string) ?? "America/Sao_Paulo";
   const sizeCqh = Math.max(3, Math.min(90, (config.sizePercent as number) ?? 28));
+  const showSeconds = (config.showSeconds as boolean | undefined) ?? true;
+  const showDate = (config.showDate as boolean | undefined) ?? false;
+  const showWeekday = (config.showWeekday as boolean | undefined) ?? false;
+  const dateFormat = ((config.dateFormat as string) ?? "dd/MM/yyyy") as
+    | "dd/MM/yyyy"
+    | "dd/MM"
+    | "long"
+    | "yyyy-MM-dd";
+  const layout = ((config.layout as string) ?? "stack") as "stack" | "inline";
+  const color = (config.color as string) ?? "#FFFFFF";
   const [now, setNow] = useState(() => new Date());
   useEffect(() => {
-    const id = setInterval(() => setNow(new Date()), 1000);
+    const id = setInterval(() => setNow(new Date()), showSeconds ? 1000 : 15000);
     return () => clearInterval(id);
-  }, []);
+  }, [showSeconds]);
   let text = "--:--";
   try {
     text = new Intl.DateTimeFormat("pt-BR", {
       hour: "2-digit",
       minute: "2-digit",
-      second: "2-digit",
+      ...(showSeconds ? { second: "2-digit" as const } : {}),
       hour12: format === "12h",
       timeZone: timezone,
     }).format(now);
   } catch {
     text = now.toLocaleTimeString("pt-BR");
   }
+
+  let dateText = "";
+  if (showDate || showWeekday) {
+    try {
+      const opts: Intl.DateTimeFormatOptions = { timeZone: timezone };
+      if (showWeekday) opts.weekday = "long";
+      if (showDate) {
+        if (dateFormat === "long") {
+          opts.day = "numeric";
+          opts.month = "long";
+          opts.year = "numeric";
+        } else if (dateFormat === "dd/MM") {
+          opts.day = "2-digit";
+          opts.month = "2-digit";
+        } else if (dateFormat === "yyyy-MM-dd") {
+          opts.day = "2-digit";
+          opts.month = "2-digit";
+          opts.year = "numeric";
+        } else {
+          opts.day = "2-digit";
+          opts.month = "2-digit";
+          opts.year = "numeric";
+        }
+      }
+      dateText = new Intl.DateTimeFormat("pt-BR", opts).format(now);
+      if (dateFormat === "yyyy-MM-dd" && showDate) {
+        const y = new Intl.DateTimeFormat("en-CA", { timeZone: timezone }).format(now);
+        dateText = showWeekday ? `${dateText.split(",")[0]}, ${y}` : y;
+      }
+    } catch {
+      dateText = "";
+    }
+  }
+
+  const wrapperFlex = layout === "inline" ? "flex-row items-baseline gap-2" : "flex-col items-center";
   return (
     <div
-      className="flex h-full w-full items-center justify-center overflow-hidden text-white"
+      className={`flex h-full w-full justify-center overflow-hidden text-white ${wrapperFlex}`}
       style={{
         fontFamily: "Inter, system-ui, sans-serif",
         fontVariantNumeric: "tabular-nums",
         fontWeight: 600,
-        fontSize: `${sizeCqh}cqh`,
         containerType: "size",
         letterSpacing: "0.02em",
+        color,
+        alignItems: layout === "stack" ? "center" : "baseline",
+        justifyContent: "center",
         ...widgetBgStyle(config, 0),
       }}
     >
-      {text}
+      <span style={{ fontSize: `${sizeCqh}cqh`, lineHeight: 1 }}>{text}</span>
+      {dateText && (
+        <span
+          style={{
+            fontSize: `${Math.max(3, sizeCqh * 0.32)}cqh`,
+            opacity: 0.85,
+            fontWeight: 500,
+            lineHeight: 1.1,
+            marginTop: layout === "stack" ? "0.4em" : 0,
+            textTransform: "capitalize",
+          }}
+          className="truncate"
+        >
+          {dateText}
+        </span>
+      )}
     </div>
   );
 }
