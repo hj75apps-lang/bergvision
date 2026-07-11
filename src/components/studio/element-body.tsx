@@ -125,7 +125,10 @@ export function ElementBody({ el }: { el: TemplateElement }) {
       );
     }
     case "image":
-    case "logo":
+    case "logo": {
+      if (el.element_type === "image" && c.imageSubtype === "sequence") {
+        return <ImageSequenceBody c={c} />;
+      }
       return (
         <MediaImage
           path={(c.mediaStoragePath as string) ?? null}
@@ -133,6 +136,7 @@ export function ElementBody({ el }: { el: TemplateElement }) {
           label={ELEMENT_LABELS[el.element_type]}
         />
       );
+    }
     case "video":
       return (
         <MediaVideo
