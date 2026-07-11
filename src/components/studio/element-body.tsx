@@ -17,6 +17,20 @@ function getWidgetConfig(c: Record<string, unknown>) {
     : {};
 }
 
+function widgetBgStyle(
+  config: Record<string, unknown>,
+  defaultOpacity: number,
+): React.CSSProperties {
+  const color = (config.bgColor as string) ?? "#000000";
+  const opacity =
+    typeof config.bgOpacity === "number"
+      ? Math.max(0, Math.min(1, config.bgOpacity as number))
+      : defaultOpacity;
+  if (opacity <= 0) return { backgroundColor: "transparent" };
+  const hex = Math.round(opacity * 255).toString(16).padStart(2, "0");
+  return { backgroundColor: `${color}${hex}` };
+}
+
 export function ElementBody({ el }: { el: TemplateElement }) {
   const c = (el.content ?? {}) as Record<string, unknown>;
   switch (el.element_type) {
@@ -146,6 +160,7 @@ function ClockWidget({ config }: { config: Record<string, unknown> }) {
         fontSize: `${sizeCqh}cqh`,
         containerType: "size",
         letterSpacing: "0.02em",
+        ...widgetBgStyle(config, 0),
       }}
     >
       {text}
@@ -186,8 +201,12 @@ function WeatherWidget({ config }: { config: Record<string, unknown> }) {
   });
   return (
     <div
-      className="flex h-full w-full flex-col items-center justify-center gap-1 overflow-hidden bg-black/30 p-2 text-white"
-      style={{ containerType: "size", fontFamily: "Inter, system-ui" }}
+      className="flex h-full w-full flex-col items-center justify-center gap-1 overflow-hidden p-2 text-white"
+      style={{
+        containerType: "size",
+        fontFamily: "Inter, system-ui",
+        ...widgetBgStyle(config, 0.3),
+      }}
     >
       {!city ? (
         <span className="text-[11cqh] opacity-70">Configure a cidade</span>
