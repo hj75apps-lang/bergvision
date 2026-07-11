@@ -197,9 +197,6 @@ export function PlaylistLocalPreview({
                 videoRef={videoRef}
               />
             )}
-            <div className="pointer-events-none absolute left-2 top-2 rounded-md bg-black/60 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-white/80 ring-1 ring-white/10">
-              {index + 1}/{items.length} · {itemLabel(current!)}
-            </div>
           </div>
         </div>
       </div>
