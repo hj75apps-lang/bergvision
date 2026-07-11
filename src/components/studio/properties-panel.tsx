@@ -1070,6 +1070,12 @@ function ShapeContent({
   patch: (p: Record<string, unknown>) => void;
   disabled: boolean;
 }) {
+  const fillOpacity =
+    typeof c.fillOpacity === "number"
+      ? Math.max(0, Math.min(1, c.fillOpacity as number))
+      : 1;
+  const motion = ((c.motion as string) ?? "none") as string;
+  const speed = Math.max(1, Math.min(60, (c.motionSpeed as number) ?? 6));
   return (
     <div className="flex flex-col gap-3">
       <label className="flex flex-col gap-1">
@@ -1096,6 +1102,35 @@ function ShapeContent({
         disabled={disabled}
         onChange={(v) => patch({ fill: v })}
       />
+      <div className="flex flex-col gap-1">
+        <div className="flex items-center justify-between">
+          <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+            Opacidade do preenchimento ({Math.round(fillOpacity * 100)}%)
+          </span>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-6 gap-1 px-2 text-[10px]"
+            disabled={disabled}
+            onClick={() => patch({ fillOpacity: 0 })}
+            title="Deixar 100% transparente"
+          >
+            Transparente
+          </Button>
+        </div>
+        <Slider
+          value={[Math.round(fillOpacity * 100)]}
+          min={0}
+          max={100}
+          step={1}
+          disabled={disabled}
+          onValueChange={([v]) => patch({ fillOpacity: v / 100 })}
+        />
+        <span className="text-[10px] text-muted-foreground">
+          0% = totalmente transparente. 100% = opaco.
+        </span>
+      </div>
       <NumberField
         label="Cantos arredondados"
         value={(c.borderRadius as number) ?? 0}
@@ -1120,6 +1155,48 @@ function ShapeContent({
         disabled={disabled}
         onChange={(v) => patch({ borderColor: v })}
       />
+
+      <Separator />
+
+      <label className="flex flex-col gap-1">
+        <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+          Movimento
+        </span>
+        <Select
+          value={motion}
+          onValueChange={(v) => patch({ motion: v })}
+          disabled={disabled}
+        >
+          <SelectTrigger className="h-8 text-xs">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="none">Sem movimento</SelectItem>
+            <SelectItem value="pulse">Pulsar</SelectItem>
+            <SelectItem value="float">Flutuar</SelectItem>
+            <SelectItem value="spin">Girar</SelectItem>
+            <SelectItem value="fade">Piscar (fade)</SelectItem>
+          </SelectContent>
+        </Select>
+      </label>
+      {motion !== "none" && (
+        <div className="flex flex-col gap-1">
+          <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+            Velocidade ({speed}s por ciclo)
+          </span>
+          <Slider
+            value={[speed]}
+            min={1}
+            max={30}
+            step={1}
+            disabled={disabled}
+            onValueChange={([v]) => patch({ motionSpeed: v })}
+          />
+          <span className="text-[10px] text-muted-foreground">
+            Menor = mais rápido.
+          </span>
+        </div>
+      )}
     </div>
   );
 }
