@@ -156,7 +156,7 @@ export function getAppearanceStyle(
   let cssMask: string | undefined;
   if (mask === "custom") {
     const trimmed = maskUrl.trim();
-    if (/^https?:\/\//i.test(trimmed)) {
+    if (/^(https?:|data:image\/)/i.test(trimmed)) {
       cssMask = `url("${trimmed.replace(/"/g, '\\"')}")`;
     }
   } else {
@@ -183,6 +183,6 @@ export function getAppearanceStyle(
 export function hasAppearance(c: Record<string, unknown>): boolean {
   const { borderRadiusPercent, mask, maskUrl } = getAppearanceConfig(c);
   if (borderRadiusPercent > 0) return true;
-  if (mask === "custom") return /^https?:\/\//i.test(maskUrl.trim());
+  if (mask === "custom") return /^(https?:|data:image\/)/i.test(maskUrl.trim());
   return mask !== "none";
 }
