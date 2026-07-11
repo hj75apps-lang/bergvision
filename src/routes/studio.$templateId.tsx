@@ -64,7 +64,10 @@ import {
   diffSnapshots,
   useHistoryStore,
 } from "@/lib/studio/history-store";
-import { TemplateBackground } from "@/components/studio/element-body";
+import {
+  ElementBody as StudioElementBody,
+  TemplateBackground,
+} from "@/components/studio/element-body";
 import { TemplateSettingsDialog } from "@/components/studio/template-settings-dialog";
 import { PreviewPanel } from "@/components/preview/preview-panel";
 import { useStudioDraftPayload } from "@/lib/studio/use-draft-payload";
@@ -1213,6 +1216,7 @@ function ElementView({
     transform: `rotate(${el.rotation ?? 0}deg)`,
     transformOrigin: "center center",
     opacity: visible ? (el.opacity ?? 1) : 0.15,
+    zIndex: el.z_index ?? 0,
     outline: selected ? "2px solid var(--primary, #3B82F6)" : "none",
     outlineOffset: "1px",
     cursor: el.locked ? "not-allowed" : "move",
@@ -1226,7 +1230,7 @@ function ElementView({
       data-rot={String(el.rotation ?? 0)}
       style={style}
     >
-      <ElementBody el={el} />
+      <StudioElementBody el={el} />
     </div>
   );
 }
