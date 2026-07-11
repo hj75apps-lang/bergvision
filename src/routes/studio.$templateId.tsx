@@ -37,6 +37,7 @@ import {
   Type as TypeIcon,
   Undo2,
   Video as VideoIcon,
+  ChevronDown,
 } from "lucide-react";
 import { toast } from "sonner";
 
