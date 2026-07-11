@@ -127,7 +127,21 @@ export function WeatherWidget({ config }: { config: Record<string, unknown> }) {
     );
   }
 
-  const d = q.data;
+  const raw = q.data as Partial<WeatherData> & Record<string, unknown>;
+  const d: WeatherData = {
+    temp: typeof raw.temp === "number" ? raw.temp : 0,
+    feelsLike: typeof raw.feelsLike === "number" ? raw.feelsLike : (typeof raw.temp === "number" ? raw.temp : 0),
+    unit: typeof raw.unit === "string" ? raw.unit : "°C",
+    code: typeof raw.code === "number" ? raw.code : 0,
+    isDay: raw.isDay !== false,
+    humidity: typeof raw.humidity === "number" ? raw.humidity : 0,
+    wind: typeof raw.wind === "number" ? raw.wind : 0,
+    windUnit: typeof raw.windUnit === "string" ? raw.windUnit : "km/h",
+    description: typeof raw.description === "string" ? raw.description : "—",
+    city: typeof raw.city === "string" ? raw.city : city,
+    country: typeof raw.country === "string" ? raw.country : "",
+    forecast: Array.isArray(raw.forecast) ? (raw.forecast as WeatherData["forecast"]) : [],
+  };
   const t = themeStyle(theme, d.code, d.isDay, accentColor);
   const shell: React.CSSProperties = {
     ...shellBase,
