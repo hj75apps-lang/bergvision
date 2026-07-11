@@ -762,10 +762,16 @@ function WidgetContent({
   patch: (p: Record<string, unknown>) => void;
   disabled: boolean;
 }) {
-  const widgetType = (c.widgetType as string) ?? "clock";
-  const config = (c.widgetConfig as Record<string, unknown>) ?? {};
+  const widgetType = ((c.widgetType ?? c.widget_type) as string | undefined) ?? "clock";
+  const rawConfig = c.widgetConfig ?? c.widget_config;
+  const config = rawConfig && typeof rawConfig === "object" && !Array.isArray(rawConfig)
+    ? (rawConfig as Record<string, unknown>)
+    : {};
   const setCfg = (p: Record<string, unknown>) =>
-    patch({ widgetConfig: { ...config, ...p } });
+    patch({
+      widgetConfig: { ...config, ...p },
+      widget_config: { ...config, ...p },
+    });
   return (
     <div className="flex flex-col gap-3">
       <label className="flex flex-col gap-1">
@@ -775,7 +781,12 @@ function WidgetContent({
         <Select
           value={widgetType}
           onValueChange={(v) =>
-            patch({ widgetType: v, widgetConfig: defaultWidgetConfig(v) })
+            patch({
+              widgetType: v,
+              widget_type: v,
+              widgetConfig: defaultWidgetConfig(v),
+              widget_config: defaultWidgetConfig(v),
+            })
           }
           disabled={disabled}
         >
