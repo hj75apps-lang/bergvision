@@ -102,20 +102,34 @@ export function useStudioDraftPayload(
       ? media.get(template.background_media_id) ?? null
       : null;
 
+    const normalizeContent = (content: Record<string, unknown> | null) => {
+      const c = { ...(content ?? {}) };
+      if (c.element_type === "widget") {
+        const widgetType = c.widgetType ?? c.widget_type ?? "clock";
+        const widgetConfig = c.widgetConfig ?? c.widget_config ?? {};
+        c.widgetType = widgetType;
+        c.widget_type = widgetType;
+        c.widgetConfig = widgetConfig;
+        c.widget_config = widgetConfig;
+      }
+      return c;
+    };
+
     const enrichedElements = elements.map((el) => {
+      const content = normalizeContent(el.content);
       if (
         el.element_type === "image" ||
         el.element_type === "logo" ||
         el.element_type === "video"
       ) {
-        const mid = (el.content as { mediaFileId?: string } | null)?.mediaFileId;
-        return { ...el, media_file: mid ? media.get(mid) ?? null : null };
+        const mid = (content as { mediaFileId?: string } | null)?.mediaFileId;
+        return { ...el, content, media_file: mid ? media.get(mid) ?? null : null };
       }
       if (el.element_type === "playlist") {
         // Rascunho: playlist não é resolvida no editor; Player usa fallback.
-        return { ...el, playlist: null };
+        return { ...el, content, playlist: null };
       }
-      return el;
+      return { ...el, content };
     });
 
     return {
