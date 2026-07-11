@@ -2741,12 +2741,14 @@ function MediaVideo({
   loop,
   muted,
   onEnded,
+  appearance,
 }: {
   path: string | null;
   fit: string;
   loop: boolean;
   muted: boolean;
   onEnded?: () => void;
+  appearance?: React.CSSProperties;
 }) {
   const url = useSignedUrl(path);
   if (!path) return <PlaceholderBadge label="Vídeo" />;
@@ -2762,6 +2764,7 @@ function MediaVideo({
       className="h-full w-full"
       style={{
         objectFit: (fit as React.CSSProperties["objectFit"]) ?? "cover",
+        ...appearance,
       }}
       autoPlay
       loop={loop}
