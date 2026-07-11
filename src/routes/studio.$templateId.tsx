@@ -970,19 +970,85 @@ function EditorPage() {
           Adicionar
         </span>
         <Separator orientation="vertical" className="h-6" />
-        {TOOLS.map((tool) => (
-          <Button
-            key={tool.type}
-            variant="ghost"
-            size="sm"
-            className="rounded-lg"
-            disabled={!canEdit || addElement.isPending}
-            onClick={() => addElement.mutate(tool)}
-          >
-            <tool.icon className="mr-1.5 h-4 w-4" />
-            {tool.label}
-          </Button>
-        ))}
+        {(() => {
+          const isImageSubtype = (t: ToolDef) =>
+            t.type === "image" &&
+            typeof (t.defaultContent as Record<string, unknown>).imageSubtype === "string";
+          const imageMain = TOOLS.find(
+            (t) => t.type === "image" && !isImageSubtype(t),
+          );
+          const imageSubtypes = TOOLS.filter(isImageSubtype);
+          const others = TOOLS.filter(
+            (t) => t !== imageMain && !isImageSubtype(t),
+          );
+          const renderTool = (tool: ToolDef, key: string) => (
+            <Button
+              key={key}
+              variant="ghost"
+              size="sm"
+              className="rounded-lg"
+              disabled={!canEdit || addElement.isPending}
+              onClick={() => addElement.mutate(tool)}
+            >
+              <tool.icon className="mr-1.5 h-4 w-4" />
+              {tool.label}
+            </Button>
+          );
+          return (
+            <>
+              {others
+                .slice(0, others.findIndex((t) => t.type !== "text") + 1 || others.length)
+                .filter((t) => t.type === "text")
+                .map((t, i) => renderTool(t, `pre-${i}`))}
+              {imageMain && (
+                <div className="inline-flex items-center rounded-lg border border-transparent hover:border-border/60">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="rounded-l-lg rounded-r-none pr-2"
+                    disabled={!canEdit || addElement.isPending}
+                    onClick={() => addElement.mutate(imageMain)}
+                  >
+                    <imageMain.icon className="mr-1.5 h-4 w-4" />
+                    {imageMain.label}
+                  </Button>
+                  {imageSubtypes.length > 0 && (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="rounded-l-none rounded-r-lg border-l border-border/60 px-1.5"
+                          disabled={!canEdit || addElement.isPending}
+                          title="Mais formatos de imagem"
+                        >
+                          <ChevronDown className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="start" className="w-56">
+                        <DropdownMenuLabel>Formatos animados</DropdownMenuLabel>
+                        <DropdownMenuSeparator />
+                        {imageSubtypes.map((t, i) => (
+                          <DropdownMenuItem
+                            key={`sub-${i}`}
+                            disabled={!canEdit || addElement.isPending}
+                            onSelect={() => addElement.mutate(t)}
+                          >
+                            <t.icon className="mr-2 h-4 w-4" />
+                            {t.label}
+                          </DropdownMenuItem>
+                        ))}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  )}
+                </div>
+              )}
+              {others
+                .filter((t) => t.type !== "text")
+                .map((t, i) => renderTool(t, `post-${i}`))}
+            </>
+          );
+        })()}
       </div>
 
       {/* Main workspace */}
