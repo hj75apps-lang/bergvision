@@ -145,9 +145,11 @@ export function getAppearanceStyle(
   const style: React.CSSProperties = {};
 
   if (borderRadiusPercent > 0) {
-    // Percentual do menor lado -> usa % (CSS calcula por eixo) mas com um cap
-    // de 50% para não gerar overshoot. Suficiente para responsividade.
-    style.borderRadius = `${borderRadiusPercent}%`;
+    // Usa unidades de container query (cqmin = 1% da menor dimensão do
+    // container) para que o raio seja UNIFORME nos 4 cantos, independente
+    // do aspect ratio. Requer container-type: size no wrapper.
+    style.containerType = "size";
+    style.borderRadius = `${borderRadiusPercent}cqmin`;
     style.overflow = "hidden";
   }
 
