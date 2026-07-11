@@ -90,6 +90,7 @@ import {
   TemplateBackground,
 } from "@/components/studio/element-body";
 import { TemplateSettingsDialog } from "@/components/studio/template-settings-dialog";
+import { ImageEditorDialog } from "@/components/studio/image-editor/image-editor-dialog";
 import { PreviewPanel } from "@/components/preview/preview-panel";
 import { useStudioDraftPayload } from "@/lib/studio/use-draft-payload";
 import { slugify } from "@/lib/template-utils";
@@ -565,6 +566,43 @@ function EditorPage() {
     el.y <= 0.01 &&
     el.width >= 99.99 &&
     el.height >= 99.99;
+
+  const isImageEditable = useCallback((el: TemplateElement) => {
+    return el.element_type === "image" || el.element_type === "logo";
+  }, []);
+
+  const [editorElementId, setEditorElementId] = useState<string | null>(null);
+  const editorElement = useMemo(
+    () => elements.find((e) => e.id === editorElementId) ?? null,
+    [elements, editorElementId],
+  );
+  const editorSource = useMemo(() => {
+    if (!editorElement) return null;
+    const c = (editorElement.content ?? {}) as Record<string, unknown>;
+    const mediaFileId = c.mediaFileId as string | undefined;
+    const storagePath = c.mediaStoragePath as string | undefined;
+    if (!mediaFileId || !storagePath) return null;
+    return {
+      mediaFileId,
+      storagePath,
+      thumbnailPath: (c.mediaThumbnailPath as string | undefined) ?? null,
+      name: (c.mediaFileName as string | undefined) ?? "imagem",
+    };
+  }, [editorElement]);
+
+  const openImageEditor = useCallback(
+    (elId: string) => {
+      const el = elements.find((e) => e.id === elId);
+      if (!el || !isImageEditable(el)) return;
+      const c = (el.content ?? {}) as Record<string, unknown>;
+      if (!c.mediaFileId || !c.mediaStoragePath) {
+        toast.info("Selecione uma imagem para este elemento antes de editar.");
+        return;
+      }
+      setEditorElementId(elId);
+    },
+    [elements, isImageEditable],
+  );
 
   const toggleFullscreen = useCallback(
     async (id: string) => {
@@ -1359,6 +1397,8 @@ function EditorPage() {
                     fullscreenable={isFullscreenable(el)}
                     isFullscreen={isFullscreenGeom(el)}
                     onToggleFullscreen={() => void toggleFullscreen(el.id)}
+                    imageEditable={isImageEditable(el)}
+                    onEditImage={() => openImageEditor(el.id)}
                   />
                 ))}
 
@@ -1492,6 +1532,12 @@ function EditorPage() {
             onToggleFullscreen={() => {
               if (activeElement) void toggleFullscreen(activeElement.id);
             }}
+            imageEditable={
+              activeElement ? isImageEditable(activeElement) : false
+            }
+            onEditImage={() => {
+              if (activeElement) openImageEditor(activeElement.id);
+            }}
             onGeomChange={(patch) => {
               if (!activeElement) return;
               void commitElementUpdate(activeElement.id, patch);
@@ -1534,6 +1580,30 @@ function EditorPage() {
           canvas_height: template.canvas_height,
         }}
         disabled={!canEdit}
+      />
+
+      <ImageEditorDialog
+        open={!!editorElement && !!editorSource}
+        onOpenChange={(v) => {
+          if (!v) setEditorElementId(null);
+        }}
+        source={editorSource}
+        onSaved={({ mediaFile, cacheBust }) => {
+          if (!editorElement) return;
+          const prev = (editorElement.content ?? {}) as Record<string, unknown>;
+          const nextContent: Record<string, unknown> = {
+            ...prev,
+            mediaFileId: mediaFile.id,
+            mediaFileName: mediaFile.name,
+            mediaStoragePath: mediaFile.storage_path,
+            mediaThumbnailPath: mediaFile.thumbnail_path,
+            mediaCacheBust: cacheBust,
+          };
+          void commitElementUpdate(editorElement.id, { content: nextContent });
+          void qc.invalidateQueries({ queryKey: ["studio_media_dims"] });
+          void qc.invalidateQueries({ queryKey: ["studio_media_picker"] });
+          void qc.invalidateQueries({ queryKey: ["media_files"] });
+        }}
       />
 
       <Dialog open={duplicateOpen} onOpenChange={setDuplicateOpen}>
@@ -1585,6 +1655,8 @@ function ElementView({
   fullscreenable,
   isFullscreen,
   onToggleFullscreen,
+  imageEditable,
+  onEditImage,
 }: {
   el: TemplateElement;
   selected: boolean;
@@ -1592,6 +1664,8 @@ function ElementView({
   fullscreenable: boolean;
   isFullscreen: boolean;
   onToggleFullscreen: () => void;
+  imageEditable: boolean;
+  onEditImage: () => void;
 }) {
   const visible = el.visible ?? true;
   const style: React.CSSProperties = {
@@ -1621,15 +1695,22 @@ function ElementView({
     </div>
   );
 
-  if (!canEdit || !fullscreenable) return body;
+  if (!canEdit || (!fullscreenable && !imageEditable)) return body;
 
   return (
     <ContextMenu>
       <ContextMenuTrigger asChild>{body}</ContextMenuTrigger>
       <ContextMenuContent className="w-56">
-        <ContextMenuItem onSelect={() => onToggleFullscreen()}>
-          {isFullscreen ? "Restaurar tamanho original" : "Ocupar tela toda"}
-        </ContextMenuItem>
+        {fullscreenable && (
+          <ContextMenuItem onSelect={() => onToggleFullscreen()}>
+            {isFullscreen ? "Restaurar tamanho original" : "Ocupar tela toda"}
+          </ContextMenuItem>
+        )}
+        {imageEditable && (
+          <ContextMenuItem onSelect={() => onEditImage()}>
+            Editar imagem…
+          </ContextMenuItem>
+        )}
       </ContextMenuContent>
     </ContextMenu>
   );

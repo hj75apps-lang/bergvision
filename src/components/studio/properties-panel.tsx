@@ -13,6 +13,7 @@ import {
   RotateCcw,
   Trash2,
   Upload,
+  Wand2,
   Video as VideoIcon,
 } from "lucide-react";
 
@@ -88,6 +89,8 @@ export function PropertiesPanel({
   fullscreenable,
   isFullscreen,
   onToggleFullscreen,
+  imageEditable,
+  onEditImage,
 }: {
   element: TemplateElement | null;
   disabled: boolean;
@@ -99,6 +102,8 @@ export function PropertiesPanel({
   fullscreenable?: boolean;
   isFullscreen?: boolean;
   onToggleFullscreen?: () => void;
+  imageEditable?: boolean;
+  onEditImage?: () => void;
 }) {
   return (
     <div className="flex h-full flex-col">
@@ -146,6 +151,19 @@ export function PropertiesPanel({
                   disabled={disabled}
                 />
               </div>
+            )}
+
+            {imageEditable && onEditImage && (
+              <Button
+                type="button"
+                variant="outline"
+                className="justify-start"
+                disabled={disabled}
+                onClick={() => onEditImage()}
+              >
+                <Wand2 className="mr-2 h-4 w-4 text-primary" />
+                Editar imagem…
+              </Button>
             )}
 
             <Separator />
