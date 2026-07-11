@@ -802,6 +802,23 @@ function WidgetContent({
         </Select>
       </label>
 
+      <div className="flex flex-col gap-1">
+        <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+          Tamanho ({Math.round((config.sizePercent as number) ?? 100)}%)
+        </span>
+        <Slider
+          value={[(config.sizePercent as number) ?? 100]}
+          min={20}
+          max={300}
+          step={5}
+          disabled={disabled}
+          onValueChange={([v]) => setCfg({ sizePercent: v })}
+        />
+        <span className="text-[10px] text-muted-foreground">
+          Ajusta o tamanho da fonte relativo à área do widget.
+        </span>
+      </div>
+
       {widgetType === "clock" && (
         <>
           <label className="flex flex-col gap-1">
