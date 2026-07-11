@@ -2917,6 +2917,11 @@ function WidgetContent({
           <p className="text-[10px] text-muted-foreground">
             Dados via Open-Meteo (gratuito, sem chave de API). Atualiza a cada 15 min.
           </p>
+          <WeatherBackgroundControls
+            config={config}
+            setCfg={setCfg}
+            disabled={disabled}
+          />
         </>
       )}
 
