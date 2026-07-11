@@ -2239,6 +2239,74 @@ function WidgetContent({
 
       {widgetType === "clock" && (
         <>
+          <label className="flex flex-col gap-1">
+            <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+              Tipo de relógio
+            </span>
+            <Select
+              value={((config.clockKind as string) ?? "digital")}
+              onValueChange={(v) => setCfg({ clockKind: v })}
+              disabled={disabled}
+            >
+              <SelectTrigger className="h-8 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="digital">Digital</SelectItem>
+                <SelectItem value="analog">Analógico</SelectItem>
+              </SelectContent>
+            </Select>
+          </label>
+          {((config.clockKind as string) ?? "digital") === "digital" ? (
+            <label className="flex flex-col gap-1">
+              <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                Estilo digital
+              </span>
+              <Select
+                value={((config.digitalStyle as string) ?? "modern")}
+                onValueChange={(v) => setCfg({ digitalStyle: v })}
+                disabled={disabled}
+              >
+                <SelectTrigger className="h-8 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="modern">Moderno</SelectItem>
+                  <SelectItem value="minimal">Minimalista</SelectItem>
+                  <SelectItem value="mono">Monoespaçado</SelectItem>
+                  <SelectItem value="led">LED</SelectItem>
+                  <SelectItem value="neon">Neon</SelectItem>
+                  <SelectItem value="outline">Contorno</SelectItem>
+                  <SelectItem value="flip">Flip (placares)</SelectItem>
+                </SelectContent>
+              </Select>
+            </label>
+          ) : (
+            <label className="flex flex-col gap-1">
+              <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                Estilo analógico
+              </span>
+              <Select
+                value={((config.analogStyle as string) ?? "classic")}
+                onValueChange={(v) => setCfg({ analogStyle: v })}
+                disabled={disabled}
+              >
+                <SelectTrigger className="h-8 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="classic">Clássico (números)</SelectItem>
+                  <SelectItem value="modern">Moderno (só marcadores)</SelectItem>
+                  <SelectItem value="minimal">Minimalista</SelectItem>
+                  <SelectItem value="roman">Romanos</SelectItem>
+                  <SelectItem value="swiss">Swiss Railway</SelectItem>
+                  <SelectItem value="railway">Estação</SelectItem>
+                  <SelectItem value="dark">Dark</SelectItem>
+                  <SelectItem value="neon">Neon</SelectItem>
+                </SelectContent>
+              </Select>
+            </label>
+          )}
           <div className="flex items-center justify-between">
             <Label className="text-xs">Mostrar segundos</Label>
             <Switch
@@ -2309,6 +2377,12 @@ function WidgetContent({
             disabled={disabled}
             onChange={(v) => setCfg({ color: v })}
           />
+          <ColorField
+            label="Cor de destaque (ponteiro dos segundos / efeitos)"
+            value={(config.accentColor as string) ?? ((config.color as string) ?? "#FFFFFF")}
+            disabled={disabled}
+            onChange={(v) => setCfg({ accentColor: v })}
+          />
           <label className="flex flex-col gap-1">
             <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
               Formato
@@ -2316,7 +2390,7 @@ function WidgetContent({
             <Select
               value={(config.format as string) ?? "24h"}
               onValueChange={(v) => setCfg({ format: v })}
-              disabled={disabled}
+              disabled={disabled || ((config.clockKind as string) ?? "digital") === "analog"}
             >
               <SelectTrigger className="h-8 text-xs">
                 <SelectValue />
