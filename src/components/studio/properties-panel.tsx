@@ -1,6 +1,18 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { AlertTriangle, AlignCenter, AlignLeft, AlignRight, ImagePlus, RotateCcw } from "lucide-react";
+import {
+  AlertTriangle,
+  AlignCenter,
+  AlignLeft,
+  AlignRight,
+  ArrowDown,
+  ArrowUp,
+  ImagePlus,
+  Plus,
+  RotateCcw,
+  Trash2,
+  Video as VideoIcon,
+} from "lucide-react";
 
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
