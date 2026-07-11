@@ -1,6 +1,18 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { AlertTriangle, AlignCenter, AlignLeft, AlignRight, ImagePlus, RotateCcw } from "lucide-react";
+import {
+  AlertTriangle,
+  AlignCenter,
+  AlignLeft,
+  AlignRight,
+  ArrowDown,
+  ArrowUp,
+  ImagePlus,
+  Plus,
+  RotateCcw,
+  Trash2,
+  Video as VideoIcon,
+} from "lucide-react";
 
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
@@ -708,6 +720,22 @@ function PlaylistContent({
   patch: (p: Record<string, unknown>) => void;
   disabled: boolean;
 }) {
+  const source = ((c.source as string) ?? "library") as "library" | "inline";
+  if (source === "inline") {
+    return <InlineGroupContent c={c} patch={patch} disabled={disabled} />;
+  }
+  return <LibraryPlaylistContent c={c} patch={patch} disabled={disabled} />;
+}
+
+function LibraryPlaylistContent({
+  c,
+  patch,
+  disabled,
+}: {
+  c: Record<string, unknown>;
+  patch: (p: Record<string, unknown>) => void;
+  disabled: boolean;
+}) {
   const { membership } = useAuth();
   const orgId = membership?.organization_id ?? null;
   const playlistsQ = useQuery({
@@ -725,31 +753,348 @@ function PlaylistContent({
   });
   const options = playlistsQ.data ?? [];
   return (
-    <label className="flex flex-col gap-1">
+    <div className="flex flex-col gap-3">
+      <SourceToggle c={c} patch={patch} disabled={disabled} current="library" />
+      <label className="flex flex-col gap-1">
+        <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+          Playlist
+        </span>
+        <Select
+          value={(c.playlistId as string) ?? ""}
+          onValueChange={(v) => patch({ playlistId: v })}
+          disabled={disabled || options.length === 0}
+        >
+          <SelectTrigger className="h-8 text-xs">
+            <SelectValue
+              placeholder={
+                options.length === 0 ? "Nenhuma playlist" : "Selecionar..."
+              }
+            />
+          </SelectTrigger>
+          <SelectContent>
+            {options.map((p) => (
+              <SelectItem key={p.id} value={p.id}>
+                {p.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </label>
+    </div>
+  );
+}
+
+function SourceToggle({
+  c,
+  patch,
+  disabled,
+  current,
+}: {
+  c: Record<string, unknown>;
+  patch: (p: Record<string, unknown>) => void;
+  disabled: boolean;
+  current: "library" | "inline";
+}) {
+  return (
+    <div className="flex flex-col gap-1">
       <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-        Playlist
+        Origem
       </span>
-      <Select
-        value={(c.playlistId as string) ?? ""}
-        onValueChange={(v) => patch({ playlistId: v })}
-        disabled={disabled || options.length === 0}
-      >
-        <SelectTrigger className="h-8 text-xs">
-          <SelectValue
-            placeholder={
-              options.length === 0 ? "Nenhuma playlist" : "Selecionar..."
-            }
-          />
-        </SelectTrigger>
-        <SelectContent>
-          {options.map((p) => (
-            <SelectItem key={p.id} value={p.id}>
-              {p.name}
-            </SelectItem>
+      <div className="grid grid-cols-2 gap-1 rounded-lg border border-border/60 p-0.5">
+        {(
+          [
+            { v: "library", label: "Playlist" },
+            { v: "inline", label: "Grupo" },
+          ] as const
+        ).map(({ v, label }) => (
+          <button
+            key={v}
+            type="button"
+            disabled={disabled}
+            onClick={() => {
+              if (v === current) return;
+              if (v === "inline") {
+                patch({
+                  source: "inline",
+                  items: (c.items as unknown[]) ?? [],
+                  loop: (c.loop as boolean) ?? true,
+                  transition: (c.transition as string) ?? "fade",
+                  defaultDuration: (c.defaultDuration as number) ?? 8,
+                  fit: (c.fit as string) ?? "cover",
+                });
+              } else {
+                patch({ source: "library" });
+              }
+            }}
+            className={cn(
+              "rounded-md py-1.5 text-xs transition",
+              current === v
+                ? "bg-primary/20 text-primary"
+                : "hover:bg-muted/60 text-muted-foreground",
+            )}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+type InlineGroupItem = {
+  id: string;
+  type: "image" | "video";
+  storagePath: string;
+  mediaFileId?: string | null;
+  name?: string | null;
+  duration?: number | null;
+};
+
+function InlineGroupContent({
+  c,
+  patch,
+  disabled,
+}: {
+  c: Record<string, unknown>;
+  patch: (p: Record<string, unknown>) => void;
+  disabled: boolean;
+}) {
+  const items: InlineGroupItem[] = Array.isArray(c.items)
+    ? ((c.items as unknown[]).filter(
+        (i) =>
+          !!i &&
+          typeof (i as InlineGroupItem).storagePath === "string" &&
+          ((i as InlineGroupItem).type === "image" ||
+            (i as InlineGroupItem).type === "video"),
+      ) as InlineGroupItem[])
+    : [];
+  const loop = (c.loop as boolean | undefined) ?? true;
+  const transition = ((c.transition as string) ?? "fade") as "none" | "fade";
+  const defaultDuration = Math.max(
+    1,
+    Math.min(600, (c.defaultDuration as number) ?? 8),
+  );
+  const fit = (c.fit as string) ?? "cover";
+
+  const [pickerKind, setPickerKind] = useState<"image" | "video" | null>(null);
+
+  const setItems = (next: InlineGroupItem[]) => patch({ items: next });
+
+  const addItem = (kind: "image" | "video") => setPickerKind(kind);
+
+  const move = (idx: number, dir: -1 | 1) => {
+    const next = [...items];
+    const to = idx + dir;
+    if (to < 0 || to >= next.length) return;
+    [next[idx], next[to]] = [next[to], next[idx]];
+    setItems(next);
+  };
+  const remove = (idx: number) => setItems(items.filter((_, i) => i !== idx));
+  const setDuration = (idx: number, v: number) => {
+    const next = items.map((it, i) => (i === idx ? { ...it, duration: v } : it));
+    setItems(next);
+  };
+
+  return (
+    <div className="flex flex-col gap-3">
+      <SourceToggle c={c} patch={patch} disabled={disabled} current="inline" />
+
+      <div className="flex items-center justify-between">
+        <Label className="text-xs">Loop</Label>
+        <Switch
+          checked={loop}
+          disabled={disabled}
+          onCheckedChange={(v) => patch({ loop: v })}
+        />
+      </div>
+
+      <label className="flex flex-col gap-1">
+        <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+          Transição
+        </span>
+        <Select
+          value={transition}
+          onValueChange={(v) => patch({ transition: v })}
+          disabled={disabled}
+        >
+          <SelectTrigger className="h-8 text-xs">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="fade">Fade (cross-fade)</SelectItem>
+            <SelectItem value="none">Sem transição</SelectItem>
+          </SelectContent>
+        </Select>
+      </label>
+
+      <label className="flex flex-col gap-1">
+        <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+          Ajuste padrão
+        </span>
+        <Select
+          value={fit}
+          onValueChange={(v) => patch({ fit: v })}
+          disabled={disabled}
+        >
+          <SelectTrigger className="h-8 text-xs capitalize">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {["cover", "contain", "fill"].map((f) => (
+              <SelectItem key={f} value={f} className="capitalize">
+                {f}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </label>
+
+      <div className="flex flex-col gap-1">
+        <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+          Duração padrão da imagem ({defaultDuration}s)
+        </span>
+        <Slider
+          value={[defaultDuration]}
+          min={1}
+          max={60}
+          step={1}
+          disabled={disabled}
+          onValueChange={([v]) => patch({ defaultDuration: v })}
+        />
+        <span className="text-[10px] text-muted-foreground">
+          Vídeos usam a duração natural. O loop volta para o primeiro item.
+        </span>
+      </div>
+
+      <Separator />
+
+      <div className="flex items-center justify-between">
+        <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+          Itens ({items.length})
+        </span>
+        <div className="flex gap-1">
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            className="h-7 gap-1 px-2 text-[11px]"
+            disabled={disabled}
+            onClick={() => addItem("image")}
+          >
+            <Plus className="h-3 w-3" />
+            <ImagePlus className="h-3 w-3" />
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            className="h-7 gap-1 px-2 text-[11px]"
+            disabled={disabled}
+            onClick={() => addItem("video")}
+          >
+            <Plus className="h-3 w-3" />
+            <VideoIcon className="h-3 w-3" />
+          </Button>
+        </div>
+      </div>
+
+      {items.length === 0 ? (
+        <p className="rounded-lg border border-dashed border-border/60 p-3 text-center text-[11px] text-muted-foreground">
+          Nenhuma mídia no grupo. Use os botões acima para adicionar imagens ou
+          vídeos.
+        </p>
+      ) : (
+        <ul className="flex flex-col gap-1.5">
+          {items.map((it, idx) => (
+            <li
+              key={it.id}
+              className="flex flex-col gap-1.5 rounded-lg border border-border/60 bg-muted/20 p-2"
+            >
+              <div className="flex items-center gap-1.5">
+                <span className="text-[10px] font-mono text-muted-foreground">
+                  {idx + 1}
+                </span>
+                {it.type === "video" ? (
+                  <VideoIcon className="h-3.5 w-3.5 text-muted-foreground" />
+                ) : (
+                  <ImagePlus className="h-3.5 w-3.5 text-muted-foreground" />
+                )}
+                <span className="min-w-0 flex-1 truncate text-xs">
+                  {it.name ?? "(sem nome)"}
+                </span>
+                <button
+                  type="button"
+                  disabled={disabled || idx === 0}
+                  onClick={() => move(idx, -1)}
+                  className="rounded p-1 opacity-60 hover:opacity-100 disabled:opacity-20"
+                  title="Mover para cima"
+                >
+                  <ArrowUp className="h-3 w-3" />
+                </button>
+                <button
+                  type="button"
+                  disabled={disabled || idx === items.length - 1}
+                  onClick={() => move(idx, 1)}
+                  className="rounded p-1 opacity-60 hover:opacity-100 disabled:opacity-20"
+                  title="Mover para baixo"
+                >
+                  <ArrowDown className="h-3 w-3" />
+                </button>
+                <button
+                  type="button"
+                  disabled={disabled}
+                  onClick={() => remove(idx)}
+                  className="rounded p-1 text-destructive/70 opacity-70 hover:opacity-100"
+                  title="Remover"
+                >
+                  <Trash2 className="h-3 w-3" />
+                </button>
+              </div>
+              {it.type === "image" && (
+                <div className="flex flex-col gap-1">
+                  <span className="text-[10px] text-muted-foreground">
+                    Duração ({it.duration ?? defaultDuration}s)
+                  </span>
+                  <Slider
+                    value={[it.duration ?? defaultDuration]}
+                    min={1}
+                    max={60}
+                    step={1}
+                    disabled={disabled}
+                    onValueChange={([v]) => setDuration(idx, v)}
+                  />
+                </div>
+              )}
+            </li>
           ))}
-        </SelectContent>
-      </Select>
-    </label>
+        </ul>
+      )}
+
+      {pickerKind && (
+        <MediaPickerDialog
+          open={!!pickerKind}
+          onOpenChange={(v) => {
+            if (!v) setPickerKind(null);
+          }}
+          filter={pickerKind}
+          onPick={(f) => {
+            const uid =
+              (crypto as { randomUUID?: () => string }).randomUUID?.() ??
+              Math.random().toString(36).slice(2);
+            const item: InlineGroupItem = {
+              id: uid,
+              type: pickerKind,
+              storagePath: f.storage_path,
+              mediaFileId: f.id,
+              name: f.name,
+              duration: pickerKind === "image" ? defaultDuration : null,
+            };
+            setItems([...items, item]);
+            setPickerKind(null);
+          }}
+        />
+      )}
+    </div>
   );
 }
 

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
 
@@ -151,6 +151,10 @@ export function ElementBody({ el }: { el: TemplateElement }) {
         return <RssWidget config={cfg} />;
       return <PlaceholderBadge label="Widget" />;
     }
+    case "playlist": {
+      if (c.source === "inline") return <InlineMediaGroup c={c} />;
+      return <PlaceholderBadge label="Playlist" />;
+    }
     default: {
       return (
         <div className="flex h-full w-full items-center justify-center rounded-md border border-dashed border-white/40 bg-white/5 text-[10px] font-medium uppercase tracking-wider text-white/80 backdrop-blur">
@@ -159,6 +163,114 @@ export function ElementBody({ el }: { el: TemplateElement }) {
       );
     }
   }
+}
+
+// ---------- Inline media group (carrossel de mídias) ----------
+
+export type GroupItem = {
+  id: string;
+  type: "image" | "video";
+  storagePath: string;
+  mediaFileId?: string | null;
+  name?: string | null;
+  duration?: number | null;
+  fit?: string | null;
+};
+
+function InlineMediaGroup({ c }: { c: Record<string, unknown> }) {
+  const rawItems = Array.isArray(c.items) ? (c.items as unknown[]) : [];
+  const items = useMemo(
+    () =>
+      rawItems
+        .map((it) => it as Partial<GroupItem>)
+        .filter(
+          (it): it is GroupItem =>
+            !!it &&
+            typeof it.storagePath === "string" &&
+            (it.type === "image" || it.type === "video"),
+        ),
+    [rawItems],
+  );
+  const loop = (c.loop as boolean | undefined) ?? true;
+  const transition = ((c.transition as string) ?? "fade") as "none" | "fade";
+  const defaultFit = ((c.fit as string) ?? "cover") as string;
+  const defaultDuration = Math.max(
+    1,
+    Math.min(600, (c.defaultDuration as number) ?? 8),
+  );
+
+  const [idx, setIdx] = useState(0);
+  const safeIdx = items.length === 0 ? 0 : idx % items.length;
+  const cur = items[safeIdx];
+
+  useEffect(() => {
+    // Reset index when items list shrinks
+    if (idx >= items.length && items.length > 0) setIdx(0);
+  }, [items.length, idx]);
+
+  const advance = () => {
+    setIdx((i) => {
+      const next = i + 1;
+      if (next >= items.length) return loop ? 0 : i;
+      return next;
+    });
+  };
+
+  useEffect(() => {
+    if (!cur || items.length === 0) return;
+    if (cur.type === "video") return; // vídeo avança em onEnded
+    const dur =
+      typeof cur.duration === "number" && cur.duration > 0
+        ? cur.duration
+        : defaultDuration;
+    const t = setTimeout(advance, Math.max(1, dur) * 1000);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [safeIdx, items.length, defaultDuration, loop]);
+
+  if (items.length === 0)
+    return <PlaceholderBadge label="Grupo de mídias (vazio)" />;
+  if (!cur) return null;
+
+  const fit = (cur.fit as string) ?? defaultFit;
+
+  return (
+    <div
+      className="relative h-full w-full overflow-hidden bg-black/20"
+      style={{ containerType: "size" }}
+    >
+      <style>{`@keyframes bv-group-fade{from{opacity:0}to{opacity:1}}`}</style>
+      {cur.type === "video" ? (
+        <MediaVideo
+          key={cur.id ?? safeIdx}
+          path={cur.storagePath}
+          fit={fit}
+          loop={items.length === 1 && loop}
+          muted
+          onEnded={items.length === 1 && loop ? undefined : advance}
+        />
+      ) : (
+        <div
+          key={cur.id ?? safeIdx}
+          className="h-full w-full"
+          style={{
+            animation:
+              transition === "fade" ? "bv-group-fade 0.5s ease-out" : undefined,
+          }}
+        >
+          <MediaImage path={cur.storagePath} fit={fit} label="Imagem" />
+        </div>
+      )}
+      {items.length > 1 && (
+        <div className="pointer-events-none absolute bottom-1 right-1 rounded-md bg-black/60 px-1.5 py-0.5 text-white/85 backdrop-blur">
+          <span style={{ fontSize: "8cqh" }}>
+            {safeIdx + 1}/{items.length}
+            {loop ? " ↻" : ""}
+          </span>
+        </div>
+      )}
+    </div>
+  );
 }
 
 // ---------- Widgets ----------
@@ -472,11 +584,13 @@ function MediaVideo({
   fit,
   loop,
   muted,
+  onEnded,
 }: {
   path: string | null;
   fit: string;
   loop: boolean;
   muted: boolean;
+  onEnded?: () => void;
 }) {
   const url = useSignedUrl(path);
   if (!path) return <PlaceholderBadge label="Vídeo" />;
@@ -497,6 +611,7 @@ function MediaVideo({
       loop={loop}
       muted={muted}
       playsInline
+      onEnded={onEnded}
     />
   );
 }

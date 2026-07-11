@@ -4,6 +4,7 @@ import {
   EyeOff,
   GripVertical,
   Image as ImageIcon,
+  Layers,
   ListMusic,
   Lock,
   Shapes,
@@ -45,7 +46,17 @@ function elementDisplayName(el: TemplateElement): string {
     const wt = ((c.widgetType ?? c.widget_type) as string | undefined) ?? "clock";
     if (WIDGET_LABELS[wt]) return WIDGET_LABELS[wt];
   }
+  if (el.element_type === "playlist" && c.source === "inline") {
+    const n = Array.isArray(c.items) ? (c.items as unknown[]).length : 0;
+    return `Grupo (${n})`;
+  }
   return ELEMENT_LABELS[el.element_type];
+}
+
+function iconFor(el: TemplateElement) {
+  const c = (el.content ?? {}) as Record<string, unknown>;
+  if (el.element_type === "playlist" && c.source === "inline") return Layers;
+  return ICONS[el.element_type];
 }
 
 export function LayersPanel({
@@ -105,7 +116,7 @@ export function LayersPanel({
         ) : (
           <ul className="flex flex-col gap-0.5 p-1.5">
             {ordered.map((el) => {
-              const Icon = ICONS[el.element_type];
+              const Icon = iconFor(el);
               const selected = selectedIds.includes(el.id);
               const isDragOver = overId === el.id && dragId && dragId !== el.id;
               const visible = el.visible ?? true;
