@@ -2,6 +2,9 @@ import { Fragment, useMemo, useState } from "react";
 import {
   ChevronDown,
   ChevronRight,
+  ChevronsDown,
+  ChevronsUp,
+  Copy,
   Eye,
   EyeOff,
   FolderClosed,
@@ -12,9 +15,13 @@ import {
   Layers,
   ListMusic,
   Lock,
+  MoveDown,
+  MoveUp,
+  Pencil,
   Shapes,
   Sparkles,
   Square,
+  Trash2,
   Type as TypeIcon,
   Unlock,
   Video as VideoIcon,
@@ -24,6 +31,13 @@ import { cn } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu";
 import type { ElementType, TemplateElement } from "@/lib/studio/types";
 import {
   ELEMENT_LABELS,
