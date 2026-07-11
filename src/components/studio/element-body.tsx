@@ -47,7 +47,62 @@ export function ElementBody({ el }: { el: TemplateElement }) {
         typeof c.backgroundColor === "string" ? c.backgroundColor : undefined;
       const bgOpacity =
         typeof c.backgroundOpacity === "number" ? c.backgroundOpacity : 1;
+      const italic = c.italic === true;
+      const underline = c.underline === true;
+      const strike = c.strikethrough === true;
+      const uppercase = c.uppercase === true;
+      const letterSpacing =
+        typeof c.letterSpacing === "number" ? c.letterSpacing : undefined;
+      const lineHeight =
+        typeof c.lineHeight === "number" ? c.lineHeight : undefined;
+      const textShadow = c.textShadow === true;
+      const anim = (c.animation as string) ?? "none";
+      const animSpeed = Math.max(
+        0.5,
+        Math.min(20, (c.animationSpeed as number) ?? 3),
+      );
+      const textDecoration = [
+        underline ? "underline" : null,
+        strike ? "line-through" : null,
+      ]
+        .filter(Boolean)
+        .join(" ") || undefined;
+      const animation =
+        anim === "fade"
+          ? `bv-text-fade ${animSpeed}s ease-in-out infinite`
+          : anim === "slide-up"
+            ? `bv-text-slide-up ${animSpeed}s ease-out infinite`
+            : anim === "slide-down"
+              ? `bv-text-slide-down ${animSpeed}s ease-out infinite`
+              : anim === "slide-left"
+                ? `bv-text-slide-left ${animSpeed}s ease-out infinite`
+                : anim === "slide-right"
+                  ? `bv-text-slide-right ${animSpeed}s ease-out infinite`
+                  : anim === "zoom"
+                    ? `bv-text-zoom ${animSpeed}s ease-in-out infinite`
+                    : anim === "pulse"
+                      ? `bv-text-pulse ${animSpeed}s ease-in-out infinite`
+                      : anim === "blink"
+                        ? `bv-text-blink ${animSpeed}s steps(2, start) infinite`
+                        : anim === "bounce"
+                          ? `bv-text-bounce ${animSpeed}s ease-in-out infinite`
+                          : anim === "typewriter"
+                            ? `bv-text-typewriter ${animSpeed}s steps(30, end) infinite`
+                            : undefined;
       return (
+        <>
+          <style>{`
+            @keyframes bv-text-fade{0%,100%{opacity:1}50%{opacity:.25}}
+            @keyframes bv-text-slide-up{0%{opacity:0;transform:translateY(20%)}20%,80%{opacity:1;transform:translateY(0)}100%{opacity:0;transform:translateY(-20%)}}
+            @keyframes bv-text-slide-down{0%{opacity:0;transform:translateY(-20%)}20%,80%{opacity:1;transform:translateY(0)}100%{opacity:0;transform:translateY(20%)}}
+            @keyframes bv-text-slide-left{0%{opacity:0;transform:translateX(20%)}20%,80%{opacity:1;transform:translateX(0)}100%{opacity:0;transform:translateX(-20%)}}
+            @keyframes bv-text-slide-right{0%{opacity:0;transform:translateX(-20%)}20%,80%{opacity:1;transform:translateX(0)}100%{opacity:0;transform:translateX(20%)}}
+            @keyframes bv-text-zoom{0%,100%{transform:scale(1)}50%{transform:scale(1.1)}}
+            @keyframes bv-text-pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.7;transform:scale(1.04)}}
+            @keyframes bv-text-blink{0%,49%{opacity:1}50%,100%{opacity:0}}
+            @keyframes bv-text-bounce{0%,100%{transform:translateY(0)}25%{transform:translateY(-8%)}50%{transform:translateY(0)}75%{transform:translateY(-4%)}}
+            @keyframes bv-text-typewriter{0%{clip-path:inset(0 100% 0 0)}60%,90%{clip-path:inset(0 0 0 0)}100%{clip-path:inset(0 100% 0 0)}}
+          `}</style>
         <div
           className="flex h-full w-full items-center overflow-hidden p-1"
           style={{
@@ -62,14 +117,33 @@ export function ElementBody({ el }: { el: TemplateElement }) {
             fontWeight: weight as React.CSSProperties["fontWeight"],
             fontSize: `${sizePct}cqh`,
             containerType: "size",
+            fontStyle: italic ? "italic" : undefined,
+            textTransform: uppercase ? "uppercase" : undefined,
+            letterSpacing:
+              letterSpacing !== undefined ? `${letterSpacing / 100}em` : undefined,
+            lineHeight,
+            textShadow: textShadow
+              ? "0 2px 8px rgba(0,0,0,0.55), 0 1px 2px rgba(0,0,0,0.4)"
+              : undefined,
             backgroundColor: bg
               ? bg +
                 Math.round(bgOpacity * 255).toString(16).padStart(2, "0")
               : undefined,
           }}
         >
-          <span className="truncate">{text}</span>
+          <span
+            className="truncate"
+            style={{
+              textDecoration,
+              animation,
+              display: "inline-block",
+              willChange: animation ? "transform, opacity" : undefined,
+            }}
+          >
+            {text}
+          </span>
         </div>
+        </>
       );
     }
     case "shape": {
