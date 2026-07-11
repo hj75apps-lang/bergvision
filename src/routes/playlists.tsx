@@ -824,6 +824,213 @@ function PlaylistEditor({
             </div>
           </div>
 
+          {/* Campanha — intervalo de datas */}
+          <div className="space-y-3 rounded-2xl border border-border/60 bg-card/40 p-4">
+            <div className="flex items-center justify-between gap-2">
+              <div>
+                <div className="text-sm font-semibold">Campanha (opcional)</div>
+                <p className="text-[11px] text-muted-foreground">
+                  Defina o período em que a playlist deve ser exibida. Fora do
+                  intervalo, ela é ignorada pelos players.
+                </p>
+              </div>
+              {(dateStart || dateEnd) && canManage && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 rounded-xl text-xs"
+                  onClick={() => {
+                    setDateStart(undefined);
+                    setDateEnd(undefined);
+                  }}
+                >
+                  Limpar
+                </Button>
+              )}
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label>Data de início</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={!canManage}
+                      className={cn(
+                        "h-10 w-full justify-start rounded-xl text-left font-normal",
+                        !dateStart && "text-muted-foreground",
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {dateStart
+                        ? format(dateStart, "dd 'de' MMM 'de' yyyy", {
+                            locale: ptBR,
+                          })
+                        : "Selecione uma data"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent
+                    align="start"
+                    className="w-auto p-0"
+                  >
+                    <Calendar
+                      mode="single"
+                      selected={dateStart}
+                      onSelect={(d) => {
+                        setDateStart(d ?? undefined);
+                        if (d && dateEnd && d > dateEnd) setDateEnd(undefined);
+                      }}
+                      locale={ptBR}
+                      initialFocus
+                      className={cn("p-3 pointer-events-auto")}
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Data de término</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={!canManage}
+                      className={cn(
+                        "h-10 w-full justify-start rounded-xl text-left font-normal",
+                        !dateEnd && "text-muted-foreground",
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {dateEnd
+                        ? format(dateEnd, "dd 'de' MMM 'de' yyyy", {
+                            locale: ptBR,
+                          })
+                        : "Selecione uma data"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent align="start" className="w-auto p-0">
+                    <Calendar
+                      mode="single"
+                      selected={dateEnd}
+                      onSelect={(d) => setDateEnd(d ?? undefined)}
+                      disabled={(d) => (dateStart ? d < dateStart : false)}
+                      locale={ptBR}
+                      initialFocus
+                      className={cn("p-3 pointer-events-auto")}
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+            </div>
+          </div>
+
+          {/* Players — targeting */}
+          <div className="space-y-3 rounded-2xl border border-border/60 bg-card/40 p-4">
+            <div className="flex items-center justify-between gap-2">
+              <div>
+                <div className="flex items-center gap-2 text-sm font-semibold">
+                  <MonitorPlay className="h-4 w-4 text-primary" />
+                  Players
+                </div>
+                <p className="text-[11px] text-muted-foreground">
+                  Selecione em quais players esta playlist será reproduzida.
+                  Players não selecionados não recebem esta playlist.
+                </p>
+              </div>
+              {canManage && (playersQ.data?.length ?? 0) > 0 && (
+                <div className="flex gap-1.5">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 rounded-xl text-xs"
+                    onClick={() =>
+                      setSelectedPlayerIds(
+                        (playersQ.data ?? []).map((p) => p.id),
+                      )
+                    }
+                  >
+                    Todos
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 rounded-xl text-xs"
+                    onClick={() => setSelectedPlayerIds([])}
+                  >
+                    Nenhum
+                  </Button>
+                </div>
+              )}
+            </div>
+
+            {playersQ.isLoading || assignedPlayersQ.isLoading ? (
+              <div className="flex justify-center py-6">
+                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+              </div>
+            ) : (playersQ.data?.length ?? 0) === 0 ? (
+              <div className="rounded-xl border border-dashed border-border/60 bg-background/40 py-6 text-center text-xs text-muted-foreground">
+                Nenhum player cadastrado ainda.
+              </div>
+            ) : (
+              <ul className="grid gap-1.5 sm:grid-cols-2">
+                {(playersQ.data ?? []).map((p) => {
+                  const checked = selectedPlayerIds.includes(p.id);
+                  return (
+                    <li key={p.id}>
+                      <label
+                        className={cn(
+                          "flex cursor-pointer items-center gap-2.5 rounded-xl border px-3 py-2 text-sm transition-colors",
+                          checked
+                            ? "border-primary/60 bg-primary/10"
+                            : "border-border/60 bg-background/40 hover:border-border",
+                          !canManage && "cursor-not-allowed opacity-70",
+                        )}
+                      >
+                        <Checkbox
+                          checked={checked}
+                          disabled={!canManage}
+                          onCheckedChange={(v) => {
+                            setSelectedPlayerIds((prev) =>
+                              v
+                                ? [...prev, p.id]
+                                : prev.filter((x) => x !== p.id),
+                            );
+                          }}
+                        />
+                        <div className="min-w-0 flex-1">
+                          <div className="truncate font-medium">{p.name}</div>
+                          <div className="text-[11px] text-muted-foreground">
+                            {p.orientation === "portrait"
+                              ? "Retrato"
+                              : "Paisagem"}
+                            {" · "}
+                            <span
+                              className={
+                                p.status === "online"
+                                  ? "text-emerald-400"
+                                  : "text-muted-foreground"
+                              }
+                            >
+                              {p.status === "online" ? "online" : "offline"}
+                            </span>
+                          </div>
+                        </div>
+                      </label>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+            <div className="text-[11px] text-muted-foreground">
+              {selectedPlayerIds.length} de {playersQ.data?.length ?? 0}{" "}
+              player(s) selecionado(s).
+            </div>
+          </div>
+
           {/* Itens */}
           <div className="space-y-3">
             <div className="flex items-center justify-between gap-2">
