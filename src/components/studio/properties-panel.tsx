@@ -1159,6 +1159,7 @@ function WidgetContent({
             <SelectItem value="weather">Clima</SelectItem>
             <SelectItem value="rss">RSS</SelectItem>
             <SelectItem value="news">Notícias</SelectItem>
+            <SelectItem value="ticker">News Ticker</SelectItem>
           </SelectContent>
         </Select>
       </label>
@@ -1518,6 +1519,10 @@ function WidgetContent({
           </div>
         </>
       )}
+
+      {widgetType === "ticker" && (
+        <TickerConfig config={config} setCfg={setCfg} disabled={disabled} />
+      )}
     </div>
   );
 }
@@ -1531,6 +1536,16 @@ function defaultWidgetConfig(type: string): Record<string, unknown> {
     case "rss":
     case "news":
       return { feedUrl: "", maxItems: 5 };
+    case "ticker":
+      return {
+        preset: "classic",
+        feedUrl: "",
+        customText: "",
+        maxItems: 8,
+        direction: "left",
+        speed: 40,
+        sizePercent: 40,
+      };
     default:
       return {};
   }
