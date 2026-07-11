@@ -132,6 +132,28 @@ export function PlaylistLocalPreview({
   const [showTimeline, setShowTimeline] = useState(true);
   const videoRef = useRef<HTMLVideoElement | null>(null);
 
+  // Guarda o item anterior por ~600ms para que a transição do novo item
+  // aconteça POR CIMA do antigo (evita "tela preta" entre trocas).
+  const [prev, setPrev] = useState<{ item: Item; tick: number } | null>(null);
+  const prevRef = useRef<{ item: Item; tick: number } | null>(null);
+  const lastKeyRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    const cur = items[index];
+    if (!cur) return;
+    const key = `${cur.id}-${tick}`;
+    if (lastKeyRef.current && lastKeyRef.current !== key) {
+      // marca o item que estava em cena como "saindo"
+      setPrev(prevRef.current);
+      const t = window.setTimeout(() => setPrev(null), 650);
+      lastKeyRef.current = key;
+      prevRef.current = { item: cur, tick };
+      return () => window.clearTimeout(t);
+    }
+    lastKeyRef.current = key;
+    prevRef.current = { item: cur, tick };
+  }, [index, tick, items]);
+
   // Se a lista mudar drasticamente, volta para o começo.
   useEffect(() => {
     setIndex((i) => (i >= items.length ? 0 : i));
@@ -231,15 +253,37 @@ export function PlaylistLocalPreview({
             }}
           >
             {current && (
-              <ItemStage
-                key={`${current.id}-${tick}`}
-                item={current}
-                playing={playing}
-                onVideoEnded={() =>
-                  setIndex((i) => (items.length ? (i + 1) % items.length : 0))
-                }
-                videoRef={videoRef}
-              />
+              <>
+                <TransitionStyles />
+                {prev && (
+                  <div
+                    key={`prev-${prev.item.id}-${prev.tick}`}
+                    className="absolute inset-0"
+                  >
+                    <ItemStage
+                      item={prev.item}
+                      playing={false}
+                      onVideoEnded={() => {}}
+                      videoRef={{ current: null } as React.MutableRefObject<HTMLVideoElement | null>}
+                      animate={false}
+                    />
+                  </div>
+                )}
+                <div
+                  key={`cur-${current.id}-${tick}`}
+                  className="absolute inset-0"
+                >
+                  <ItemStage
+                    item={current}
+                    playing={playing}
+                    onVideoEnded={() =>
+                      setIndex((i) => (items.length ? (i + 1) % items.length : 0))
+                    }
+                    videoRef={videoRef}
+                    animate
+                  />
+                </div>
+              </>
             )}
           </div>
         </div>
