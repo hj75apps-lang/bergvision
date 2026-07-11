@@ -60,6 +60,7 @@ import { LayoutEditorDialog } from "@/components/template/layout-editor-dialog";
 import { PreviewPanel } from "@/components/preview/preview-panel";
 import {
   aspectRatioLabel,
+  aspectRatioCss,
   slugify,
   zonesWithReferenceFallback,
   type AspectRatio,
@@ -106,7 +107,7 @@ function TemplatesPage() {
       const { data, error } = await supabase
         .from("templates")
         .select(
-          "id, name, slug, orientation, zone_count, is_system, organization_id, aspect_ratio, canvas_width, canvas_height, allow_overlap, thumbnail_url",
+          "id, name, slug, orientation, zone_count, is_system, organization_id, aspect_ratio, canvas_width, canvas_height, allow_overlap, thumbnail_url, type, background_color",
         )
         .order("is_system", { ascending: false })
         .order("name");
@@ -143,6 +144,50 @@ function TemplatesPage() {
     }
     return map;
   }, [zonesAllQ.data]);
+
+  // Canvas-type templates (Studio) don't use template_zones; fetch their
+  // template_elements so the gallery card renders the real layout instead of
+  // an empty placeholder.
+  const canvasTemplateIds = (templatesQ.data ?? [])
+    .filter((t: any) => t.type === "canvas")
+    .map((t) => t.id);
+  const elementsAllQ = useQuery({
+    queryKey: ["template_elements_all", canvasTemplateIds.join(",")],
+    enabled: canvasTemplateIds.length > 0,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("template_elements")
+        .select(
+          "id, template_id, element_type, x, y, width, height, rotation, z_index, opacity, visible, content",
+        )
+        .in("template_id", canvasTemplateIds)
+        .order("z_index");
+      if (error) throw error;
+      return (data ?? []) as Array<{
+        id: string;
+        template_id: string;
+        element_type: string;
+        x: number;
+        y: number;
+        width: number;
+        height: number;
+        rotation: number;
+        z_index: number;
+        opacity: number;
+        visible: boolean;
+        content: Record<string, unknown> | null;
+      }>;
+    },
+  });
+  const elementsByTemplate = useMemo(() => {
+    const map = new Map<string, typeof elementsAllQ.data extends undefined ? never : NonNullable<typeof elementsAllQ.data>>();
+    for (const el of elementsAllQ.data ?? []) {
+      const arr = (map.get(el.template_id) as any) ?? [];
+      arr.push(el);
+      map.set(el.template_id, arr as any);
+    }
+    return map;
+  }, [elementsAllQ.data]);
 
   // Count how many players use each template — for the "usado por N" badge
   // and to block deletion when > 0.
@@ -252,6 +297,10 @@ function TemplatesPage() {
           {(templatesQ.data ?? []).map((t) => {
             const zones = zonesByTemplate.get(t.id) ?? [];
             const usage = usageQ.data?.[t.id] ?? 0;
+            const isCanvas = (t as any).type === "canvas";
+            const elements = elementsByTemplate.get(t.id) ?? [];
+            const contentCount = isCanvas ? elements.length : zones.length;
+            const contentLabel = isCanvas ? "elemento" : "zona";
             return (
               <Card
                 key={t.id}
@@ -262,8 +311,8 @@ function TemplatesPage() {
                     <div className="min-w-0">
                       <CardTitle className="truncate text-base">{t.name}</CardTitle>
                       <CardDescription className="mt-0.5 text-xs">
-                        {aspectRatioLabel(t)} · {zones.length} zona
-                        {zones.length !== 1 ? "s" : ""}
+                        {aspectRatioLabel(t)} · {contentCount} {contentLabel}
+                        {contentCount !== 1 ? "s" : ""}
                         {usage > 0 && ` · usado por ${usage} player${usage !== 1 ? "s" : ""}`}
                       </CardDescription>
                     </div>
@@ -279,7 +328,11 @@ function TemplatesPage() {
                   </div>
                 </CardHeader>
                 <CardContent className="pb-3">
-                  <TemplateCanvas template={t} zones={zones} mode="preview" showLabels={false} />
+                  {isCanvas ? (
+                    <CanvasElementsPreview template={t} elements={elements} />
+                  ) : (
+                    <TemplateCanvas template={t} zones={zones} mode="preview" showLabels={false} />
+                  )}
                 </CardContent>
                 <CardFooter className="flex-wrap gap-2 pt-0">
                   <Button
@@ -424,6 +477,79 @@ function TemplatesPage() {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+      )}
+    </div>
+  );
+}
+
+type CanvasElementPreview = {
+  id: string;
+  element_type: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  rotation: number;
+  z_index: number;
+  opacity: number;
+  visible: boolean;
+  content: Record<string, unknown> | null;
+};
+
+const ELEMENT_COLORS: Record<string, string> = {
+  text: "hsl(217 91% 60% / 0.55)",
+  image: "hsl(160 84% 45% / 0.55)",
+  video: "hsl(340 82% 60% / 0.55)",
+  logo: "hsl(38 92% 55% / 0.55)",
+  playlist: "hsl(265 89% 66% / 0.55)",
+  widget: "hsl(190 84% 55% / 0.55)",
+  shape: "hsl(0 0% 70% / 0.45)",
+};
+
+function CanvasElementsPreview({
+  template,
+  elements,
+}: {
+  template: Template;
+  elements: CanvasElementPreview[];
+}) {
+  const bg = (template as any).background_color ?? "#0F172A";
+  const visible = elements.filter((e) => e.visible !== false);
+  return (
+    <div
+      className="relative w-full overflow-hidden rounded-xl border border-border/60"
+      style={{ aspectRatio: aspectRatioCss(template), background: bg }}
+    >
+      {visible.length === 0 ? (
+        <div className="pointer-events-none absolute inset-0 p-3">
+          <div className="grid h-full w-full grid-cols-6 grid-rows-4 gap-1.5 opacity-70">
+            <div className="col-span-4 row-span-2 rounded-md bg-foreground/15" />
+            <div className="col-span-2 row-span-1 rounded-md bg-foreground/10" />
+            <div className="col-span-2 row-span-1 rounded-md bg-foreground/20" />
+            <div className="col-span-3 row-span-2 rounded-md bg-foreground/10" />
+            <div className="col-span-3 row-span-2 rounded-md bg-foreground/15" />
+          </div>
+        </div>
+      ) : (
+        visible
+          .slice()
+          .sort((a, b) => a.z_index - b.z_index)
+          .map((el) => (
+            <div
+              key={el.id}
+              className="absolute rounded-sm ring-1 ring-white/10"
+              style={{
+                left: `${el.x}%`,
+                top: `${el.y}%`,
+                width: `${el.width}%`,
+                height: `${el.height}%`,
+                transform: `rotate(${el.rotation}deg)`,
+                opacity: el.opacity,
+                background: ELEMENT_COLORS[el.element_type] ?? "hsl(0 0% 60% / 0.4)",
+                zIndex: el.z_index,
+              }}
+            />
+          ))
       )}
     </div>
   );

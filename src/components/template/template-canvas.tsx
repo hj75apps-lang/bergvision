@@ -307,10 +307,25 @@ export function TemplateCanvas({
         })}
 
       {normalized.length === 0 && (
-        <div className="absolute inset-0 grid place-items-center text-xs text-white/50">
-          Sem zonas
-        </div>
+        <EmptyTemplatePattern />
       )}
+    </div>
+  );
+}
+
+// Decorative placeholder used when a template has no zones/elements yet.
+// Matches the visual language of the native template previews so the card
+// never shows a plain "Sem zonas" text.
+function EmptyTemplatePattern() {
+  return (
+    <div className="pointer-events-none absolute inset-0 p-3">
+      <div className="grid h-full w-full grid-cols-6 grid-rows-4 gap-1.5 opacity-70">
+        <div className="col-span-4 row-span-2 rounded-md bg-foreground/15" />
+        <div className="col-span-2 row-span-1 rounded-md bg-foreground/10" />
+        <div className="col-span-2 row-span-1 rounded-md bg-foreground/20" />
+        <div className="col-span-3 row-span-2 rounded-md bg-foreground/10" />
+        <div className="col-span-3 row-span-2 rounded-md bg-foreground/15" />
+      </div>
     </div>
   );
 }
