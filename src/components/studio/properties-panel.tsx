@@ -926,6 +926,52 @@ function WidgetContent({
             disabled={disabled}
             onCommit={(v) => setCfg({ maxItems: v })}
           />
+          <label className="flex flex-col gap-1">
+            <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+              Animação
+            </span>
+            <Select
+              value={(config.motion as string) ?? "fade"}
+              onValueChange={(v) => setCfg({ motion: v })}
+              disabled={disabled}
+            >
+              <SelectTrigger className="h-8 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="fade">Fade (cross-fade)</SelectItem>
+                <SelectItem value="marquee-left">
+                  Horizontal — direita → esquerda
+                </SelectItem>
+                <SelectItem value="marquee-right">
+                  Horizontal — esquerda → direita
+                </SelectItem>
+                <SelectItem value="vertical-up">
+                  Vertical — baixo → cima
+                </SelectItem>
+                <SelectItem value="vertical-down">
+                  Vertical — cima → baixo
+                </SelectItem>
+                <SelectItem value="none">Estático (sem animação)</SelectItem>
+              </SelectContent>
+            </Select>
+          </label>
+          <div className="flex flex-col gap-1">
+            <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+              Velocidade ({(config.speed as number) ?? 40}s por ciclo)
+            </span>
+            <Slider
+              value={[(config.speed as number) ?? 40]}
+              min={10}
+              max={180}
+              step={5}
+              disabled={disabled}
+              onValueChange={([v]) => setCfg({ speed: v })}
+            />
+            <span className="text-[10px] text-muted-foreground">
+              Menor = mais rápido. Aplica-se a marquee e scroll vertical.
+            </span>
+          </div>
         </>
       )}
     </div>

@@ -217,6 +217,15 @@ function RssWidget({ config }: { config: Record<string, unknown> }) {
   const url = ((config.feedUrl as string) ?? "").trim();
   const max = (config.maxItems as number) ?? 5;
   const scale = ((config.sizePercent as number) ?? 100) / 100;
+  const motion = ((config.motion as string) ?? "fade") as
+    | "none"
+    | "fade"
+    | "marquee-left"
+    | "marquee-right"
+    | "vertical-up"
+    | "vertical-down";
+  const speed = Math.max(5, Math.min(180, (config.speed as number) ?? 40));
+  const separator = (config.separator as string) ?? "  •  ";
   const q = useQuery({
     queryKey: ["widget-rss", url, max],
     enabled: url.length > 0,
@@ -234,41 +243,135 @@ function RssWidget({ config }: { config: Record<string, unknown> }) {
   const items = q.data?.items ?? [];
   useEffect(() => {
     if (items.length <= 1) return;
+    if (motion !== "fade" && motion !== "none") return;
     const id = setInterval(
       () => setIdx((i) => (i + 1) % items.length),
       6000,
     );
     return () => clearInterval(id);
-  }, [items.length]);
+  }, [items.length, motion]);
+
+  const wrapperStyle: React.CSSProperties = {
+    containerType: "size",
+    fontFamily: "Inter, system-ui",
+  };
+
+  if (!url) {
+    return (
+      <div
+        className="flex h-full w-full flex-col justify-center gap-1 overflow-hidden bg-black/40 p-2 text-white"
+        style={wrapperStyle}
+      >
+        <span className="text-[10cqh] opacity-70">Configure a URL do feed</span>
+      </div>
+    );
+  }
+  if (q.isLoading) {
+    return (
+      <div
+        className="flex h-full w-full items-center justify-center overflow-hidden bg-black/40 p-2 text-white"
+        style={wrapperStyle}
+      >
+        <Loader2 className="h-4 w-4 animate-spin opacity-70" />
+      </div>
+    );
+  }
+  if (q.isError || items.length === 0) {
+    return (
+      <div
+        className="flex h-full w-full items-center justify-center overflow-hidden bg-black/40 p-2 text-white"
+        style={wrapperStyle}
+      >
+        <span className="text-[10cqh] opacity-70">Feed indisponível</span>
+      </div>
+    );
+  }
+
+  // Horizontal marquee (esquerda ↔ direita)
+  if (motion === "marquee-left" || motion === "marquee-right") {
+    const text = items.map((i) => i.title).join(separator);
+    const dir = motion === "marquee-left" ? "normal" : "reverse";
+    return (
+      <div
+        className="flex h-full w-full items-center overflow-hidden bg-black/40 text-white"
+        style={wrapperStyle}
+      >
+        <style>{`@keyframes bv-marquee-x{from{transform:translateX(0)}to{transform:translateX(-50%)}}`}</style>
+        <div
+          className="flex shrink-0 whitespace-nowrap"
+          style={{
+            animation: `bv-marquee-x ${speed}s linear infinite`,
+            animationDirection: dir,
+            fontSize: `${18 * scale}cqh`,
+            fontWeight: 600,
+            paddingLeft: "2rem",
+          }}
+        >
+          <span>{text}{separator}</span>
+          <span>{text}{separator}</span>
+        </div>
+      </div>
+    );
+  }
+
+  // Vertical ticker (cima ↔ baixo)
+  if (motion === "vertical-up" || motion === "vertical-down") {
+    const dir = motion === "vertical-up" ? "normal" : "reverse";
+    return (
+      <div
+        className="flex h-full w-full flex-col overflow-hidden bg-black/40 p-2 text-white"
+        style={wrapperStyle}
+      >
+        <style>{`@keyframes bv-marquee-y{from{transform:translateY(0)}to{transform:translateY(-50%)}}`}</style>
+        <div
+          className="flex flex-col gap-2"
+          style={{
+            animation: `bv-marquee-y ${speed}s linear infinite`,
+            animationDirection: dir,
+          }}
+        >
+          {[...items, ...items].map((it, i) => (
+            <span
+              key={i}
+              style={{
+                fontSize: `${14 * scale}cqh`,
+                fontWeight: 600,
+                lineHeight: 1.3,
+              }}
+            >
+              • {it.title}
+            </span>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  // Fade / none (comportamento anterior)
   return (
     <div
       className="flex h-full w-full flex-col justify-center gap-1 overflow-hidden bg-black/40 p-2 text-white"
-      style={{ containerType: "size", fontFamily: "Inter, system-ui" }}
+      style={wrapperStyle}
     >
-      {!url ? (
-        <span className="text-[10cqh] opacity-70">
-          Configure a URL do feed
-        </span>
-      ) : q.isLoading ? (
-        <Loader2 className="h-4 w-4 animate-spin opacity-70" />
-      ) : q.isError || items.length === 0 ? (
-        <span className="text-[10cqh] opacity-70">Feed indisponível</span>
-      ) : (
-        <>
-          <span
-            style={{ fontSize: `${9 * scale}cqh`, opacity: 0.6 }}
-            className="uppercase tracking-wider"
-          >
-            Notícia {idx + 1}/{items.length}
-          </span>
-          <span
-            style={{ fontSize: `${14 * scale}cqh`, fontWeight: 600, lineHeight: 1.2 }}
-            className="line-clamp-3"
-          >
-            {items[idx]?.title}
-          </span>
-        </>
-      )}
+      <span
+        style={{ fontSize: `${9 * scale}cqh`, opacity: 0.6 }}
+        className="uppercase tracking-wider"
+      >
+        Notícia {idx + 1}/{items.length}
+      </span>
+      <span
+        key={motion === "fade" ? idx : "static"}
+        style={{
+          fontSize: `${14 * scale}cqh`,
+          fontWeight: 600,
+          lineHeight: 1.2,
+          animation: motion === "fade" ? "bv-fade 0.6s ease-out" : undefined,
+        }}
+        className="line-clamp-3"
+      >
+        {items[idx]?.title}
+      </span>
+      <style>{`@keyframes bv-fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}`}</style>
     </div>
   );
 }
