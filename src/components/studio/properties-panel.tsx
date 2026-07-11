@@ -3075,30 +3075,43 @@ function IframeConfig({
   const allowScripts = config.allowScripts !== false;
   const allowSameOrigin = config.allowSameOrigin === true;
   const isValid = /^https:\/\//i.test(url);
+  const handleUrlInput = (raw: string) => {
+    const trimmed = raw.trim();
+    // Aceita colar tanto uma URL crua quanto um snippet completo de <iframe ...>.
+    // Extrai o atributo src="..." | src='...' quando presente.
+    if (/<iframe/i.test(trimmed)) {
+      const match = trimmed.match(/\bsrc\s*=\s*["']([^"']+)["']/i);
+      if (match?.[1]) {
+        setCfg({ url: match[1].trim() });
+        return;
+      }
+    }
+    setCfg({ url: trimmed });
+  };
   return (
     <div className="flex flex-col gap-3">
       <Separator />
       <label className="flex flex-col gap-1">
         <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-          URL (https)
+          URL ou código de incorporação
         </span>
-        <Input
-          type="url"
-          inputMode="url"
-          placeholder="https://exemplo.com/widget-clima"
+        <Textarea
+          placeholder={'https://exemplo.com/widget-clima\nou cole aqui o <iframe src="..."></iframe>'}
           value={url}
           disabled={disabled}
-          onChange={(e) => setCfg({ url: e.target.value.trim() })}
-          className="h-8 text-xs"
+          onChange={(e) => handleUrlInput(e.target.value)}
+          className="min-h-16 text-xs"
+          rows={3}
         />
         {!isValid && url.length > 0 && (
           <span className="text-[10px] text-destructive">
-            A URL precisa começar com https://
+            Não foi possível extrair uma URL https:// válida.
           </span>
         )}
         <span className="text-[10px] text-muted-foreground">
-          Use serviços de embed (clima, mapas, câmeras, cotações) que permitam
-          iframe. Sites que bloqueiam via X-Frame-Options não serão exibidos.
+          Cole a URL direta ou o código completo do iframe (ex.: Climatempo,
+          Google Maps, YouTube). Extraímos o src automaticamente. Sites que
+          bloqueiam via X-Frame-Options não serão exibidos.
         </span>
       </label>
 
