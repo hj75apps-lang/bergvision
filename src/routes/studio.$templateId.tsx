@@ -1397,6 +1397,8 @@ function EditorPage() {
                     fullscreenable={isFullscreenable(el)}
                     isFullscreen={isFullscreenGeom(el)}
                     onToggleFullscreen={() => void toggleFullscreen(el.id)}
+                    imageEditable={isImageEditable(el)}
+                    onEditImage={() => openImageEditor(el.id)}
                   />
                 ))}
 
@@ -1530,6 +1532,12 @@ function EditorPage() {
             onToggleFullscreen={() => {
               if (activeElement) void toggleFullscreen(activeElement.id);
             }}
+            imageEditable={
+              activeElement ? isImageEditable(activeElement) : false
+            }
+            onEditImage={() => {
+              if (activeElement) openImageEditor(activeElement.id);
+            }}
             onGeomChange={(patch) => {
               if (!activeElement) return;
               void commitElementUpdate(activeElement.id, patch);
@@ -1623,6 +1631,8 @@ function ElementView({
   fullscreenable,
   isFullscreen,
   onToggleFullscreen,
+  imageEditable,
+  onEditImage,
 }: {
   el: TemplateElement;
   selected: boolean;
@@ -1630,6 +1640,8 @@ function ElementView({
   fullscreenable: boolean;
   isFullscreen: boolean;
   onToggleFullscreen: () => void;
+  imageEditable: boolean;
+  onEditImage: () => void;
 }) {
   const visible = el.visible ?? true;
   const style: React.CSSProperties = {
@@ -1659,15 +1671,22 @@ function ElementView({
     </div>
   );
 
-  if (!canEdit || !fullscreenable) return body;
+  if (!canEdit || (!fullscreenable && !imageEditable)) return body;
 
   return (
     <ContextMenu>
       <ContextMenuTrigger asChild>{body}</ContextMenuTrigger>
       <ContextMenuContent className="w-56">
-        <ContextMenuItem onSelect={() => onToggleFullscreen()}>
-          {isFullscreen ? "Restaurar tamanho original" : "Ocupar tela toda"}
-        </ContextMenuItem>
+        {fullscreenable && (
+          <ContextMenuItem onSelect={() => onToggleFullscreen()}>
+            {isFullscreen ? "Restaurar tamanho original" : "Ocupar tela toda"}
+          </ContextMenuItem>
+        )}
+        {imageEditable && (
+          <ContextMenuItem onSelect={() => onEditImage()}>
+            Editar imagem…
+          </ContextMenuItem>
+        )}
       </ContextMenuContent>
     </ContextMenu>
   );
