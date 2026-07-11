@@ -1237,10 +1237,12 @@ function MediaImage({
   path,
   fit,
   label,
+  appearance,
 }: {
   path: string | null;
   fit: string;
   label: string;
+  appearance?: React.CSSProperties;
 }) {
   const url = useSignedUrl(path);
   if (!path) return <PlaceholderBadge label={label} />;
@@ -1258,6 +1260,7 @@ function MediaImage({
       className="h-full w-full"
       style={{
         objectFit: (fit as React.CSSProperties["objectFit"]) ?? "cover",
+        ...appearance,
       }}
     />
   );
@@ -1265,7 +1268,13 @@ function MediaImage({
 
 // ---------- Image Sequence (frame-by-frame) ----------
 
-function ImageSequenceBody({ c }: { c: Record<string, unknown> }) {
+function ImageSequenceBody({
+  c,
+  appearance,
+}: {
+  c: Record<string, unknown>;
+  appearance?: React.CSSProperties;
+}) {
   const rawFrames = Array.isArray(c.frames) ? (c.frames as unknown[]) : [];
   const frames = useMemo(
     () =>
@@ -1300,7 +1309,7 @@ function ImageSequenceBody({ c }: { c: Record<string, unknown> }) {
   if (frames.length === 0) return <PlaceholderBadge label="Sequência" />;
 
   return (
-    <div className="relative h-full w-full">
+    <div className="relative h-full w-full" style={appearance}>
       {frames.map((f, i) => (
         <SequenceFrame
           key={i}
