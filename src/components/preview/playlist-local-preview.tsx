@@ -548,8 +548,24 @@ function TransitionStyles() {
       .bv-anim-slide-down { animation: bv-slide-down 550ms cubic-bezier(.22,.61,.36,1) both; will-change: transform, opacity }
       .bv-anim-zoom-in { animation: bv-zoom-in 550ms ease-out both; will-change: transform, opacity }
       .bv-anim-zoom-out { animation: bv-zoom-out 550ms ease-out both; will-change: transform, opacity }
+      /* Saída pareada — para o item que está sendo trocado */
+      @keyframes bv-fade-out { from { opacity: 1 } to { opacity: 0 } }
+      @keyframes bv-exit-left { from { transform: translateX(0) } to { transform: translateX(-100%) } }
+      @keyframes bv-exit-right { from { transform: translateX(0) } to { transform: translateX(100%) } }
+      @keyframes bv-exit-up { from { transform: translateY(0) } to { transform: translateY(-100%) } }
+      @keyframes bv-exit-down { from { transform: translateY(0) } to { transform: translateY(100%) } }
+      @keyframes bv-exit-scale-down { from { transform: scale(1); opacity: 1 } to { transform: scale(0.85); opacity: 0 } }
+      @keyframes bv-exit-scale-up { from { transform: scale(1); opacity: 1 } to { transform: scale(1.15); opacity: 0 } }
+      .bv-exit-fade { animation: bv-fade-out 500ms ease-in both; will-change: opacity }
+      .bv-exit-slide-left { animation: bv-exit-left 550ms cubic-bezier(.22,.61,.36,1) both; will-change: transform }
+      .bv-exit-slide-right { animation: bv-exit-right 550ms cubic-bezier(.22,.61,.36,1) both; will-change: transform }
+      .bv-exit-slide-up { animation: bv-exit-up 550ms cubic-bezier(.22,.61,.36,1) both; will-change: transform }
+      .bv-exit-slide-down { animation: bv-exit-down 550ms cubic-bezier(.22,.61,.36,1) both; will-change: transform }
+      .bv-exit-zoom-out-away { animation: bv-exit-scale-down 550ms ease-in both; will-change: transform, opacity }
+      .bv-exit-zoom-in-away { animation: bv-exit-scale-up 550ms ease-in both; will-change: transform, opacity }
       @media (prefers-reduced-motion: reduce) {
         .bv-anim-fade, .bv-anim-slide-left, .bv-anim-slide-right, .bv-anim-slide-up, .bv-anim-slide-down, .bv-anim-zoom-in, .bv-anim-zoom-out { animation: none !important }
+        .bv-exit-fade, .bv-exit-slide-left, .bv-exit-slide-right, .bv-exit-slide-up, .bv-exit-slide-down, .bv-exit-zoom-out-away, .bv-exit-zoom-in-away { animation: none !important }
       }
     `}</style>
   );
