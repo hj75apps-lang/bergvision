@@ -505,6 +505,32 @@ function transitionClass(t: string): string {
   }
 }
 
+// Animação de SAÍDA do item anterior — pareada com a entrada, para que a
+// transição seja "push real" (slide empurra, zoom cede, fade cruza) e não
+// haja duas mídias visíveis paradas ao mesmo tempo.
+function exitClass(t: string): string {
+  switch ((t ?? "").toLowerCase()) {
+    case "cut":
+      return "";
+    case "slide":
+    case "slide-left":
+      return "bv-exit-slide-left";
+    case "slide-right":
+      return "bv-exit-slide-right";
+    case "slide-up":
+      return "bv-exit-slide-up";
+    case "slide-down":
+      return "bv-exit-slide-down";
+    case "zoom-in":
+      return "bv-exit-zoom-out-away";
+    case "zoom-out":
+      return "bv-exit-zoom-in-away";
+    case "fade":
+    default:
+      return "bv-exit-fade";
+  }
+}
+
 function TransitionStyles() {
   return (
     <style>{`
