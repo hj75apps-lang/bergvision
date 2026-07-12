@@ -1927,7 +1927,14 @@ function AppearanceFields({
   patch: (p: Record<string, unknown>) => void;
   disabled: boolean;
 }) {
-  const { borderRadiusPercent, mask, maskUrl } = getAppearanceConfig(c);
+  const {
+    borderRadiusPercent,
+    mask,
+    maskUrl,
+    borderWidthPercent,
+    borderColor,
+    borderStyle,
+  } = getAppearanceConfig(c);
   const isCustom = mask === "custom";
   const trimmedMaskUrl = maskUrl.trim();
   const isDataUrl = /^data:image\//i.test(trimmedMaskUrl);
@@ -1969,7 +1976,9 @@ function AppearanceFields({
         <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
           Aparência
         </span>
-        {(borderRadiusPercent > 0 || mask !== "none") && (
+        {(borderRadiusPercent > 0 ||
+          mask !== "none" ||
+          borderWidthPercent > 0) && (
           <Button
             type="button"
             variant="ghost"
@@ -1977,7 +1986,12 @@ function AppearanceFields({
             disabled={disabled}
             className="h-6 px-2 text-[10px]"
             onClick={() =>
-              patch({ borderRadiusPercent: 0, mask: "none", maskUrl: "" })
+              patch({
+                borderRadiusPercent: 0,
+                mask: "none",
+                maskUrl: "",
+                borderWidthPercent: 0,
+              })
             }
           >
             <RotateCcw className="mr-1 h-3 w-3" /> Redefinir
@@ -1998,6 +2012,51 @@ function AppearanceFields({
           onValueChange={(v) => patch({ borderRadiusPercent: v[0] })}
         />
       </label>
+
+      <div className="flex flex-col gap-2 rounded-md border border-border/40 bg-background/30 p-2">
+        <label className="flex flex-col gap-1">
+          <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+            Borda — espessura ({borderWidthPercent.toFixed(1)}%)
+          </span>
+          <Slider
+            value={[borderWidthPercent]}
+            min={0}
+            max={10}
+            step={0.1}
+            disabled={disabled}
+            onValueChange={(v) => patch({ borderWidthPercent: v[0] })}
+          />
+        </label>
+        {borderWidthPercent > 0 && (
+          <div className="grid grid-cols-2 gap-2">
+            <ColorField
+              label="Cor"
+              value={borderColor}
+              disabled={disabled}
+              onChange={(v) => patch({ borderColor: v })}
+            />
+            <label className="flex flex-col gap-1">
+              <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                Estilo
+              </span>
+              <Select
+                value={borderStyle}
+                onValueChange={(v) => patch({ borderStyle: v })}
+                disabled={disabled}
+              >
+                <SelectTrigger className="h-8 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="solid" className="text-xs">Sólida</SelectItem>
+                  <SelectItem value="dashed" className="text-xs">Tracejada</SelectItem>
+                  <SelectItem value="dotted" className="text-xs">Pontilhada</SelectItem>
+                </SelectContent>
+              </Select>
+            </label>
+          </div>
+        )}
+      </div>
 
       <label className="flex flex-col gap-1">
         <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
