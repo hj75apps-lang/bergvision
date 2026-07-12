@@ -134,7 +134,13 @@ export function PlaylistLocalPreview({
 
   // Guarda o item anterior por ~600ms para que a transição do novo item
   // aconteça POR CIMA do antigo (evita "tela preta" entre trocas).
-  const [prev, setPrev] = useState<{ item: Item; tick: number } | null>(null);
+  // Guarda também o tipo de transição que o novo item pediu, para animar a
+  // SAÍDA do prev de forma pareada com a ENTRADA do current (push real).
+  const [prev, setPrev] = useState<{
+    item: Item;
+    tick: number;
+    transition: string;
+  } | null>(null);
   const prevRef = useRef<{ item: Item; tick: number } | null>(null);
   const lastItemIdRef = useRef<string | null>(null);
 
@@ -145,11 +151,20 @@ export function PlaylistLocalPreview({
     // senão o overlay de prev era sobrescrito com o item novo e a transição
     // parecia um corte seco.
     if (lastItemIdRef.current && lastItemIdRef.current !== cur.id) {
-      setPrev(prevRef.current);
-      const t = window.setTimeout(() => setPrev(null), 650);
+      const incoming = (cur.transition ?? "fade").toLowerCase();
+      // Corte seco: nenhuma sobreposição.
+      if (incoming === "cut") {
+        setPrev(null);
+      } else if (prevRef.current) {
+        setPrev({ ...prevRef.current, transition: incoming });
+        const t = window.setTimeout(() => setPrev(null), 650);
+        lastItemIdRef.current = cur.id;
+        prevRef.current = { item: cur, tick };
+        return () => window.clearTimeout(t);
+      }
       lastItemIdRef.current = cur.id;
       prevRef.current = { item: cur, tick };
-      return () => window.clearTimeout(t);
+      return;
     }
     lastItemIdRef.current = cur.id;
     prevRef.current = { item: cur, tick };
