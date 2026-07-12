@@ -130,7 +130,27 @@ export function getAppearanceConfig(c: Record<string, unknown>) {
     typeof radiusRaw === "number" ? Math.max(0, Math.min(50, radiusRaw)) : 0;
   const maskId = (c.mask as string | undefined) ?? "none";
   const maskUrl = (c.maskUrl as string | undefined) ?? "";
-  return { borderRadiusPercent, mask: maskId as MaskPresetId, maskUrl };
+  const borderWidthRaw = c.borderWidthPercent;
+  const borderWidthPercent =
+    typeof borderWidthRaw === "number"
+      ? Math.max(0, Math.min(10, borderWidthRaw))
+      : 0;
+  const borderColor =
+    typeof c.borderColor === "string" && /^#([0-9a-fA-F]{3,8})$/.test(c.borderColor as string)
+      ? (c.borderColor as string)
+      : "#FFFFFF";
+  const borderStyleRaw = (c.borderStyle as string | undefined) ?? "solid";
+  const borderStyle = (["solid", "dashed", "dotted"].includes(borderStyleRaw)
+    ? borderStyleRaw
+    : "solid") as "solid" | "dashed" | "dotted";
+  return {
+    borderRadiusPercent,
+    mask: maskId as MaskPresetId,
+    maskUrl,
+    borderWidthPercent,
+    borderColor,
+    borderStyle,
+  };
 }
 
 /**
@@ -141,16 +161,31 @@ export function getAppearanceConfig(c: Record<string, unknown>) {
 export function getAppearanceStyle(
   c: Record<string, unknown>,
 ): React.CSSProperties {
-  const { borderRadiusPercent, mask, maskUrl } = getAppearanceConfig(c);
+  const {
+    borderRadiusPercent,
+    mask,
+    maskUrl,
+    borderWidthPercent,
+    borderColor,
+    borderStyle,
+  } = getAppearanceConfig(c);
   const style: React.CSSProperties = {};
 
-  if (borderRadiusPercent > 0) {
+  if (borderRadiusPercent > 0 || borderWidthPercent > 0) {
     // Usa unidades de container query (cqmin = 1% da menor dimensão do
     // container) para que o raio seja UNIFORME nos 4 cantos, independente
     // do aspect ratio. Requer container-type: size no wrapper.
     style.containerType = "size";
-    style.borderRadius = `${borderRadiusPercent}cqmin`;
-    style.overflow = "hidden";
+    if (borderRadiusPercent > 0) {
+      style.borderRadius = `${borderRadiusPercent}cqmin`;
+      style.overflow = "hidden";
+    }
+  }
+
+  if (borderWidthPercent > 0) {
+    // Espessura em cqmin mantém a borda proporcional em qualquer resolução.
+    style.border = `${borderWidthPercent}cqmin ${borderStyle} ${borderColor}`;
+    style.boxSizing = "border-box";
   }
 
   let cssMask: string | undefined;
@@ -181,8 +216,10 @@ export function getAppearanceStyle(
 
 /** True se o elemento tem alguma configuração visual de aparência aplicada. */
 export function hasAppearance(c: Record<string, unknown>): boolean {
-  const { borderRadiusPercent, mask, maskUrl } = getAppearanceConfig(c);
+  const { borderRadiusPercent, mask, maskUrl, borderWidthPercent } =
+    getAppearanceConfig(c);
   if (borderRadiusPercent > 0) return true;
+  if (borderWidthPercent > 0) return true;
   if (mask === "custom") return /^(https?:|data:image\/)/i.test(maskUrl.trim());
   return mask !== "none";
 }
