@@ -240,7 +240,8 @@ export function ElementBody({ el }: { el: TemplateElement }) {
       else inner = <PlaceholderBadge label="Widget" />;
       const hasAppearance =
         (appearance.borderRadius as string | undefined) !== undefined ||
-        (appearance.maskImage as string | undefined) !== undefined;
+        (appearance.maskImage as string | undefined) !== undefined ||
+        (appearance.border as string | undefined) !== undefined;
       if (!hasAppearance) return <>{inner}</>;
       return (
         <div
