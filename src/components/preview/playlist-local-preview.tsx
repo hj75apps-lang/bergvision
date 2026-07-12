@@ -134,7 +134,13 @@ export function PlaylistLocalPreview({
 
   // Guarda o item anterior por ~600ms para que a transição do novo item
   // aconteça POR CIMA do antigo (evita "tela preta" entre trocas).
-  const [prev, setPrev] = useState<{ item: Item; tick: number } | null>(null);
+  // Guarda também o tipo de transição que o novo item pediu, para animar a
+  // SAÍDA do prev de forma pareada com a ENTRADA do current (push real).
+  const [prev, setPrev] = useState<{
+    item: Item;
+    tick: number;
+    transition: string;
+  } | null>(null);
   const prevRef = useRef<{ item: Item; tick: number } | null>(null);
   const lastItemIdRef = useRef<string | null>(null);
 
@@ -145,11 +151,20 @@ export function PlaylistLocalPreview({
     // senão o overlay de prev era sobrescrito com o item novo e a transição
     // parecia um corte seco.
     if (lastItemIdRef.current && lastItemIdRef.current !== cur.id) {
-      setPrev(prevRef.current);
-      const t = window.setTimeout(() => setPrev(null), 650);
+      const incoming = (cur.transition ?? "fade").toLowerCase();
+      // Corte seco: nenhuma sobreposição.
+      if (incoming === "cut") {
+        setPrev(null);
+      } else if (prevRef.current) {
+        setPrev({ ...prevRef.current, transition: incoming });
+        const t = window.setTimeout(() => setPrev(null), 650);
+        lastItemIdRef.current = cur.id;
+        prevRef.current = { item: cur, tick };
+        return () => window.clearTimeout(t);
+      }
       lastItemIdRef.current = cur.id;
       prevRef.current = { item: cur, tick };
-      return () => window.clearTimeout(t);
+      return;
     }
     lastItemIdRef.current = cur.id;
     prevRef.current = { item: cur, tick };
@@ -259,7 +274,7 @@ export function PlaylistLocalPreview({
                 {prev && (
                   <div
                     key={`prev-${prev.item.id}-${prev.tick}`}
-                    className="absolute inset-0"
+                    className={cn("absolute inset-0", exitClass(prev.transition))}
                   >
                     <ItemStage
                       item={prev.item}
@@ -490,6 +505,32 @@ function transitionClass(t: string): string {
   }
 }
 
+// Animação de SAÍDA do item anterior — pareada com a entrada, para que a
+// transição seja "push real" (slide empurra, zoom cede, fade cruza) e não
+// haja duas mídias visíveis paradas ao mesmo tempo.
+function exitClass(t: string): string {
+  switch ((t ?? "").toLowerCase()) {
+    case "cut":
+      return "";
+    case "slide":
+    case "slide-left":
+      return "bv-exit-slide-left";
+    case "slide-right":
+      return "bv-exit-slide-right";
+    case "slide-up":
+      return "bv-exit-slide-up";
+    case "slide-down":
+      return "bv-exit-slide-down";
+    case "zoom-in":
+      return "bv-exit-zoom-out-away";
+    case "zoom-out":
+      return "bv-exit-zoom-in-away";
+    case "fade":
+    default:
+      return "bv-exit-fade";
+  }
+}
+
 function TransitionStyles() {
   return (
     <style>{`
@@ -507,8 +548,24 @@ function TransitionStyles() {
       .bv-anim-slide-down { animation: bv-slide-down 550ms cubic-bezier(.22,.61,.36,1) both; will-change: transform, opacity }
       .bv-anim-zoom-in { animation: bv-zoom-in 550ms ease-out both; will-change: transform, opacity }
       .bv-anim-zoom-out { animation: bv-zoom-out 550ms ease-out both; will-change: transform, opacity }
+      /* Saída pareada — para o item que está sendo trocado */
+      @keyframes bv-fade-out { from { opacity: 1 } to { opacity: 0 } }
+      @keyframes bv-exit-left { from { transform: translateX(0) } to { transform: translateX(-100%) } }
+      @keyframes bv-exit-right { from { transform: translateX(0) } to { transform: translateX(100%) } }
+      @keyframes bv-exit-up { from { transform: translateY(0) } to { transform: translateY(-100%) } }
+      @keyframes bv-exit-down { from { transform: translateY(0) } to { transform: translateY(100%) } }
+      @keyframes bv-exit-scale-down { from { transform: scale(1); opacity: 1 } to { transform: scale(0.85); opacity: 0 } }
+      @keyframes bv-exit-scale-up { from { transform: scale(1); opacity: 1 } to { transform: scale(1.15); opacity: 0 } }
+      .bv-exit-fade { animation: bv-fade-out 500ms ease-in both; will-change: opacity }
+      .bv-exit-slide-left { animation: bv-exit-left 550ms cubic-bezier(.22,.61,.36,1) both; will-change: transform }
+      .bv-exit-slide-right { animation: bv-exit-right 550ms cubic-bezier(.22,.61,.36,1) both; will-change: transform }
+      .bv-exit-slide-up { animation: bv-exit-up 550ms cubic-bezier(.22,.61,.36,1) both; will-change: transform }
+      .bv-exit-slide-down { animation: bv-exit-down 550ms cubic-bezier(.22,.61,.36,1) both; will-change: transform }
+      .bv-exit-zoom-out-away { animation: bv-exit-scale-down 550ms ease-in both; will-change: transform, opacity }
+      .bv-exit-zoom-in-away { animation: bv-exit-scale-up 550ms ease-in both; will-change: transform, opacity }
       @media (prefers-reduced-motion: reduce) {
         .bv-anim-fade, .bv-anim-slide-left, .bv-anim-slide-right, .bv-anim-slide-up, .bv-anim-slide-down, .bv-anim-zoom-in, .bv-anim-zoom-out { animation: none !important }
+        .bv-exit-fade, .bv-exit-slide-left, .bv-exit-slide-right, .bv-exit-slide-up, .bv-exit-slide-down, .bv-exit-zoom-out-away, .bv-exit-zoom-in-away { animation: none !important }
       }
     `}</style>
   );
