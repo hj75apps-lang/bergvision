@@ -274,7 +274,7 @@ export function PlaylistLocalPreview({
                 {prev && (
                   <div
                     key={`prev-${prev.item.id}-${prev.tick}`}
-                    className="absolute inset-0"
+                    className={cn("absolute inset-0", exitClass(prev.transition))}
                   >
                     <ItemStage
                       item={prev.item}
