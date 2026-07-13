@@ -947,96 +947,14 @@ function EditorPage() {
         </div>
       </div>
 
-      {/* Toolbar */}
-      <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-border/60 bg-card/60 p-2 backdrop-blur">
-        <span className="px-2 text-xs uppercase tracking-wider text-muted-foreground">
-          Adicionar
-        </span>
-        <Separator orientation="vertical" className="h-6" />
-        {(() => {
-          const isImageSubtype = (t: ToolDef) =>
-            t.type === "image" &&
-            typeof (t.defaultContent as Record<string, unknown>).imageSubtype === "string";
-          const imageMainIdx = TOOLS.findIndex(
-            (t) => t.type === "image" && !isImageSubtype(t),
-          );
-          const imageMain = imageMainIdx >= 0 ? TOOLS[imageMainIdx] : null;
-          const imageSubtypes = TOOLS.filter(isImageSubtype);
-          return TOOLS.map((tool, idx) => {
-            if (isImageSubtype(tool)) return null;
-            if (tool === imageMain) {
-              return (
-                <div
-                  key={`tool-${idx}`}
-                  className="inline-flex items-center rounded-lg"
-                >
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="rounded-l-lg rounded-r-none pr-2"
-                    disabled={!canEdit || addElement.isPending}
-                    onClick={() => addElement.mutate(tool)}
-                  >
-                    <tool.icon className="mr-1.5 h-4 w-4" />
-                    {tool.label}
-                  </Button>
-                  {imageSubtypes.length > 0 && (
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="rounded-l-none rounded-r-lg border-l border-border/60 px-1.5"
-                          disabled={!canEdit || addElement.isPending}
-                          title="Mais formatos de imagem"
-                        >
-                          <ChevronDown className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="start" className="w-56">
-                        <DropdownMenuLabel>Formatos animados</DropdownMenuLabel>
-                        <DropdownMenuSeparator />
-                        {imageSubtypes.map((t, i) => (
-                          <DropdownMenuItem
-                            key={`sub-${i}`}
-                            disabled={!canEdit || addElement.isPending}
-                            onSelect={() => addElement.mutate(t)}
-                          >
-                            <t.icon className="mr-2 h-4 w-4" />
-                            {t.label}
-                          </DropdownMenuItem>
-                        ))}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  )}
-                </div>
-              );
-            }
-            return (
-              <Button
-                key={`tool-${idx}`}
-                variant="ghost"
-                size="sm"
-                className="rounded-lg"
-                disabled={!canEdit || addElement.isPending}
-                onClick={() => addElement.mutate(tool)}
-              >
-                <tool.icon className="mr-1.5 h-4 w-4" />
-                {tool.label}
-              </Button>
-            );
-          });
-        })()}
-      </div>
-
       {/* Main workspace */}
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-[240px_1fr_280px]">
         {/* Layers */}
         <aside className="hidden overflow-hidden rounded-2xl border border-border/60 bg-card/40 backdrop-blur lg:flex lg:flex-col lg:h-[72vh]">
-          <Tabs defaultValue="layers" className="flex h-full flex-col">
+          <Tabs defaultValue="components" className="flex h-full flex-col">
             <TabsList className="mx-2 mt-2 grid w-auto grid-cols-2">
-              <TabsTrigger value="layers" className="text-xs">Camadas</TabsTrigger>
               <TabsTrigger value="components" className="text-xs">Componentes</TabsTrigger>
+              <TabsTrigger value="layers" className="text-xs">Camadas</TabsTrigger>
             </TabsList>
             <TabsContent value="layers" className="mt-0 flex-1 overflow-hidden data-[state=inactive]:hidden">
               <LayersPanel
