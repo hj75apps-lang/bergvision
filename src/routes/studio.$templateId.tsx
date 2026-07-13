@@ -92,6 +92,11 @@ import {
 import { TemplateSettingsDialog } from "@/components/studio/template-settings-dialog";
 import { ImageEditorDialog } from "@/components/studio/image-editor/image-editor-dialog";
 import { PreviewPanel } from "@/components/preview/preview-panel";
+import {
+  ComponentsPanel,
+  type LibraryItem,
+} from "@/components/studio/components-panel";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useStudioDraftPayload } from "@/lib/studio/use-draft-payload";
 import { slugify } from "@/lib/template-utils";
 
@@ -1160,7 +1165,13 @@ function EditorPage() {
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-[240px_1fr_280px]">
         {/* Layers */}
         <aside className="hidden overflow-hidden rounded-2xl border border-border/60 bg-card/40 backdrop-blur lg:flex lg:flex-col lg:h-[72vh]">
-          <LayersPanel
+          <Tabs defaultValue="layers" className="flex h-full flex-col">
+            <TabsList className="mx-2 mt-2 grid w-auto grid-cols-2">
+              <TabsTrigger value="layers" className="text-xs">Camadas</TabsTrigger>
+              <TabsTrigger value="components" className="text-xs">Componentes</TabsTrigger>
+            </TabsList>
+            <TabsContent value="layers" className="mt-0 flex-1 overflow-hidden data-[state=inactive]:hidden">
+              <LayersPanel
             elements={elements}
             selectedIds={selectedIds}
             disabled={!canEdit}
@@ -1344,7 +1355,15 @@ function EditorPage() {
               if (ids.length === 0) return;
               void deleteElements(ids);
             }}
-          />
+              />
+            </TabsContent>
+            <TabsContent value="components" className="mt-0 flex-1 overflow-hidden data-[state=inactive]:hidden">
+              <ComponentsPanel
+                disabled={!canEdit || addElement.isPending}
+                onAdd={(item: LibraryItem) => addElement.mutate(item)}
+              />
+            </TabsContent>
+          </Tabs>
         </aside>
 
         {/* Canvas stage */}
