@@ -106,7 +106,7 @@ export const Route = createFileRoute("/playlists")({
   component: PlaylistsPage,
 });
 
-type Playlist = {
+export type Playlist = {
   id: string;
   organization_id: string;
   name: string;
@@ -381,7 +381,7 @@ function PlaylistsPage() {
   );
 }
 
-function PlaylistEditor({
+export function PlaylistEditor({
   playlist,
   open,
   canManage,
