@@ -779,6 +779,27 @@ function CampanhasPage() {
             </Card>
           )}
 
+          <Tabs
+            value={view}
+            onValueChange={(v) => setView(v as typeof view)}
+            className="space-y-4"
+          >
+            <TabsList className="rounded-xl">
+              <TabsTrigger value="programadas" className="gap-1.5">
+                <ListChecks className="h-3.5 w-3.5" /> Programadas
+              </TabsTrigger>
+              <TabsTrigger value="timeline" className="gap-1.5">
+                <GanttChartSquare className="h-3.5 w-3.5" /> Linha do tempo
+              </TabsTrigger>
+              <TabsTrigger value="calendario" className="gap-1.5">
+                <CalendarDays className="h-3.5 w-3.5" /> Calendário
+              </TabsTrigger>
+              <TabsTrigger value="historico" className="gap-1.5">
+                <History className="h-3.5 w-3.5" /> Histórico
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="programadas" className="mt-0">
           <Card className="rounded-2xl border-border/60 bg-card/60 backdrop-blur-xl">
             <CardHeader className="pb-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
@@ -976,6 +997,32 @@ function CampanhasPage() {
               )}
             </CardContent>
           </Card>
+            </TabsContent>
+
+            <TabsContent value="timeline" className="mt-0">
+              <TimelineView
+                campaigns={campaigns}
+                range={timelineRange}
+                onSelect={(c) => setEditing(c)}
+              />
+            </TabsContent>
+
+            <TabsContent value="calendario" className="mt-0">
+              <CalendarView
+                campaigns={campaigns}
+                cursor={cursor}
+                onCursorChange={setCursor}
+                onSelect={(c) => setEditing(c)}
+              />
+            </TabsContent>
+
+            <TabsContent value="historico" className="mt-0">
+              <HistoryView
+                campaigns={campaigns}
+                onSelect={(c) => setEditing(c)}
+              />
+            </TabsContent>
+          </Tabs>
         </>
       )}
 
