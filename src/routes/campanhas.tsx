@@ -477,6 +477,194 @@ function CampanhasPage() {
     return campaigns.filter((c) => statusOf(c) === tab);
   }, [campaigns, tab]);
 
+  const [view, setView] = useState<
+    "programadas" | "timeline" | "calendario" | "historico"
+  >("programadas");
+  const [cursor, setCursor] = useState<Date>(() => startOfMonth(today()));
+
+  const timelineRange = useMemo(() => {
+    const dates: Date[] = [];
+    for (const c of campaigns) {
+      const s = parseDate(c.schedule_date_start);
+      const e = parseDate(c.schedule_date_end);
+      if (s) dates.push(s);
+      if (e) dates.push(e);
+    }
+    if (dates.length === 0) {
+      const s = today();
+      return { start: s, end: addDays(s, 30) };
+    }
+    return { start: dfMin(dates), end: dfMax(dates) };
+  }, [campaigns]);
+
+  function exportReport(
+    scope: "programadas" | "timeline" | "calendario" | "historico" | "alertas",
+    fmtKind: "csv" | "json" | "html",
+  ) {
+    const stamp = format(new Date(), "yyyyMMdd-HHmm");
+    const filename = `campanhas-${scope}-${stamp}.${fmtKind}`;
+
+    const rows = campaigns.map((c) => {
+      const s = statusOf(c);
+      const start = parseDate(c.schedule_date_start);
+      const end = parseDate(c.schedule_date_end);
+      const players =
+        playersByCampaign.get(c.id)?.size ??
+        (c.players_count?.[0]?.count ?? 0);
+      const items = c.items_count?.[0]?.count ?? 0;
+      return {
+        nome: c.name,
+        status: statusMeta(s).label,
+        ativa: c.is_active ? "Sim" : "Não",
+        inicio: c.schedule_date_start ?? "",
+        fim: c.schedule_date_end ?? "",
+        janela_inicio: c.schedule_start ?? "",
+        janela_fim: c.schedule_end ?? "",
+        itens: items,
+        players,
+        criada_em: c.created_at ?? "",
+        dias_restantes: end ? differenceInCalendarDays(end, today()) : "",
+        _start: start,
+        _end: end,
+      };
+    });
+
+    let dataset: Record<string, unknown>[] = [];
+    let title = "";
+
+    if (scope === "programadas") {
+      title = "Campanhas programadas";
+      dataset = rows.map(({ _start, _end, ...r }) => {
+        void _start;
+        void _end;
+        return r;
+      });
+    } else if (scope === "timeline") {
+      title = "Linha do tempo das campanhas";
+      dataset = rows
+        .filter((r) => r._start || r._end)
+        .sort((a, b) => {
+          const av = a._start?.getTime() ?? Infinity;
+          const bv = b._start?.getTime() ?? Infinity;
+          return av - bv;
+        })
+        .map(({ _start, _end, ...r }) => {
+          void _start;
+          void _end;
+          return r;
+        });
+    } else if (scope === "calendario") {
+      title = `Calendário — ${format(cursor, "MMMM yyyy", { locale: ptBR })}`;
+      const start = startOfMonth(cursor);
+      const end = endOfMonth(cursor);
+      dataset = eachDayOfInterval({ start, end }).flatMap((d) => {
+        const day = format(d, "yyyy-MM-dd");
+        const inDay = rows.filter(
+          (r) =>
+            r._start &&
+            r._end &&
+            d >= r._start &&
+            d <= r._end &&
+            r.ativa === "Sim",
+        );
+        if (inDay.length === 0) return [];
+        return inDay.map((r) => ({
+          data: day,
+          campanha: r.nome,
+          status: r.status,
+          players: r.players,
+          itens: r.itens,
+        }));
+      });
+    } else if (scope === "historico") {
+      title = "Histórico de campanhas";
+      dataset = [...rows]
+        .sort((a, b) => (b.criada_em || "").localeCompare(a.criada_em || ""))
+        .map(({ _start, _end, ...r }) => {
+          void _start;
+          void _end;
+          return r;
+        });
+    } else if (scope === "alertas") {
+      title = "Alertas de campanhas";
+      dataset = alerts.map((a) => ({
+        campanha: a.campaignName,
+        severidade:
+          a.severity === "error"
+            ? "Erro"
+            : a.severity === "warn"
+              ? "Aviso"
+              : "Info",
+        mensagem: a.message,
+      }));
+    }
+
+    const download = (content: string, mime: string) => {
+      const blob = new Blob([content], { type: `${mime};charset=utf-8` });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    };
+
+    if (fmtKind === "json") {
+      download(
+        JSON.stringify(
+          { titulo: title, geradoEm: new Date().toISOString(), dados: dataset },
+          null,
+          2,
+        ),
+        "application/json",
+      );
+    } else if (fmtKind === "csv") {
+      if (dataset.length === 0) {
+        download("\uFEFFsem dados\r\n", "text/csv");
+      } else {
+        const headers = Object.keys(dataset[0]);
+        const esc = (v: unknown) => {
+          const s = v == null ? "" : String(v);
+          return /[",;\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+        };
+        const lines = [headers.join(";")];
+        for (const row of dataset) {
+          lines.push(headers.map((h) => esc(row[h])).join(";"));
+        }
+        download("\uFEFF" + lines.join("\r\n"), "text/csv");
+      }
+    } else {
+      const escHtml = (s: string) =>
+        s
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;");
+      const headers = dataset.length ? Object.keys(dataset[0]) : [];
+      const body = dataset
+        .map(
+          (r) =>
+            "<tr>" +
+            headers.map((h) => `<td>${escHtml(String(r[h] ?? ""))}</td>`).join("") +
+            "</tr>",
+        )
+        .join("");
+      const html = `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>${escHtml(
+        title,
+      )}</title><style>body{font-family:-apple-system,Segoe UI,Inter,Roboto,sans-serif;padding:24px;color:#0f172a}h1{font-size:20px;margin:0 0 4px}p{color:#64748b;font-size:12px;margin:0 0 16px}table{border-collapse:collapse;width:100%;font-size:13px}th,td{border-bottom:1px solid #e2e8f0;padding:8px 10px;text-align:left}th{background:#f1f5f9;text-transform:uppercase;font-size:11px;letter-spacing:.06em;color:#475569}@media print{body{padding:12px}}</style></head><body><h1>${escHtml(
+        title,
+      )}</h1><p>Gerado em ${escHtml(
+        new Date().toLocaleString("pt-BR"),
+      )} · ${dataset.length} registro(s)</p><table><thead><tr>${headers
+        .map((h) => `<th>${escHtml(h)}</th>`)
+        .join("")}</tr></thead><tbody>${body}</tbody></table></body></html>`;
+      download(html, "text/html");
+    }
+    toast.success("Relatório exportado.");
+  }
+
   return (
     <div className="mx-auto max-w-7xl space-y-6">
       <header className="flex flex-wrap items-end justify-between gap-3">
@@ -486,20 +674,23 @@ function CampanhasPage() {
             Programe, publique e acompanhe suas campanhas nos players.
           </p>
         </div>
-        {canManage && (
-          <Button
-            onClick={() => create.mutate()}
-            disabled={create.isPending}
-            className="h-10 rounded-xl"
-          >
-            {create.isPending ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              <Plus className="mr-2 h-4 w-4" />
-            )}
-            Nova Campanha
-          </Button>
-        )}
+        <div className="flex items-center gap-2">
+          <ExportMenu onExport={exportReport} />
+          {canManage && (
+            <Button
+              onClick={() => create.mutate()}
+              disabled={create.isPending}
+              className="h-10 rounded-xl"
+            >
+              {create.isPending ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Plus className="mr-2 h-4 w-4" />
+              )}
+              Nova Campanha
+            </Button>
+          )}
+        </div>
       </header>
 
       {campaignsQ.isLoading ? (
