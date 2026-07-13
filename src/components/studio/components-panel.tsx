@@ -433,10 +433,10 @@ export function ComponentsPanel({
           )}
           {filtered.map((cat) => (
             <div key={cat.title}>
-              <div className="mb-2 px-1 text-[11px] uppercase tracking-wide text-muted-foreground">
+              <div className="mb-2 px-1 text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground/80">
                 {cat.title}
               </div>
-              <div className="grid grid-cols-2 gap-1.5">
+              <div className="grid grid-cols-2 gap-2">
                 {cat.items.map((item) => {
                   const btn = (
                     <Button
@@ -445,12 +445,14 @@ export function ComponentsPanel({
                       disabled={disabled || item.disabled}
                       onClick={() => !item.disabled && onAdd(item)}
                       className={cn(
-                        "h-auto flex-col gap-1 py-2 px-1 text-[11px] font-normal",
-                        "hover:bg-accent",
+                        "group relative flex aspect-square h-auto w-full flex-col items-center justify-center gap-1.5 rounded-xl border-border/60 bg-card/40 p-2 text-[11px] font-medium text-foreground/90 shadow-sm backdrop-blur-sm transition-all",
+                        "hover:-translate-y-0.5 hover:border-primary/40 hover:bg-accent/60 hover:text-foreground hover:shadow-md",
+                        "focus-visible:ring-1 focus-visible:ring-primary/50",
+                        "disabled:opacity-40 disabled:hover:translate-y-0 disabled:hover:shadow-sm",
                       )}
                     >
-                      <item.icon className="h-4 w-4" />
-                      <span className="truncate">{item.label}</span>
+                      <item.icon className="h-5 w-5 shrink-0 text-muted-foreground transition-colors group-hover:text-primary" strokeWidth={1.75} />
+                      <span className="w-full truncate text-center leading-none">{item.label}</span>
                     </Button>
                   );
                   if (item.disabled && item.disabledHint) {
