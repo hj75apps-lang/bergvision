@@ -30,6 +30,16 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -96,6 +106,7 @@ export function LayoutEditorDialog({
 
   const [zones, setZones] = useState<Zone[]>(() => initialZones.map((z) => ({ ...z })));
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [confirmDiscardOpen, setConfirmDiscardOpen] = useState(false);
 
   // Undo/redo history — snapshots of zones only (metadata is edited via inputs
   // and doesn't need to participate in the drag/resize history).
@@ -268,7 +279,8 @@ export function LayoutEditorDialog({
 
   const attemptClose = (v: boolean) => {
     if (!v && dirtyRef.current) {
-      if (!window.confirm("Descartar alterações não salvas?")) return;
+      setConfirmDiscardOpen(true);
+      return;
     }
     onOpenChange(v);
   };
@@ -531,6 +543,29 @@ export function LayoutEditorDialog({
           </Button>
         </DialogFooter>
       </DialogContent>
+      <AlertDialog open={confirmDiscardOpen} onOpenChange={setConfirmDiscardOpen}>
+        <AlertDialogContent className="rounded-2xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Descartar alterações?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Há alterações não salvas no layout. Se sair agora, elas serão perdidas.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="rounded-xl">Continuar editando</AlertDialogCancel>
+            <AlertDialogAction
+              className="rounded-xl"
+              onClick={() => {
+                dirtyRef.current = false;
+                setConfirmDiscardOpen(false);
+                onOpenChange(false);
+              }}
+            >
+              Descartar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Dialog>
   );
 }
