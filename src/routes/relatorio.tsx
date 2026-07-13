@@ -248,16 +248,71 @@ function ReportPage() {
   const nowMs = Date.now();
   const today = new Date();
 
-  const players = playersQ.data ?? [];
-  const media = mediaQ.data ?? [];
-  const templates = templatesQ.data ?? [];
-  const playlists = playlistsQ.data ?? [];
+  const rawPlayers = playersQ.data ?? [];
+  const rawMedia = mediaQ.data ?? [];
+  const rawTemplates = templatesQ.data ?? [];
+  const rawPlaylists = playlistsQ.data ?? [];
+
+  // ---- Filtros ----
+  type PeriodKey = "7d" | "30d" | "90d" | "ytd" | "all";
+  const [period, setPeriod] = useState<PeriodKey>("30d");
+  const [playerId, setPlayerId] = useState<string>("all");
+  const [playlistId, setPlaylistId] = useState<string>("all");
+
+  const periodStartMs = useMemo(() => {
+    if (period === "all") return null;
+    if (period === "ytd") return new Date(today.getFullYear(), 0, 1).getTime();
+    const days = period === "7d" ? 7 : period === "90d" ? 90 : 30;
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    d.setDate(d.getDate() - (days - 1));
+    return d.getTime();
+  }, [period, today]);
+
+  const inPeriod = (iso: string | null): boolean => {
+    if (periodStartMs == null) return true;
+    if (!iso) return false;
+    const t = new Date(iso).getTime();
+    return !Number.isNaN(t) && t >= periodStartMs;
+  };
+
+  const chartDays = period === "7d" ? 7 : period === "90d" ? 90 : period === "ytd"
+    ? Math.max(1, Math.ceil((today.getTime() - periodStartMs!) / 86_400_000))
+    : 30;
+
+  const players = useMemo(
+    () => (playerId === "all" ? rawPlayers : rawPlayers.filter((p) => p.id === playerId)),
+    [rawPlayers, playerId],
+  );
+  const media = useMemo(
+    () => rawMedia.filter((m) => inPeriod(m.created_at)),
+    [rawMedia, periodStartMs],
+  );
+  const templates = useMemo(
+    () => rawTemplates.filter((t) => inPeriod(t.created_at)),
+    [rawTemplates, periodStartMs],
+  );
+  const playlists = useMemo(() => {
+    let arr = rawPlaylists.filter((pl) => inPeriod(pl.created_at));
+    if (playlistId !== "all") arr = arr.filter((pl) => pl.id === playlistId);
+    return arr;
+  }, [rawPlaylists, periodStartMs, playlistId]);
+
+  const activeFilterCount =
+    (period !== "30d" ? 1 : 0) + (playerId !== "all" ? 1 : 0) + (playlistId !== "all" ? 1 : 0);
+  const resetFilters = () => {
+    setPeriod("30d");
+    setPlayerId("all");
+    setPlaylistId("all");
+  };
 
   const templateNameById = useMemo(() => {
     const map = new Map<string, string>();
-    templates.forEach((t) => map.set(t.id, t.name));
+    // Always use the full template list so player rows can resolve names even
+    // when a period filter would otherwise hide older templates.
+    rawTemplates.forEach((t) => map.set(t.id, t.name));
     return map;
-  }, [templates]);
+  }, [rawTemplates]);
 
   const onlinePlayers = useMemo(
     () => players.filter((p) => isOnline(p, nowMs)).length,
@@ -319,7 +374,8 @@ function ReportPage() {
   const createdLast30Days = useMemo(() => {
     const days: { date: string; label: string; midias: number; playlists: number }[] = [];
     const now = new Date();
-    for (let i = 29; i >= 0; i--) {
+    const N = Math.min(Math.max(1, chartDays), 180);
+    for (let i = N - 1; i >= 0; i--) {
       const d = new Date(now);
       d.setDate(now.getDate() - i);
       d.setHours(0, 0, 0, 0);
@@ -345,7 +401,7 @@ function ReportPage() {
       if (row) row.playlists += 1;
     });
     return days;
-  }, [media, playlists]);
+  }, [media, playlists, chartDays]);
 
   const buildSnapshot = (): ReportSnapshot => ({
     generatedAt: new Date(),
