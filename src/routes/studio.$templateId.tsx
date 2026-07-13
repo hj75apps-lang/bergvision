@@ -134,141 +134,9 @@ export const Route = createFileRoute("/studio/$templateId")({
 
 type ToolDef = {
   type: ElementType;
-  label: string;
-  icon: typeof TypeIcon;
   defaultContent: Record<string, unknown>;
   defaultSize: { width: number; height: number };
 };
-
-const TOOLS: ToolDef[] = [
-  {
-    type: "text",
-    label: "Texto",
-    icon: TypeIcon,
-    defaultContent: {
-      element_type: "text",
-      content: "Texto",
-      fontFamily: "Inter",
-      fontSizePercent: 6,
-      fontWeight: "500",
-      color: "#FFFFFF",
-      textAlign: "left",
-    },
-    defaultSize: { width: 30, height: 10 },
-  },
-  {
-    type: "image",
-    label: "Imagem",
-    icon: ImageIcon,
-    defaultContent: { element_type: "image", fit: "cover" },
-    defaultSize: { width: 30, height: 30 },
-  },
-  {
-    type: "image",
-    label: "GIF",
-    icon: Film,
-    defaultContent: {
-      element_type: "image",
-      imageSubtype: "gif",
-      fit: "contain",
-      name: "GIF animado",
-    },
-    defaultSize: { width: 25, height: 25 },
-  },
-  {
-    type: "image",
-    label: "APNG",
-    icon: FileImage,
-    defaultContent: {
-      element_type: "image",
-      imageSubtype: "apng",
-      fit: "contain",
-      name: "APNG animado",
-    },
-    defaultSize: { width: 25, height: 25 },
-  },
-  {
-    type: "image",
-    label: "Sequência",
-    icon: Images,
-    defaultContent: {
-      element_type: "image",
-      imageSubtype: "sequence",
-      fit: "contain",
-      fps: 12,
-      loop: true,
-      frames: [],
-      name: "Sequência de imagens",
-    },
-    defaultSize: { width: 30, height: 30 },
-  },
-  {
-    type: "video",
-    label: "Vídeo",
-    icon: VideoIcon,
-    defaultContent: {
-      element_type: "video",
-      fit: "cover",
-      loop: true,
-      muted: true,
-    },
-    defaultSize: { width: 40, height: 30 },
-  },
-  {
-    type: "logo",
-    label: "Logo",
-    icon: Sparkles,
-    defaultContent: { element_type: "logo", fit: "contain" },
-    defaultSize: { width: 20, height: 10 },
-  },
-  {
-    type: "playlist",
-    label: "Playlist",
-    icon: ListMusic,
-    defaultContent: { element_type: "playlist" },
-    defaultSize: { width: 40, height: 40 },
-  },
-  {
-    type: "playlist",
-    label: "Grupo",
-    icon: Layers,
-    defaultContent: {
-      element_type: "playlist",
-      source: "inline",
-      items: [],
-      loop: true,
-      transition: "fade",
-      defaultDuration: 8,
-      fit: "cover",
-      name: "Grupo de mídias",
-    },
-    defaultSize: { width: 40, height: 40 },
-  },
-  {
-    type: "widget",
-    label: "Widget",
-    icon: Shapes,
-    defaultContent: {
-      element_type: "widget",
-      widgetType: "clock",
-      widgetConfig: { format: "24h", timezone: "America/Sao_Paulo" },
-    },
-    defaultSize: { width: 25, height: 15 },
-  },
-  {
-    type: "shape",
-    label: "Forma",
-    icon: Square,
-    defaultContent: {
-      element_type: "shape",
-      shapeType: "rectangle",
-      fill: "#3B82F6",
-      borderRadius: 8,
-      borderWidth: 0,
-    },
-    defaultSize: { width: 20, height: 20 },
-  },
-];
 
 function EditorPage() {
   const { templateId } = Route.useParams();
@@ -1079,96 +947,14 @@ function EditorPage() {
         </div>
       </div>
 
-      {/* Toolbar */}
-      <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-border/60 bg-card/60 p-2 backdrop-blur">
-        <span className="px-2 text-xs uppercase tracking-wider text-muted-foreground">
-          Adicionar
-        </span>
-        <Separator orientation="vertical" className="h-6" />
-        {(() => {
-          const isImageSubtype = (t: ToolDef) =>
-            t.type === "image" &&
-            typeof (t.defaultContent as Record<string, unknown>).imageSubtype === "string";
-          const imageMainIdx = TOOLS.findIndex(
-            (t) => t.type === "image" && !isImageSubtype(t),
-          );
-          const imageMain = imageMainIdx >= 0 ? TOOLS[imageMainIdx] : null;
-          const imageSubtypes = TOOLS.filter(isImageSubtype);
-          return TOOLS.map((tool, idx) => {
-            if (isImageSubtype(tool)) return null;
-            if (tool === imageMain) {
-              return (
-                <div
-                  key={`tool-${idx}`}
-                  className="inline-flex items-center rounded-lg"
-                >
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="rounded-l-lg rounded-r-none pr-2"
-                    disabled={!canEdit || addElement.isPending}
-                    onClick={() => addElement.mutate(tool)}
-                  >
-                    <tool.icon className="mr-1.5 h-4 w-4" />
-                    {tool.label}
-                  </Button>
-                  {imageSubtypes.length > 0 && (
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="rounded-l-none rounded-r-lg border-l border-border/60 px-1.5"
-                          disabled={!canEdit || addElement.isPending}
-                          title="Mais formatos de imagem"
-                        >
-                          <ChevronDown className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="start" className="w-56">
-                        <DropdownMenuLabel>Formatos animados</DropdownMenuLabel>
-                        <DropdownMenuSeparator />
-                        {imageSubtypes.map((t, i) => (
-                          <DropdownMenuItem
-                            key={`sub-${i}`}
-                            disabled={!canEdit || addElement.isPending}
-                            onSelect={() => addElement.mutate(t)}
-                          >
-                            <t.icon className="mr-2 h-4 w-4" />
-                            {t.label}
-                          </DropdownMenuItem>
-                        ))}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  )}
-                </div>
-              );
-            }
-            return (
-              <Button
-                key={`tool-${idx}`}
-                variant="ghost"
-                size="sm"
-                className="rounded-lg"
-                disabled={!canEdit || addElement.isPending}
-                onClick={() => addElement.mutate(tool)}
-              >
-                <tool.icon className="mr-1.5 h-4 w-4" />
-                {tool.label}
-              </Button>
-            );
-          });
-        })()}
-      </div>
-
       {/* Main workspace */}
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-[240px_1fr_280px]">
         {/* Layers */}
         <aside className="hidden overflow-hidden rounded-2xl border border-border/60 bg-card/40 backdrop-blur lg:flex lg:flex-col lg:h-[72vh]">
-          <Tabs defaultValue="layers" className="flex h-full flex-col">
+          <Tabs defaultValue="components" className="flex h-full flex-col">
             <TabsList className="mx-2 mt-2 grid w-auto grid-cols-2">
-              <TabsTrigger value="layers" className="text-xs">Camadas</TabsTrigger>
               <TabsTrigger value="components" className="text-xs">Componentes</TabsTrigger>
+              <TabsTrigger value="layers" className="text-xs">Camadas</TabsTrigger>
             </TabsList>
             <TabsContent value="layers" className="mt-0 flex-1 overflow-hidden data-[state=inactive]:hidden">
               <LayersPanel
