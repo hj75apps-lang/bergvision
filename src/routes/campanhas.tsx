@@ -1,7 +1,20 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { format, differenceInCalendarDays, addDays } from "date-fns";
+import {
+  format,
+  differenceInCalendarDays,
+  addDays,
+  startOfMonth,
+  endOfMonth,
+  eachDayOfInterval,
+  addMonths,
+  subMonths,
+  isSameMonth,
+  isSameDay,
+  min as dfMin,
+  max as dfMax,
+} from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
   Megaphone,
@@ -17,6 +30,13 @@ import {
   CircleDot,
   CalendarX2,
   Layers,
+  ChevronLeft,
+  ChevronRight,
+  Download,
+  CalendarDays,
+  History,
+  ListChecks,
+  GanttChartSquare,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -43,6 +63,20 @@ import {
   TabsList,
   TabsTrigger,
 } from "@/components/ui/tabs";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSub,
+  DropdownMenuSubTrigger,
+  DropdownMenuSubContent,
+  DropdownMenuPortal,
+} from "@/components/ui/dropdown-menu";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -443,6 +477,194 @@ function CampanhasPage() {
     return campaigns.filter((c) => statusOf(c) === tab);
   }, [campaigns, tab]);
 
+  const [view, setView] = useState<
+    "programadas" | "timeline" | "calendario" | "historico"
+  >("programadas");
+  const [cursor, setCursor] = useState<Date>(() => startOfMonth(today()));
+
+  const timelineRange = useMemo(() => {
+    const dates: Date[] = [];
+    for (const c of campaigns) {
+      const s = parseDate(c.schedule_date_start);
+      const e = parseDate(c.schedule_date_end);
+      if (s) dates.push(s);
+      if (e) dates.push(e);
+    }
+    if (dates.length === 0) {
+      const s = today();
+      return { start: s, end: addDays(s, 30) };
+    }
+    return { start: dfMin(dates), end: dfMax(dates) };
+  }, [campaigns]);
+
+  function exportReport(
+    scope: "programadas" | "timeline" | "calendario" | "historico" | "alertas",
+    fmtKind: "csv" | "json" | "html",
+  ) {
+    const stamp = format(new Date(), "yyyyMMdd-HHmm");
+    const filename = `campanhas-${scope}-${stamp}.${fmtKind}`;
+
+    const rows = campaigns.map((c) => {
+      const s = statusOf(c);
+      const start = parseDate(c.schedule_date_start);
+      const end = parseDate(c.schedule_date_end);
+      const players =
+        playersByCampaign.get(c.id)?.size ??
+        (c.players_count?.[0]?.count ?? 0);
+      const items = c.items_count?.[0]?.count ?? 0;
+      return {
+        nome: c.name,
+        status: statusMeta(s).label,
+        ativa: c.is_active ? "Sim" : "Não",
+        inicio: c.schedule_date_start ?? "",
+        fim: c.schedule_date_end ?? "",
+        janela_inicio: c.schedule_start ?? "",
+        janela_fim: c.schedule_end ?? "",
+        itens: items,
+        players,
+        criada_em: c.created_at ?? "",
+        dias_restantes: end ? differenceInCalendarDays(end, today()) : "",
+        _start: start,
+        _end: end,
+      };
+    });
+
+    let dataset: Record<string, unknown>[] = [];
+    let title = "";
+
+    if (scope === "programadas") {
+      title = "Campanhas programadas";
+      dataset = rows.map(({ _start, _end, ...r }) => {
+        void _start;
+        void _end;
+        return r;
+      });
+    } else if (scope === "timeline") {
+      title = "Linha do tempo das campanhas";
+      dataset = rows
+        .filter((r) => r._start || r._end)
+        .sort((a, b) => {
+          const av = a._start?.getTime() ?? Infinity;
+          const bv = b._start?.getTime() ?? Infinity;
+          return av - bv;
+        })
+        .map(({ _start, _end, ...r }) => {
+          void _start;
+          void _end;
+          return r;
+        });
+    } else if (scope === "calendario") {
+      title = `Calendário — ${format(cursor, "MMMM yyyy", { locale: ptBR })}`;
+      const start = startOfMonth(cursor);
+      const end = endOfMonth(cursor);
+      dataset = eachDayOfInterval({ start, end }).flatMap((d) => {
+        const day = format(d, "yyyy-MM-dd");
+        const inDay = rows.filter(
+          (r) =>
+            r._start &&
+            r._end &&
+            d >= r._start &&
+            d <= r._end &&
+            r.ativa === "Sim",
+        );
+        if (inDay.length === 0) return [];
+        return inDay.map((r) => ({
+          data: day,
+          campanha: r.nome,
+          status: r.status,
+          players: r.players,
+          itens: r.itens,
+        }));
+      });
+    } else if (scope === "historico") {
+      title = "Histórico de campanhas";
+      dataset = [...rows]
+        .sort((a, b) => (b.criada_em || "").localeCompare(a.criada_em || ""))
+        .map(({ _start, _end, ...r }) => {
+          void _start;
+          void _end;
+          return r;
+        });
+    } else if (scope === "alertas") {
+      title = "Alertas de campanhas";
+      dataset = alerts.map((a) => ({
+        campanha: a.campaignName,
+        severidade:
+          a.severity === "error"
+            ? "Erro"
+            : a.severity === "warn"
+              ? "Aviso"
+              : "Info",
+        mensagem: a.message,
+      }));
+    }
+
+    const download = (content: string, mime: string) => {
+      const blob = new Blob([content], { type: `${mime};charset=utf-8` });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    };
+
+    if (fmtKind === "json") {
+      download(
+        JSON.stringify(
+          { titulo: title, geradoEm: new Date().toISOString(), dados: dataset },
+          null,
+          2,
+        ),
+        "application/json",
+      );
+    } else if (fmtKind === "csv") {
+      if (dataset.length === 0) {
+        download("\uFEFFsem dados\r\n", "text/csv");
+      } else {
+        const headers = Object.keys(dataset[0]);
+        const esc = (v: unknown) => {
+          const s = v == null ? "" : String(v);
+          return /[",;\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+        };
+        const lines = [headers.join(";")];
+        for (const row of dataset) {
+          lines.push(headers.map((h) => esc(row[h])).join(";"));
+        }
+        download("\uFEFF" + lines.join("\r\n"), "text/csv");
+      }
+    } else {
+      const escHtml = (s: string) =>
+        s
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;");
+      const headers = dataset.length ? Object.keys(dataset[0]) : [];
+      const body = dataset
+        .map(
+          (r) =>
+            "<tr>" +
+            headers.map((h) => `<td>${escHtml(String(r[h] ?? ""))}</td>`).join("") +
+            "</tr>",
+        )
+        .join("");
+      const html = `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>${escHtml(
+        title,
+      )}</title><style>body{font-family:-apple-system,Segoe UI,Inter,Roboto,sans-serif;padding:24px;color:#0f172a}h1{font-size:20px;margin:0 0 4px}p{color:#64748b;font-size:12px;margin:0 0 16px}table{border-collapse:collapse;width:100%;font-size:13px}th,td{border-bottom:1px solid #e2e8f0;padding:8px 10px;text-align:left}th{background:#f1f5f9;text-transform:uppercase;font-size:11px;letter-spacing:.06em;color:#475569}@media print{body{padding:12px}}</style></head><body><h1>${escHtml(
+        title,
+      )}</h1><p>Gerado em ${escHtml(
+        new Date().toLocaleString("pt-BR"),
+      )} · ${dataset.length} registro(s)</p><table><thead><tr>${headers
+        .map((h) => `<th>${escHtml(h)}</th>`)
+        .join("")}</tr></thead><tbody>${body}</tbody></table></body></html>`;
+      download(html, "text/html");
+    }
+    toast.success("Relatório exportado.");
+  }
+
   return (
     <div className="mx-auto max-w-7xl space-y-6">
       <header className="flex flex-wrap items-end justify-between gap-3">
@@ -452,20 +674,23 @@ function CampanhasPage() {
             Programe, publique e acompanhe suas campanhas nos players.
           </p>
         </div>
-        {canManage && (
-          <Button
-            onClick={() => create.mutate()}
-            disabled={create.isPending}
-            className="h-10 rounded-xl"
-          >
-            {create.isPending ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              <Plus className="mr-2 h-4 w-4" />
-            )}
-            Nova Campanha
-          </Button>
-        )}
+        <div className="flex items-center gap-2">
+          <ExportMenu onExport={exportReport} />
+          {canManage && (
+            <Button
+              onClick={() => create.mutate()}
+              disabled={create.isPending}
+              className="h-10 rounded-xl"
+            >
+              {create.isPending ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Plus className="mr-2 h-4 w-4" />
+              )}
+              Nova Campanha
+            </Button>
+          )}
+        </div>
       </header>
 
       {campaignsQ.isLoading ? (
@@ -554,6 +779,27 @@ function CampanhasPage() {
             </Card>
           )}
 
+          <Tabs
+            value={view}
+            onValueChange={(v) => setView(v as typeof view)}
+            className="space-y-4"
+          >
+            <TabsList className="rounded-xl">
+              <TabsTrigger value="programadas" className="gap-1.5">
+                <ListChecks className="h-3.5 w-3.5" /> Programadas
+              </TabsTrigger>
+              <TabsTrigger value="timeline" className="gap-1.5">
+                <GanttChartSquare className="h-3.5 w-3.5" /> Linha do tempo
+              </TabsTrigger>
+              <TabsTrigger value="calendario" className="gap-1.5">
+                <CalendarDays className="h-3.5 w-3.5" /> Calendário
+              </TabsTrigger>
+              <TabsTrigger value="historico" className="gap-1.5">
+                <History className="h-3.5 w-3.5" /> Histórico
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="programadas" className="mt-0">
           <Card className="rounded-2xl border-border/60 bg-card/60 backdrop-blur-xl">
             <CardHeader className="pb-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
@@ -751,6 +997,32 @@ function CampanhasPage() {
               )}
             </CardContent>
           </Card>
+            </TabsContent>
+
+            <TabsContent value="timeline" className="mt-0">
+              <TimelineView
+                campaigns={campaigns}
+                range={timelineRange}
+                onSelect={(c) => setEditing(c)}
+              />
+            </TabsContent>
+
+            <TabsContent value="calendario" className="mt-0">
+              <CalendarView
+                campaigns={campaigns}
+                cursor={cursor}
+                onCursorChange={setCursor}
+                onSelect={(c) => setEditing(c)}
+              />
+            </TabsContent>
+
+            <TabsContent value="historico" className="mt-0">
+              <HistoryView
+                campaigns={campaigns}
+                onSelect={(c) => setEditing(c)}
+              />
+            </TabsContent>
+          </Tabs>
         </>
       )}
 
@@ -815,3 +1087,450 @@ function KpiCard({
 
 // unused imports guard
 void CheckCircle2;
+
+function ExportMenu({
+  onExport,
+}: {
+  onExport: (
+    scope: "programadas" | "timeline" | "calendario" | "historico" | "alertas",
+    fmt: "csv" | "json" | "html",
+  ) => void;
+}) {
+  const [scope, setScope] = useState<
+    "programadas" | "timeline" | "calendario" | "historico" | "alertas"
+  >("programadas");
+  const scopeLabels: Record<typeof scope, string> = {
+    programadas: "Programadas",
+    timeline: "Linha do tempo",
+    calendario: "Calendário",
+    historico: "Histórico",
+    alertas: "Alertas",
+  };
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="outline" className="h-10 rounded-xl">
+          <Download className="mr-2 h-4 w-4" />
+          Exportar
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-56">
+        <DropdownMenuLabel>Relatório</DropdownMenuLabel>
+        <DropdownMenuRadioGroup
+          value={scope}
+          onValueChange={(v) => setScope(v as typeof scope)}
+        >
+          {(Object.keys(scopeLabels) as (keyof typeof scopeLabels)[]).map(
+            (k) => (
+              <DropdownMenuRadioItem key={k} value={k}>
+                {scopeLabels[k]}
+              </DropdownMenuRadioItem>
+            ),
+          )}
+        </DropdownMenuRadioGroup>
+        <DropdownMenuSeparator />
+        <DropdownMenuSub>
+          <DropdownMenuSubTrigger>
+            <Download className="mr-2 h-4 w-4" /> Baixar como…
+          </DropdownMenuSubTrigger>
+          <DropdownMenuPortal>
+            <DropdownMenuSubContent>
+              <DropdownMenuItem onSelect={() => onExport(scope, "html")}>
+                HTML / PDF (imprimir)
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => onExport(scope, "csv")}>
+                CSV (Excel)
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => onExport(scope, "json")}>
+                JSON
+              </DropdownMenuItem>
+            </DropdownMenuSubContent>
+          </DropdownMenuPortal>
+        </DropdownMenuSub>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+function TimelineView({
+  campaigns,
+  range,
+  onSelect,
+}: {
+  campaigns: CampaignRow[];
+  range: { start: Date; end: Date };
+  onSelect: (c: CampaignRow) => void;
+}) {
+  const scheduled = campaigns.filter(
+    (c) => c.schedule_date_start || c.schedule_date_end,
+  );
+  const total = Math.max(
+    1,
+    differenceInCalendarDays(range.end, range.start) + 1,
+  );
+  const now = today();
+  const nowPct =
+    now >= range.start && now <= range.end
+      ? (differenceInCalendarDays(now, range.start) / total) * 100
+      : null;
+
+  const ticks = 6;
+  const tickDates = Array.from({ length: ticks + 1 }, (_, i) =>
+    addDays(range.start, Math.round((total - 1) * (i / ticks))),
+  );
+
+  return (
+    <Card className="rounded-2xl border-border/60 bg-card/60 backdrop-blur-xl">
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base">Linha do tempo</CardTitle>
+        <CardDescription>
+          Visão horizontal de todas as campanhas por janela de datas.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        {scheduled.length === 0 ? (
+          <p className="py-8 text-center text-sm text-muted-foreground">
+            Nenhuma campanha com datas definidas.
+          </p>
+        ) : (
+          <div className="space-y-3">
+            <div className="relative h-6 border-b border-border/60">
+              {tickDates.map((d, i) => (
+                <div
+                  key={i}
+                  className="absolute -translate-x-1/2 text-[10px] text-muted-foreground"
+                  style={{ left: `${(i / ticks) * 100}%` }}
+                >
+                  {format(d, "dd/MM", { locale: ptBR })}
+                </div>
+              ))}
+            </div>
+            <div className="relative space-y-2">
+              {nowPct != null && (
+                <div
+                  className="pointer-events-none absolute top-0 bottom-0 z-10 w-px bg-primary/70"
+                  style={{ left: `${nowPct}%` }}
+                >
+                  <div className="absolute -top-1 -left-1 h-2 w-2 rounded-full bg-primary" />
+                </div>
+              )}
+              {scheduled.map((c) => {
+                const s = parseDate(c.schedule_date_start) ?? range.start;
+                const e = parseDate(c.schedule_date_end) ?? range.end;
+                const left =
+                  (Math.max(0, differenceInCalendarDays(s, range.start)) /
+                    total) *
+                  100;
+                const width = Math.max(
+                  2,
+                  ((differenceInCalendarDays(e, s) + 1) / total) * 100,
+                );
+                const st = statusOf(c);
+                const color =
+                  st === "no_ar"
+                    ? "bg-emerald-500/80 hover:bg-emerald-500"
+                    : st === "agendada"
+                      ? "bg-sky-500/80 hover:bg-sky-500"
+                      : st === "encerrada"
+                        ? "bg-muted-foreground/40 hover:bg-muted-foreground/60"
+                        : "bg-amber-500/80 hover:bg-amber-500";
+                return (
+                  <div
+                    key={c.id}
+                    className="relative h-8 rounded-lg bg-muted/40"
+                  >
+                    <button
+                      type="button"
+                      onClick={() => onSelect(c)}
+                      title={`${c.name} — ${fmt(s)} → ${fmt(e)}`}
+                      className={cn(
+                        "absolute top-0 h-full rounded-lg px-2 text-left text-[11px] font-medium text-white transition-all",
+                        color,
+                      )}
+                      style={{ left: `${left}%`, width: `${width}%` }}
+                    >
+                      <span className="line-clamp-1 leading-8">{c.name}</span>
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function CalendarView({
+  campaigns,
+  cursor,
+  onCursorChange,
+  onSelect,
+}: {
+  campaigns: CampaignRow[];
+  cursor: Date;
+  onCursorChange: (d: Date) => void;
+  onSelect: (c: CampaignRow) => void;
+}) {
+  const monthStart = startOfMonth(cursor);
+  const monthEnd = endOfMonth(cursor);
+  const gridStart = addDays(monthStart, -monthStart.getDay());
+  const gridEnd = addDays(monthEnd, 6 - monthEnd.getDay());
+  const days = eachDayOfInterval({ start: gridStart, end: gridEnd });
+  const now = today();
+
+  const perDay = (d: Date) =>
+    campaigns.filter((c) => {
+      const s = parseDate(c.schedule_date_start);
+      const e = parseDate(c.schedule_date_end);
+      if (!s || !e) return false;
+      return d >= s && d <= e && c.is_active;
+    });
+
+  const colorFor = (c: CampaignRow) => {
+    const st = statusOf(c);
+    if (st === "no_ar") return "bg-emerald-500/80";
+    if (st === "agendada") return "bg-sky-500/80";
+    if (st === "encerrada") return "bg-muted-foreground/40";
+    return "bg-amber-500/80";
+  };
+
+  return (
+    <Card className="rounded-2xl border-border/60 bg-card/60 backdrop-blur-xl">
+      <CardHeader className="pb-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <CardTitle className="text-base capitalize">
+              {format(cursor, "MMMM 'de' yyyy", { locale: ptBR })}
+            </CardTitle>
+            <CardDescription>
+              Campanhas ativas por dia — clique numa faixa para editar.
+            </CardDescription>
+          </div>
+          <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 rounded-lg"
+              onClick={() => onCursorChange(subMonths(cursor, 1))}
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 rounded-lg text-xs"
+              onClick={() => onCursorChange(startOfMonth(today()))}
+            >
+              Hoje
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 rounded-lg"
+              onClick={() => onCursorChange(addMonths(cursor, 1))}
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div className="grid grid-cols-7 gap-1 text-center text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+          {["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"].map((d) => (
+            <div key={d} className="py-1">
+              {d}
+            </div>
+          ))}
+        </div>
+        <div className="mt-1 grid grid-cols-7 gap-1">
+          {days.map((d) => {
+            const inMonth = isSameMonth(d, cursor);
+            const isToday = isSameDay(d, now);
+            const list = perDay(d);
+            return (
+              <div
+                key={d.toISOString()}
+                className={cn(
+                  "min-h-[92px] rounded-lg border border-border/40 bg-background/40 p-1.5 text-left",
+                  !inMonth && "opacity-40",
+                  isToday && "border-primary/60 bg-primary/5",
+                )}
+              >
+                <div className="flex items-center justify-between">
+                  <span
+                    className={cn(
+                      "text-[11px] font-semibold",
+                      isToday && "text-primary",
+                    )}
+                  >
+                    {format(d, "d")}
+                  </span>
+                  {list.length > 0 && (
+                    <span className="text-[9px] text-muted-foreground">
+                      {list.length}
+                    </span>
+                  )}
+                </div>
+                <div className="mt-1 space-y-0.5">
+                  {list.slice(0, 3).map((c) => (
+                    <button
+                      key={c.id}
+                      type="button"
+                      title={c.name}
+                      onClick={() => onSelect(c)}
+                      className={cn(
+                        "block w-full truncate rounded px-1.5 py-0.5 text-left text-[10px] font-medium text-white transition-opacity hover:opacity-90",
+                        colorFor(c),
+                      )}
+                    >
+                      {c.name}
+                    </button>
+                  ))}
+                  {list.length > 3 && (
+                    <div className="pl-1 text-[9px] text-muted-foreground">
+                      +{list.length - 3}
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        <div className="mt-4 flex flex-wrap items-center gap-3 text-[11px] text-muted-foreground">
+          <LegendDot className="bg-emerald-500/80" label="No ar" />
+          <LegendDot className="bg-sky-500/80" label="Agendada" />
+          <LegendDot className="bg-amber-500/80" label="Sem janela" />
+          <LegendDot className="bg-muted-foreground/40" label="Encerrada" />
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function LegendDot({ className, label }: { className: string; label: string }) {
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <span className={cn("h-2.5 w-2.5 rounded-full", className)} />
+      {label}
+    </span>
+  );
+}
+
+function HistoryView({
+  campaigns,
+  onSelect,
+}: {
+  campaigns: CampaignRow[];
+  onSelect: (c: CampaignRow) => void;
+}) {
+  const events = useMemo(() => {
+    const evs: Array<{
+      at: string;
+      campaign: CampaignRow;
+      kind: "created" | "start" | "end" | "paused";
+      label: string;
+    }> = [];
+    const now = today();
+    for (const c of campaigns) {
+      if (c.created_at) {
+        evs.push({
+          at: c.created_at,
+          campaign: c,
+          kind: "created",
+          label: "Campanha criada",
+        });
+      }
+      const s = parseDate(c.schedule_date_start);
+      if (s) {
+        evs.push({
+          at: `${c.schedule_date_start}T00:00:00`,
+          campaign: c,
+          kind: "start",
+          label: s <= now ? "Estreia" : "Estreia programada",
+        });
+      }
+      const e = parseDate(c.schedule_date_end);
+      if (e) {
+        evs.push({
+          at: `${c.schedule_date_end}T23:59:00`,
+          campaign: c,
+          kind: "end",
+          label: e < now ? "Encerrou" : "Encerramento previsto",
+        });
+      }
+      if (!c.is_active) {
+        evs.push({
+          at: c.created_at ?? new Date().toISOString(),
+          campaign: c,
+          kind: "paused",
+          label: "Pausada / inativa",
+        });
+      }
+    }
+    return evs.sort((a, b) => b.at.localeCompare(a.at));
+  }, [campaigns]);
+
+  const kindMeta = {
+    created: { icon: Plus, tone: "text-primary bg-primary/15" },
+    start: { icon: CircleDot, tone: "text-emerald-500 bg-emerald-500/15" },
+    end: { icon: CalendarX2, tone: "text-muted-foreground bg-muted" },
+    paused: { icon: CircleAlert, tone: "text-amber-500 bg-amber-500/15" },
+  } as const;
+
+  return (
+    <Card className="rounded-2xl border-border/60 bg-card/60 backdrop-blur-xl">
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base">Histórico</CardTitle>
+        <CardDescription>
+          Eventos derivados da programação das campanhas.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        {events.length === 0 ? (
+          <p className="py-8 text-center text-sm text-muted-foreground">
+            Sem eventos por enquanto.
+          </p>
+        ) : (
+          <ol className="relative space-y-3 border-l border-border/60 pl-5">
+            {events.slice(0, 100).map((ev, i) => {
+              const meta = kindMeta[ev.kind];
+              const Icon = meta.icon;
+              const when = new Date(ev.at);
+              return (
+                <li key={`${ev.campaign.id}-${ev.kind}-${i}`} className="relative">
+                  <span
+                    className={cn(
+                      "absolute -left-[27px] grid h-5 w-5 place-items-center rounded-full",
+                      meta.tone,
+                    )}
+                  >
+                    <Icon className="h-3 w-3" />
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => onSelect(ev.campaign)}
+                    className="block w-full rounded-lg border border-border/40 bg-background/50 px-3 py-2 text-left transition hover:bg-background"
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="text-sm font-medium">
+                        {ev.campaign.name}
+                      </div>
+                      <div className="text-[11px] text-muted-foreground">
+                        {format(when, "dd/MM/yyyy HH:mm", { locale: ptBR })}
+                      </div>
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      {ev.label}
+                    </div>
+                  </button>
+                </li>
+              );
+            })}
+          </ol>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
