@@ -92,6 +92,11 @@ import {
 import { TemplateSettingsDialog } from "@/components/studio/template-settings-dialog";
 import { ImageEditorDialog } from "@/components/studio/image-editor/image-editor-dialog";
 import { PreviewPanel } from "@/components/preview/preview-panel";
+import {
+  ComponentsPanel,
+  type LibraryItem,
+} from "@/components/studio/components-panel";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useStudioDraftPayload } from "@/lib/studio/use-draft-payload";
 import { slugify } from "@/lib/template-utils";
 
