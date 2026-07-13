@@ -4,6 +4,11 @@ import { useQuery } from "@tanstack/react-query";
 import {
   BarChart3,
   CalendarClock,
+  Download,
+  FileCode2,
+  FileJson,
+  FileSpreadsheet,
+  FileText,
   HardDrive,
   Image as ImageIcon,
   LayoutTemplate,
@@ -28,6 +33,15 @@ import {
 } from "recharts";
 
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Card,
   CardContent,
@@ -47,6 +61,13 @@ import { GridSkeleton } from "@/components/layout/grid-skeleton";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { formatBytes } from "@/lib/media-utils";
+import {
+  exportCsv,
+  exportHtml,
+  exportJson,
+  exportPdf,
+  type ReportSnapshot,
+} from "@/lib/report-export";
 
 export const Route = createFileRoute("/relatorio")({
   head: () => ({
@@ -316,6 +337,29 @@ function ReportPage() {
     return days;
   }, [media, playlists]);
 
+  const buildSnapshot = (): ReportSnapshot => ({
+    generatedAt: new Date(),
+    organization: membership?.organization_id ?? "—",
+    players,
+    media,
+    templates,
+    playlists,
+    kpis: {
+      playersTotal: players.length,
+      playersOnline: onlinePlayers,
+      playersOffline: offlinePlayers,
+      playlistsTotal: playlists.length,
+      playlistsActive: activePlaylists,
+      playlistsScheduled: scheduledPlaylists,
+      templatesTotal: templates.length,
+      templatesStudio: templates.filter((t) => (t.type ?? "grid") === "canvas").length,
+      mediaTotal: media.length,
+      mediaBytes: totalBytes,
+      mediaBytesFormatted: formatBytes(totalBytes),
+    },
+    templateNameById: Object.fromEntries(templateNameById.entries()),
+  });
+
   return (
     <div className="mx-auto flex w-full max-w-7xl flex-col gap-8">
       <header className="flex flex-wrap items-end justify-between gap-3">
@@ -330,10 +374,78 @@ function ReportPage() {
             Panorama consolidado do conteúdo produzido, campanhas programadas e execução nos players.
           </p>
         </div>
-        <Badge className="rounded-full border-none bg-primary/15 px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary/20">
-          <BarChart3 className="mr-1.5 h-3.5 w-3.5" />
-          Dados em tempo real
-        </Badge>
+        <div className="flex items-center gap-2">
+          <Badge className="rounded-full border-none bg-primary/15 px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary/20">
+            <BarChart3 className="mr-1.5 h-3.5 w-3.5" />
+            Dados em tempo real
+          </Badge>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                size="sm"
+                disabled={loading}
+                className="h-8 rounded-full bg-primary/90 px-4 text-xs font-medium shadow-sm hover:bg-primary"
+              >
+                <Download className="mr-1.5 h-3.5 w-3.5" />
+                Exportar
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56 rounded-2xl">
+              <DropdownMenuLabel className="text-[11px] uppercase tracking-wider text-muted-foreground">
+                Formato do relatório
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                className="gap-2"
+                onSelect={() => exportPdf(buildSnapshot())}
+              >
+                <FileText className="h-4 w-4 text-red-500" />
+                <div className="flex flex-col">
+                  <span>PDF (imprimir)</span>
+                  <span className="text-[11px] text-muted-foreground">
+                    Abre para salvar como PDF
+                  </span>
+                </div>
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                className="gap-2"
+                onSelect={() => exportHtml(buildSnapshot())}
+              >
+                <FileCode2 className="h-4 w-4 text-primary" />
+                <div className="flex flex-col">
+                  <span>HTML</span>
+                  <span className="text-[11px] text-muted-foreground">
+                    Página autônoma pronta para compartilhar
+                  </span>
+                </div>
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                className="gap-2"
+                onSelect={() => exportCsv(buildSnapshot())}
+              >
+                <FileSpreadsheet className="h-4 w-4 text-emerald-500" />
+                <div className="flex flex-col">
+                  <span>CSV (Excel)</span>
+                  <span className="text-[11px] text-muted-foreground">
+                    4 arquivos: players, playlists, templates, mídias
+                  </span>
+                </div>
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                className="gap-2"
+                onSelect={() => exportJson(buildSnapshot())}
+              >
+                <FileJson className="h-4 w-4 text-amber-500" />
+                <div className="flex flex-col">
+                  <span>JSON</span>
+                  <span className="text-[11px] text-muted-foreground">
+                    Dados estruturados para integração
+                  </span>
+                </div>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </header>
 
       {loading ? (
