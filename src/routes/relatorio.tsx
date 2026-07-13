@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -1123,7 +1123,7 @@ function FilterField({
 }: {
   label: string;
   icon: typeof MonitorPlay;
-  children: React.ReactNode;
+  children: ReactNode;
 }) {
   return (
     <label className="flex flex-col gap-1">
