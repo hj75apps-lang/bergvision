@@ -1,7 +1,20 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { format, differenceInCalendarDays, addDays } from "date-fns";
+import {
+  format,
+  differenceInCalendarDays,
+  addDays,
+  startOfMonth,
+  endOfMonth,
+  eachDayOfInterval,
+  addMonths,
+  subMonths,
+  isSameMonth,
+  isSameDay,
+  min as dfMin,
+  max as dfMax,
+} from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
   Megaphone,
@@ -17,6 +30,13 @@ import {
   CircleDot,
   CalendarX2,
   Layers,
+  ChevronLeft,
+  ChevronRight,
+  Download,
+  CalendarDays,
+  History,
+  ListChecks,
+  GanttChartSquare,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -43,6 +63,20 @@ import {
   TabsList,
   TabsTrigger,
 } from "@/components/ui/tabs";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSub,
+  DropdownMenuSubTrigger,
+  DropdownMenuSubContent,
+  DropdownMenuPortal,
+} from "@/components/ui/dropdown-menu";
 import {
   AlertDialog,
   AlertDialogAction,
