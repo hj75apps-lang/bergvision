@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -9,6 +9,8 @@ import {
   FileJson,
   FileSpreadsheet,
   FileText,
+  Filter,
+  Building2,
   HardDrive,
   Image as ImageIcon,
   LayoutTemplate,
@@ -16,6 +18,7 @@ import {
   MonitorPlay,
   Signal,
   SignalZero,
+  X,
   Video,
 } from "lucide-react";
 import {
@@ -34,6 +37,13 @@ import {
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   DropdownMenu,
   DropdownMenuContent,
