@@ -64,6 +64,7 @@ import {
   aspectRatioCss,
   slugify,
   zonesWithReferenceFallback,
+  zoneColor,
   type AspectRatio,
   type ContentType,
   type Template,
