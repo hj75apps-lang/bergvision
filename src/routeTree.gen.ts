@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as TemplatesRouteImport } from './routes/templates'
 import { Route as StudioRouteImport } from './routes/studio'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
+import { Route as RelatorioRouteImport } from './routes/relatorio'
 import { Route as PlaylistsRouteImport } from './routes/playlists'
 import { Route as PlayersRouteImport } from './routes/players'
 import { Route as EquipeRouteImport } from './routes/equipe'
@@ -36,6 +37,11 @@ const StudioRoute = StudioRouteImport.update({
 const ResetPasswordRoute = ResetPasswordRouteImport.update({
   id: '/reset-password',
   path: '/reset-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RelatorioRoute = RelatorioRouteImport.update({
+  id: '/relatorio',
+  path: '/relatorio',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PlaylistsRoute = PlaylistsRouteImport.update({
@@ -97,6 +103,7 @@ export interface FileRoutesByFullPath {
   '/equipe': typeof EquipeRoute
   '/players': typeof PlayersRoute
   '/playlists': typeof PlaylistsRoute
+  '/relatorio': typeof RelatorioRoute
   '/reset-password': typeof ResetPasswordRoute
   '/studio': typeof StudioRouteWithChildren
   '/templates': typeof TemplatesRoute
@@ -112,6 +119,7 @@ export interface FileRoutesByTo {
   '/equipe': typeof EquipeRoute
   '/players': typeof PlayersRoute
   '/playlists': typeof PlaylistsRoute
+  '/relatorio': typeof RelatorioRoute
   '/reset-password': typeof ResetPasswordRoute
   '/templates': typeof TemplatesRoute
   '/invite/$token': typeof InviteTokenRoute
@@ -127,6 +135,7 @@ export interface FileRoutesById {
   '/equipe': typeof EquipeRoute
   '/players': typeof PlayersRoute
   '/playlists': typeof PlaylistsRoute
+  '/relatorio': typeof RelatorioRoute
   '/reset-password': typeof ResetPasswordRoute
   '/studio': typeof StudioRouteWithChildren
   '/templates': typeof TemplatesRoute
@@ -144,6 +153,7 @@ export interface FileRouteTypes {
     | '/equipe'
     | '/players'
     | '/playlists'
+    | '/relatorio'
     | '/reset-password'
     | '/studio'
     | '/templates'
@@ -159,6 +169,7 @@ export interface FileRouteTypes {
     | '/equipe'
     | '/players'
     | '/playlists'
+    | '/relatorio'
     | '/reset-password'
     | '/templates'
     | '/invite/$token'
@@ -173,6 +184,7 @@ export interface FileRouteTypes {
     | '/equipe'
     | '/players'
     | '/playlists'
+    | '/relatorio'
     | '/reset-password'
     | '/studio'
     | '/templates'
@@ -189,6 +201,7 @@ export interface RootRouteChildren {
   EquipeRoute: typeof EquipeRoute
   PlayersRoute: typeof PlayersRoute
   PlaylistsRoute: typeof PlaylistsRoute
+  RelatorioRoute: typeof RelatorioRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
   StudioRoute: typeof StudioRouteWithChildren
   TemplatesRoute: typeof TemplatesRoute
@@ -216,6 +229,13 @@ declare module '@tanstack/react-router' {
       path: '/reset-password'
       fullPath: '/reset-password'
       preLoaderRoute: typeof ResetPasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/relatorio': {
+      id: '/relatorio'
+      path: '/relatorio'
+      fullPath: '/relatorio'
+      preLoaderRoute: typeof RelatorioRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/playlists': {
@@ -312,6 +332,7 @@ const rootRouteChildren: RootRouteChildren = {
   EquipeRoute: EquipeRoute,
   PlayersRoute: PlayersRoute,
   PlaylistsRoute: PlaylistsRoute,
+  RelatorioRoute: RelatorioRoute,
   ResetPasswordRoute: ResetPasswordRoute,
   StudioRoute: StudioRouteWithChildren,
   TemplatesRoute: TemplatesRoute,

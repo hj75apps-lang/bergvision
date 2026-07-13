@@ -9,6 +9,7 @@ import {
   Users,
   Settings,
   Wand2,
+  BarChart3,
 } from "lucide-react";
 
 import {
@@ -39,6 +40,7 @@ const mainItems: NavItem[] = [
   { title: "Templates", url: "/templates", icon: LayoutTemplate },
   { title: "Studio", url: "/studio", icon: Wand2 },
   { title: "Playlists", url: "/playlists", icon: ListMusic },
+  { title: "Relatório", url: "/relatorio", icon: BarChart3 },
 ];
 
 const secondaryItems: NavItem[] = [
