@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -9,6 +9,8 @@ import {
   FileJson,
   FileSpreadsheet,
   FileText,
+  Filter,
+  Building2,
   HardDrive,
   Image as ImageIcon,
   LayoutTemplate,
@@ -16,6 +18,7 @@ import {
   MonitorPlay,
   Signal,
   SignalZero,
+  X,
   Video,
 } from "lucide-react";
 import {
@@ -34,6 +37,13 @@ import {
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -238,16 +248,71 @@ function ReportPage() {
   const nowMs = Date.now();
   const today = new Date();
 
-  const players = playersQ.data ?? [];
-  const media = mediaQ.data ?? [];
-  const templates = templatesQ.data ?? [];
-  const playlists = playlistsQ.data ?? [];
+  const rawPlayers = playersQ.data ?? [];
+  const rawMedia = mediaQ.data ?? [];
+  const rawTemplates = templatesQ.data ?? [];
+  const rawPlaylists = playlistsQ.data ?? [];
+
+  // ---- Filtros ----
+  type PeriodKey = "7d" | "30d" | "90d" | "ytd" | "all";
+  const [period, setPeriod] = useState<PeriodKey>("30d");
+  const [playerId, setPlayerId] = useState<string>("all");
+  const [playlistId, setPlaylistId] = useState<string>("all");
+
+  const periodStartMs = useMemo(() => {
+    if (period === "all") return null;
+    if (period === "ytd") return new Date(today.getFullYear(), 0, 1).getTime();
+    const days = period === "7d" ? 7 : period === "90d" ? 90 : 30;
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    d.setDate(d.getDate() - (days - 1));
+    return d.getTime();
+  }, [period, today]);
+
+  const inPeriod = (iso: string | null): boolean => {
+    if (periodStartMs == null) return true;
+    if (!iso) return false;
+    const t = new Date(iso).getTime();
+    return !Number.isNaN(t) && t >= periodStartMs;
+  };
+
+  const chartDays = period === "7d" ? 7 : period === "90d" ? 90 : period === "ytd"
+    ? Math.max(1, Math.ceil((today.getTime() - periodStartMs!) / 86_400_000))
+    : 30;
+
+  const players = useMemo(
+    () => (playerId === "all" ? rawPlayers : rawPlayers.filter((p) => p.id === playerId)),
+    [rawPlayers, playerId],
+  );
+  const media = useMemo(
+    () => rawMedia.filter((m) => inPeriod(m.created_at)),
+    [rawMedia, periodStartMs],
+  );
+  const templates = useMemo(
+    () => rawTemplates.filter((t) => inPeriod(t.created_at)),
+    [rawTemplates, periodStartMs],
+  );
+  const playlists = useMemo(() => {
+    let arr = rawPlaylists.filter((pl) => inPeriod(pl.created_at));
+    if (playlistId !== "all") arr = arr.filter((pl) => pl.id === playlistId);
+    return arr;
+  }, [rawPlaylists, periodStartMs, playlistId]);
+
+  const activeFilterCount =
+    (period !== "30d" ? 1 : 0) + (playerId !== "all" ? 1 : 0) + (playlistId !== "all" ? 1 : 0);
+  const resetFilters = () => {
+    setPeriod("30d");
+    setPlayerId("all");
+    setPlaylistId("all");
+  };
 
   const templateNameById = useMemo(() => {
     const map = new Map<string, string>();
-    templates.forEach((t) => map.set(t.id, t.name));
+    // Always use the full template list so player rows can resolve names even
+    // when a period filter would otherwise hide older templates.
+    rawTemplates.forEach((t) => map.set(t.id, t.name));
     return map;
-  }, [templates]);
+  }, [rawTemplates]);
 
   const onlinePlayers = useMemo(
     () => players.filter((p) => isOnline(p, nowMs)).length,
@@ -309,7 +374,8 @@ function ReportPage() {
   const createdLast30Days = useMemo(() => {
     const days: { date: string; label: string; midias: number; playlists: number }[] = [];
     const now = new Date();
-    for (let i = 29; i >= 0; i--) {
+    const N = Math.min(Math.max(1, chartDays), 180);
+    for (let i = N - 1; i >= 0; i--) {
       const d = new Date(now);
       d.setDate(now.getDate() - i);
       d.setHours(0, 0, 0, 0);
@@ -335,11 +401,11 @@ function ReportPage() {
       if (row) row.playlists += 1;
     });
     return days;
-  }, [media, playlists]);
+  }, [media, playlists, chartDays]);
 
   const buildSnapshot = (): ReportSnapshot => ({
     generatedAt: new Date(),
-    organization: membership?.organization_id ?? "—",
+    organization: membership?.organization?.name ?? membership?.organization_id ?? "—",
     players,
     media,
     templates,
@@ -448,6 +514,92 @@ function ReportPage() {
         </div>
       </header>
 
+      {/* Barra de filtros */}
+      <Card className="rounded-3xl border-border/60 bg-card/70 backdrop-blur-xl">
+        <CardContent className="flex flex-wrap items-end gap-3 p-4">
+          <div className="flex items-center gap-1.5 pr-2 text-xs font-medium text-muted-foreground">
+            <Filter className="h-3.5 w-3.5" />
+            Filtros
+          </div>
+
+          <FilterField label="Período" icon={CalendarClock}>
+            <Select value={period} onValueChange={(v) => setPeriod(v as typeof period)}>
+              <SelectTrigger className="h-9 w-[180px] rounded-xl">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent className="rounded-xl">
+                <SelectItem value="7d">Últimos 7 dias</SelectItem>
+                <SelectItem value="30d">Últimos 30 dias</SelectItem>
+                <SelectItem value="90d">Últimos 90 dias</SelectItem>
+                <SelectItem value="ytd">Este ano</SelectItem>
+                <SelectItem value="all">Todo o período</SelectItem>
+              </SelectContent>
+            </Select>
+          </FilterField>
+
+          <FilterField label="Organização" icon={Building2}>
+            <Select value={orgId ?? "current"} disabled>
+              <SelectTrigger className="h-9 w-[200px] rounded-xl">
+                <SelectValue>
+                  {membership?.organization?.name ?? "Organização atual"}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent />
+            </Select>
+          </FilterField>
+
+          <FilterField label="Player" icon={MonitorPlay}>
+            <Select value={playerId} onValueChange={setPlayerId}>
+              <SelectTrigger className="h-9 w-[220px] rounded-xl">
+                <SelectValue placeholder="Todos" />
+              </SelectTrigger>
+              <SelectContent className="rounded-xl">
+                <SelectItem value="all">Todos os players</SelectItem>
+                {rawPlayers.map((p) => (
+                  <SelectItem key={p.id} value={p.id}>
+                    {p.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </FilterField>
+
+          <FilterField label="Campanha" icon={ListMusic}>
+            <Select value={playlistId} onValueChange={setPlaylistId}>
+              <SelectTrigger className="h-9 w-[220px] rounded-xl">
+                <SelectValue placeholder="Todas" />
+              </SelectTrigger>
+              <SelectContent className="rounded-xl">
+                <SelectItem value="all">Todas as campanhas</SelectItem>
+                {rawPlaylists.map((pl) => (
+                  <SelectItem key={pl.id} value={pl.id}>
+                    {pl.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </FilterField>
+
+          <div className="ml-auto flex items-center gap-2">
+            {activeFilterCount > 0 && (
+              <Badge variant="secondary" className="rounded-full text-[11px]">
+                {activeFilterCount} ativo(s)
+              </Badge>
+            )}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={resetFilters}
+              disabled={activeFilterCount === 0}
+              className="h-9 rounded-xl text-xs"
+            >
+              <X className="mr-1 h-3.5 w-3.5" />
+              Limpar
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
       {loading ? (
         <GridSkeleton count={8} heightClass="h-32" />
       ) : (
@@ -489,7 +641,11 @@ function ReportPage() {
             <Card className="rounded-3xl border-border/60 bg-card/70 backdrop-blur-xl lg:col-span-2">
               <CardHeader>
                 <CardTitle className="text-lg font-semibold">
-                  Conteúdo produzido nos últimos 30 dias
+                  {period === "all"
+                    ? "Conteúdo produzido (últimos 30 dias)"
+                    : period === "ytd"
+                      ? "Conteúdo produzido neste ano"
+                      : `Conteúdo produzido nos últimos ${period === "7d" ? 7 : period === "90d" ? 90 : 30} dias`}
                 </CardTitle>
                 <CardDescription>
                   Mídias enviadas para a Biblioteca e playlists criadas por dia.
@@ -502,7 +658,7 @@ function ReportPage() {
                     <XAxis
                       dataKey="label"
                       tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
-                      interval={4}
+                      interval={Math.max(0, Math.floor(createdLast30Days.length / 10))}
                     />
                     <YAxis
                       allowDecimals={false}
@@ -961,6 +1117,26 @@ function LegendDot({ color, label }: { color: string; label: string }) {
       <span className={`inline-block h-2 w-2 rounded-full ${color}`} />
       {label}
     </span>
+  );
+}
+
+function FilterField({
+  label,
+  icon: Icon,
+  children,
+}: {
+  label: string;
+  icon: typeof MonitorPlay;
+  children: ReactNode;
+}) {
+  return (
+    <label className="flex flex-col gap-1">
+      <span className="inline-flex items-center gap-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+        <Icon className="h-3 w-3" />
+        {label}
+      </span>
+      {children}
+    </label>
   );
 }
 
