@@ -10,6 +10,7 @@ import {
   Settings,
   Wand2,
   BarChart3,
+  Megaphone,
 } from "lucide-react";
 
 import {
@@ -40,6 +41,7 @@ const mainItems: NavItem[] = [
   { title: "Templates", url: "/templates", icon: LayoutTemplate },
   { title: "Studio", url: "/studio", icon: Wand2 },
   { title: "Playlists", url: "/playlists", icon: ListMusic },
+  { title: "Campanhas", url: "/campanhas", icon: Megaphone },
   { title: "Relatório", url: "/relatorio", icon: BarChart3 },
 ];
 
