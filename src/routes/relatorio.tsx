@@ -405,7 +405,7 @@ function ReportPage() {
 
   const buildSnapshot = (): ReportSnapshot => ({
     generatedAt: new Date(),
-    organization: membership?.organization_id ?? "—",
+    organization: membership?.organization?.name ?? membership?.organization_id ?? "—",
     players,
     media,
     templates,
@@ -641,7 +641,11 @@ function ReportPage() {
             <Card className="rounded-3xl border-border/60 bg-card/70 backdrop-blur-xl lg:col-span-2">
               <CardHeader>
                 <CardTitle className="text-lg font-semibold">
-                  Conteúdo produzido nos últimos 30 dias
+                  {period === "all"
+                    ? "Conteúdo produzido (últimos 30 dias)"
+                    : period === "ytd"
+                      ? "Conteúdo produzido neste ano"
+                      : `Conteúdo produzido nos últimos ${period === "7d" ? 7 : period === "90d" ? 90 : 30} dias`}
                 </CardTitle>
                 <CardDescription>
                   Mídias enviadas para a Biblioteca e playlists criadas por dia.
@@ -654,7 +658,7 @@ function ReportPage() {
                     <XAxis
                       dataKey="label"
                       tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
-                      interval={4}
+                      interval={Math.max(0, Math.floor(createdLast30Days.length / 10))}
                     />
                     <YAxis
                       allowDecimals={false}
