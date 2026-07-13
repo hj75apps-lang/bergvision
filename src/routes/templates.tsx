@@ -599,30 +599,20 @@ function CreateTemplateDialog({
   onCreated: (id: string) => void;
 }) {
   const qc = useQueryClient();
-  const [name, setName] = useState("");
-  const [aspect, setAspect] = useState<AspectRatio>("16:9");
-  const [w, setW] = useState(1920);
-  const [h, setH] = useState(1080);
-
-  useEffect(() => {
-    if (open) {
-      setName("");
-      setAspect("16:9");
-      setW(1920);
-      setH(1080);
-    }
-  }, [open]);
+  const [creatingId, setCreatingId] = useState<string | null>(null);
 
   const create = useMutation({
-    mutationFn: async () => {
-      if (!name.trim()) throw new Error("Informe um nome.");
+    mutationFn: async (preset: TemplatePreset) => {
+      const aspect: AspectRatio = preset.orientation === "portrait" ? "9:16" : "16:9";
+      const w = preset.orientation === "portrait" ? 1080 : 1920;
+      const h = preset.orientation === "portrait" ? 1920 : 1080;
       const { data, error } = await supabase
         .from("templates")
         .insert({
-          name: name.trim(),
-          slug: `${slugify(name)}-${Math.random().toString(36).slice(2, 6)}`,
-          orientation: aspect === "9:16" ? "portrait" : "landscape",
-          zone_count: 1,
+          name: preset.name,
+          slug: `${slugify(preset.name)}-${Math.random().toString(36).slice(2, 6)}`,
+          orientation: preset.orientation,
+          zone_count: Math.max(1, preset.zones.length),
           is_system: false,
           organization_id: orgId,
           created_by: userId,
@@ -635,104 +625,317 @@ function CreateTemplateDialog({
         .select("id")
         .single();
       if (error) throw error;
-      // Seed a single fullscreen zone so the editor opens on something usable.
-      const { error: zErr } = await supabase.from("template_zones").insert({
-        template_id: (data as any).id,
-        zone_index: 0,
-        zone_name: "Zona 1",
-        pos_x: 0,
-        pos_y: 0,
-        width_pct: 100,
-        height_pct: 100,
-        z_index: 0,
-        content_type: "empty",
-      });
+      const tplId = (data as any).id as string;
+      const zones = preset.zones.length > 0
+        ? preset.zones
+        : [{ name: "Zona 1", x: 0, y: 0, w: 100, h: 100 }];
+      const rows = zones.map((z, i) => ({
+        template_id: tplId,
+        zone_index: i,
+        zone_name: z.name,
+        pos_x: z.x,
+        pos_y: z.y,
+        width_pct: z.w,
+        height_pct: z.h,
+        z_index: i,
+        content_type: "empty" as const,
+      }));
+      const { error: zErr } = await supabase.from("template_zones").insert(rows);
       if (zErr) throw zErr;
-      return (data as any).id as string;
+      return tplId;
     },
     onSuccess: async (id) => {
-      toast.success("Template criado. Abra o editor para desenhar zonas.");
+      toast.success("Template criado. Abra o editor para ajustar zonas.");
       await qc.invalidateQueries({ queryKey: ["templates"] });
       onOpenChange(false);
+      setCreatingId(null);
       onCreated(id);
     },
-    onError: (err: any) => toast.error(err?.message || "Falha ao criar."),
+    onError: (err: any) => {
+      setCreatingId(null);
+      toast.error(err?.message || "Falha ao criar.");
+    },
   });
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="rounded-2xl sm:max-w-md">
+      <DialogContent className="max-h-[90vh] overflow-y-auto rounded-2xl sm:max-w-4xl">
         <DialogHeader>
-          <DialogTitle>Novo template</DialogTitle>
+          <DialogTitle>Escolher template</DialogTitle>
           <DialogDescription>
-            Defina o formato inicial. Você desenha as zonas em seguida.
+            Comece a partir de um template ou de um layout personalizado.
           </DialogDescription>
         </DialogHeader>
-        <div className="space-y-3">
-          <div className="space-y-1.5">
-            <Label>Nome</Label>
-            <Input
-              className="h-10 rounded-xl"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Ex.: Home Store"
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label>Aspect ratio</Label>
-            <Select value={aspect} onValueChange={(v) => setAspect(v as AspectRatio)}>
-              <SelectTrigger className="h-10 rounded-xl">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="16:9">16:9 · Paisagem TV</SelectItem>
-                <SelectItem value="9:16">9:16 · Retrato / totem</SelectItem>
-                <SelectItem value="4:3">4:3</SelectItem>
-                <SelectItem value="21:9">21:9 · Ultra-wide</SelectItem>
-                <SelectItem value="custom">Personalizado</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          {aspect === "custom" && (
-            <div className="grid grid-cols-2 gap-2">
-              <div className="space-y-1.5">
-                <Label>Largura (px)</Label>
-                <Input
-                  type="number"
-                  min={100}
-                  className="h-10 rounded-xl"
-                  value={w}
-                  onChange={(e) => setW(Number(e.target.value) || 0)}
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label>Altura (px)</Label>
-                <Input
-                  type="number"
-                  min={100}
-                  className="h-10 rounded-xl"
-                  value={h}
-                  onChange={(e) => setH(Number(e.target.value) || 0)}
-                />
-              </div>
-            </div>
-          )}
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {TEMPLATE_PRESETS.map((preset) => {
+            const busy = create.isPending && creatingId === preset.id;
+            return (
+              <button
+                key={preset.id}
+                type="button"
+                disabled={create.isPending}
+                onClick={() => {
+                  setCreatingId(preset.id);
+                  create.mutate(preset);
+                }}
+                className={cn(
+                  "group flex flex-col overflow-hidden rounded-2xl border border-border/60 bg-card/60 text-left backdrop-blur-xl transition-all",
+                  "hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-lg",
+                  "disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0",
+                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
+                )}
+              >
+                <div className="relative aspect-video w-full overflow-hidden bg-slate-900">
+                  <PresetThumbnail preset={preset} />
+                  {busy && (
+                    <div className="absolute inset-0 grid place-items-center bg-background/60 backdrop-blur-sm">
+                      <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                    </div>
+                  )}
+                </div>
+                <div className="flex-1 space-y-1 p-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="truncate text-sm font-semibold">{preset.name}</div>
+                    <Badge
+                      variant="secondary"
+                      className={cn(
+                        "shrink-0 rounded-full text-[10px] font-medium",
+                        PRESET_CATEGORY_STYLES[preset.category],
+                      )}
+                    >
+                      {preset.category}
+                    </Badge>
+                  </div>
+                  <p className="line-clamp-2 text-xs text-muted-foreground">
+                    {preset.description}
+                  </p>
+                </div>
+              </button>
+            );
+          })}
         </div>
-        <DialogFooter>
-          <Button variant="ghost" onClick={() => onOpenChange(false)} className="rounded-xl">
-            Cancelar
-          </Button>
-          <Button
-            onClick={() => create.mutate()}
-            disabled={create.isPending}
-            className="rounded-xl"
-          >
-            {create.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Criar e abrir editor
-          </Button>
-        </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+type PresetCategory = "Basic" | "Split" | "Grid" | "Widgets";
+
+type PresetZone = { name: string; x: number; y: number; w: number; h: number };
+
+type TemplatePreset = {
+  id: string;
+  name: string;
+  description: string;
+  category: PresetCategory;
+  orientation: "landscape" | "portrait";
+  zones: PresetZone[];
+};
+
+const PRESET_CATEGORY_STYLES: Record<PresetCategory, string> = {
+  Basic: "bg-slate-500/15 text-slate-300 border border-slate-500/30",
+  Split: "bg-sky-500/15 text-sky-300 border border-sky-500/30",
+  Grid: "bg-emerald-500/15 text-emerald-300 border border-emerald-500/30",
+  Widgets: "bg-violet-500/15 text-violet-300 border border-violet-500/30",
+};
+
+const TEMPLATE_PRESETS: TemplatePreset[] = [
+  {
+    id: "fullscreen",
+    name: "Tela cheia",
+    description: "Uma única região ocupando todo o canvas.",
+    category: "Basic",
+    orientation: "landscape",
+    zones: [{ name: "Principal", x: 0, y: 0, w: 100, h: 100 }],
+  },
+  {
+    id: "split-h",
+    name: "2 regiões horizontais",
+    description: "Duas regiões lado a lado.",
+    category: "Split",
+    orientation: "landscape",
+    zones: [
+      { name: "Esquerda", x: 0, y: 0, w: 50, h: 100 },
+      { name: "Direita", x: 50, y: 0, w: 50, h: 100 },
+    ],
+  },
+  {
+    id: "split-v",
+    name: "2 regiões verticais",
+    description: "Uma acima da outra.",
+    category: "Split",
+    orientation: "landscape",
+    zones: [
+      { name: "Superior", x: 0, y: 0, w: 100, h: 50 },
+      { name: "Inferior", x: 0, y: 50, w: 100, h: 50 },
+    ],
+  },
+  {
+    id: "three",
+    name: "3 regiões",
+    description: "Uma principal e duas menores.",
+    category: "Split",
+    orientation: "landscape",
+    zones: [
+      { name: "Principal", x: 0, y: 0, w: 66, h: 100 },
+      { name: "Superior", x: 66, y: 0, w: 34, h: 50 },
+      { name: "Inferior", x: 66, y: 50, w: 34, h: 50 },
+    ],
+  },
+  {
+    id: "four",
+    name: "4 regiões",
+    description: "Quatro quadrantes iguais.",
+    category: "Grid",
+    orientation: "landscape",
+    zones: [
+      { name: "Superior esquerda", x: 0, y: 0, w: 50, h: 50 },
+      { name: "Superior direita", x: 50, y: 0, w: 50, h: 50 },
+      { name: "Inferior esquerda", x: 0, y: 50, w: 50, h: 50 },
+      { name: "Inferior direita", x: 50, y: 50, w: 50, h: 50 },
+    ],
+  },
+  {
+    id: "sidebar-left",
+    name: "Sidebar esquerda",
+    description: "Barra lateral esquerda + conteúdo.",
+    category: "Split",
+    orientation: "landscape",
+    zones: [
+      { name: "Sidebar", x: 0, y: 0, w: 25, h: 100 },
+      { name: "Conteúdo", x: 25, y: 0, w: 75, h: 100 },
+    ],
+  },
+  {
+    id: "sidebar-right",
+    name: "Sidebar direita",
+    description: "Conteúdo + barra lateral direita.",
+    category: "Split",
+    orientation: "landscape",
+    zones: [
+      { name: "Conteúdo", x: 0, y: 0, w: 75, h: 100 },
+      { name: "Sidebar", x: 75, y: 0, w: 25, h: 100 },
+    ],
+  },
+  {
+    id: "footer-rss",
+    name: "Rodapé RSS",
+    description: "Conteúdo principal + rodapé para ticker RSS.",
+    category: "Widgets",
+    orientation: "landscape",
+    zones: [
+      { name: "Principal", x: 0, y: 0, w: 100, h: 88 },
+      { name: "Ticker RSS", x: 0, y: 88, w: 100, h: 12 },
+    ],
+  },
+  {
+    id: "footer-image",
+    name: "Rodapé imagem",
+    description: "Conteúdo principal + rodapé com imagem.",
+    category: "Widgets",
+    orientation: "landscape",
+    zones: [
+      { name: "Principal", x: 0, y: 0, w: 100, h: 80 },
+      { name: "Rodapé", x: 0, y: 80, w: 100, h: 20 },
+    ],
+  },
+  {
+    id: "sidebar-footer",
+    name: "Sidebar + Rodapé",
+    description: "Sidebar direita + rodapé com ticker.",
+    category: "Widgets",
+    orientation: "landscape",
+    zones: [
+      { name: "Principal", x: 0, y: 0, w: 75, h: 85 },
+      { name: "Sidebar", x: 75, y: 0, w: 25, h: 85 },
+      { name: "Ticker", x: 0, y: 85, w: 100, h: 15 },
+    ],
+  },
+  {
+    id: "grid-2x2",
+    name: "Grade 2x2",
+    description: "Grade quatro colunas em dois níveis.",
+    category: "Grid",
+    orientation: "landscape",
+    zones: [
+      { name: "Z1", x: 0, y: 0, w: 50, h: 50 },
+      { name: "Z2", x: 50, y: 0, w: 50, h: 50 },
+      { name: "Z3", x: 0, y: 50, w: 50, h: 50 },
+      { name: "Z4", x: 50, y: 50, w: 50, h: 50 },
+    ],
+  },
+  {
+    id: "grid-3x3",
+    name: "Grade 3x3",
+    description: "Nove regiões iguais.",
+    category: "Grid",
+    orientation: "landscape",
+    zones: Array.from({ length: 9 }, (_, i) => ({
+      name: `Z${i + 1}`,
+      x: (i % 3) * (100 / 3),
+      y: Math.floor(i / 3) * (100 / 3),
+      w: 100 / 3,
+      h: 100 / 3,
+    })),
+  },
+  {
+    id: "custom",
+    name: "Layout personalizado",
+    description: "Comece do zero e adicione regiões livremente.",
+    category: "Basic",
+    orientation: "landscape",
+    zones: [],
+  },
+];
+
+function PresetThumbnail({ preset }: { preset: TemplatePreset }) {
+  const vb = preset.orientation === "portrait" ? "0 0 90 160" : "0 0 160 90";
+  return (
+    <svg
+      viewBox={vb}
+      preserveAspectRatio="xMidYMid meet"
+      className="h-full w-full"
+    >
+      <rect x="0" y="0" width="100%" height="100%" fill="hsl(222 47% 11%)" />
+      {preset.zones.length === 0 ? (
+        <g>
+          <rect
+            x="10%"
+            y="15%"
+            width="80%"
+            height="70%"
+            fill="transparent"
+            stroke="rgba(255,255,255,0.25)"
+            strokeWidth="0.5"
+            strokeDasharray="2 2"
+            rx="2"
+          />
+          <text
+            x="50%"
+            y="52%"
+            textAnchor="middle"
+            fill="rgba(255,255,255,0.45)"
+            fontSize="6"
+            fontFamily="Inter, system-ui, sans-serif"
+          >
+            + livre
+          </text>
+        </g>
+      ) : (
+        preset.zones.map((z, i) => (
+          <rect
+            key={i}
+            x={`${z.x}%`}
+            y={`${z.y}%`}
+            width={`${z.w}%`}
+            height={`${z.h}%`}
+            fill={zoneColor(i)}
+            stroke="rgba(255,255,255,0.35)"
+            strokeWidth="0.5"
+          />
+        ))
+      )}
+    </svg>
   );
 }
 
