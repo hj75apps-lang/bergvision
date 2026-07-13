@@ -514,6 +514,92 @@ function ReportPage() {
         </div>
       </header>
 
+      {/* Barra de filtros */}
+      <Card className="rounded-3xl border-border/60 bg-card/70 backdrop-blur-xl">
+        <CardContent className="flex flex-wrap items-end gap-3 p-4">
+          <div className="flex items-center gap-1.5 pr-2 text-xs font-medium text-muted-foreground">
+            <Filter className="h-3.5 w-3.5" />
+            Filtros
+          </div>
+
+          <FilterField label="Período" icon={CalendarClock}>
+            <Select value={period} onValueChange={(v) => setPeriod(v as typeof period)}>
+              <SelectTrigger className="h-9 w-[180px] rounded-xl">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent className="rounded-xl">
+                <SelectItem value="7d">Últimos 7 dias</SelectItem>
+                <SelectItem value="30d">Últimos 30 dias</SelectItem>
+                <SelectItem value="90d">Últimos 90 dias</SelectItem>
+                <SelectItem value="ytd">Este ano</SelectItem>
+                <SelectItem value="all">Todo o período</SelectItem>
+              </SelectContent>
+            </Select>
+          </FilterField>
+
+          <FilterField label="Organização" icon={Building2}>
+            <Select value={orgId ?? "current"} disabled>
+              <SelectTrigger className="h-9 w-[200px] rounded-xl">
+                <SelectValue>
+                  {membership?.organization?.name ?? "Organização atual"}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent />
+            </Select>
+          </FilterField>
+
+          <FilterField label="Player" icon={MonitorPlay}>
+            <Select value={playerId} onValueChange={setPlayerId}>
+              <SelectTrigger className="h-9 w-[220px] rounded-xl">
+                <SelectValue placeholder="Todos" />
+              </SelectTrigger>
+              <SelectContent className="rounded-xl">
+                <SelectItem value="all">Todos os players</SelectItem>
+                {rawPlayers.map((p) => (
+                  <SelectItem key={p.id} value={p.id}>
+                    {p.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </FilterField>
+
+          <FilterField label="Campanha" icon={ListMusic}>
+            <Select value={playlistId} onValueChange={setPlaylistId}>
+              <SelectTrigger className="h-9 w-[220px] rounded-xl">
+                <SelectValue placeholder="Todas" />
+              </SelectTrigger>
+              <SelectContent className="rounded-xl">
+                <SelectItem value="all">Todas as campanhas</SelectItem>
+                {rawPlaylists.map((pl) => (
+                  <SelectItem key={pl.id} value={pl.id}>
+                    {pl.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </FilterField>
+
+          <div className="ml-auto flex items-center gap-2">
+            {activeFilterCount > 0 && (
+              <Badge variant="secondary" className="rounded-full text-[11px]">
+                {activeFilterCount} ativo(s)
+              </Badge>
+            )}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={resetFilters}
+              disabled={activeFilterCount === 0}
+              className="h-9 rounded-xl text-xs"
+            >
+              <X className="mr-1 h-3.5 w-3.5" />
+              Limpar
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
       {loading ? (
         <GridSkeleton count={8} heightClass="h-32" />
       ) : (
