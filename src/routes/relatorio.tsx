@@ -1116,6 +1116,26 @@ function LegendDot({ color, label }: { color: string; label: string }) {
   );
 }
 
+function FilterField({
+  label,
+  icon: Icon,
+  children,
+}: {
+  label: string;
+  icon: typeof MonitorPlay;
+  children: React.ReactNode;
+}) {
+  return (
+    <label className="flex flex-col gap-1">
+      <span className="inline-flex items-center gap-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+        <Icon className="h-3 w-3" />
+        {label}
+      </span>
+      {children}
+    </label>
+  );
+}
+
 function EmptyRow({ label }: { label: string }) {
   return <p className="px-6 py-10 text-center text-sm text-muted-foreground">{label}</p>;
 }
