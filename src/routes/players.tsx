@@ -365,26 +365,40 @@ function PairDialog({
     setSubmitting(true);
     try {
       const { data, error } = await supabase.functions.invoke("confirm-pairing", {
-        body: { pin_code: pin, name: name.trim() },
+        body: {
+          // Enviamos aliases porque a Edge Function pode aceitar qualquer um destes nomes.
+          pin_code: pin,
+          pairing_code: pin,
+          code: pin,
+          name: name.trim(),
+          player_name: name.trim(),
+        },
       });
       if (error) {
         // Tenta extrair mensagem detalhada da resposta
         let detail = "";
+        let status: number | undefined;
         try {
           const ctx = (error as any).context;
+          status = ctx?.status;
           if (ctx?.json) detail = (await ctx.json())?.error ?? "";
           else if (ctx?.text) detail = await ctx.text();
         } catch {
           /* noop */
         }
         const msg = (detail || error.message || "").toString().toLowerCase();
+        if (status === 404 || msg.includes("not_found") && msg.includes("function")) {
+          throw new Error(
+            "Edge Function 'confirm-pairing' não está publicada no Supabase. Faça o deploy com `supabase functions deploy confirm-pairing` (ou peça ao administrador do backend).",
+          );
+        }
         if (msg.includes("expired")) {
           throw new Error("Este PIN expirou. Gere um novo no player.");
         }
         if (msg.includes("used") || msg.includes("already")) {
           throw new Error("Este PIN já foi utilizado.");
         }
-        if (msg.includes("invalid") || msg.includes("not found") || msg.includes("not_found")) {
+        if (msg.includes("invalid") || msg.includes("not found")) {
           throw new Error("PIN inválido. Verifique os 6 dígitos.");
         }
         throw new Error(detail || error.message);
