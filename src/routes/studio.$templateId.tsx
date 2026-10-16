@@ -427,10 +427,17 @@ function EditorPage() {
   );
 
   const isFullscreenable = useCallback((el: TemplateElement) => {
+    // Widgets (vídeo por link, clima, iframe), formas, mídias e o
+    // placeholder de Contador (elemento de texto) abrem em tela cheia
+    // com duplo clique.
     return (
       el.element_type === "image" ||
       el.element_type === "video" ||
-      el.element_type === "widget"
+      el.element_type === "logo" ||
+      el.element_type === "playlist" ||
+      el.element_type === "widget" ||
+      el.element_type === "shape" ||
+      el.element_type === "text"
     );
   }, []);
 
