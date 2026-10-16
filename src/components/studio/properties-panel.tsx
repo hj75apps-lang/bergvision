@@ -3382,9 +3382,17 @@ function IframeConfig({
     if (/<iframe/i.test(trimmed)) {
       const match = trimmed.match(/\bsrc\s*=\s*["']([^"']+)["']/i);
       if (match?.[1]) {
-        setCfg({ url: match[1].trim() });
+        const src = match[1].trim();
+        const embed = toVideoEmbedUrl(src);
+        setCfg(embed ? { url: embed, allowScripts: true, allowSameOrigin: true } : { url: src });
         return;
       }
+    }
+    // Links de vídeo (YouTube, Vimeo, Drive...) viram URL de incorporação.
+    const embed = toVideoEmbedUrl(trimmed);
+    if (embed) {
+      setCfg({ url: embed, allowScripts: true, allowSameOrigin: true });
+      return;
     }
     setCfg({ url: trimmed });
   };

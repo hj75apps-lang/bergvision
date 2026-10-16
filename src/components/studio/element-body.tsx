@@ -1,3 +1,4 @@
+import { isVideoEmbedHost } from "@/lib/studio/video-embed";
 import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
@@ -377,7 +378,8 @@ function IframeWidget({ config }: { config: Record<string, unknown> }) {
       ? Math.max(0, Math.min(3600, Math.round(config.refreshSeconds)))
       : 0;
   const allowScripts = config.allowScripts !== false;
-  const allowSameOrigin = config.allowSameOrigin === true;
+  const isVideo = isVideoEmbedHost(url);
+  const allowSameOrigin = config.allowSameOrigin === true || isVideo;
   const [nonce, setNonce] = useState(0);
   useEffect(() => {
     if (refresh <= 0) return;
@@ -410,9 +412,9 @@ function IframeWidget({ config }: { config: Record<string, unknown> }) {
         src={src}
         title="Iframe widget"
         loading="lazy"
-        referrerPolicy="no-referrer"
-        sandbox={sandboxTokens}
-        allow="autoplay; fullscreen; geolocation"
+        referrerPolicy={isVideo ? "strict-origin-when-cross-origin" : "no-referrer"}
+        sandbox={isVideo ? `${sandboxTokens} allow-presentation` : sandboxTokens}
+        allow="autoplay; fullscreen; geolocation; encrypted-media; picture-in-picture"
         style={{
           border: 0,
           width: inverse,
