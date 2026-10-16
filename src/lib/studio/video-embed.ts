@@ -39,7 +39,9 @@ export function toVideoEmbedUrl(raw: string): string | null {
       const h = u.searchParams.get("h");
       return `https://player.vimeo.com/video/${fromVideo[1]}?autoplay=1&muted=1&loop=1&background=1${h ? `&h=${h}` : ""}`;
     }
-    const m = u.pathname.match(/(\d{5,})(?:\/([\w]+))?/);
+    // ID numérico precisa ser um segmento inteiro do caminho (evita pegar
+    // números de "user12345678"). Links "bonitos" sem ID vão para o oEmbed.
+    const m = u.pathname.match(/(?:^|\/)(\d{5,})(?:\/([0-9a-f]{6,}))?\/?$/i);
     if (!m) return null;
     const h = u.searchParams.get("h") ?? m[2];
     return `https://player.vimeo.com/video/${m[1]}?autoplay=1&muted=1&loop=1&background=1${h ? `&h=${h}` : ""}`;
@@ -86,5 +88,36 @@ export function isVideoEmbedHost(url: string): boolean {
     );
   } catch {
     return false;
+  }
+}
+
+/** Link de página do Vimeo que precisa ser resolvido pelo oEmbed oficial. */
+export function needsVimeoOEmbed(url: string): boolean {
+  try {
+    const u = new URL(url.trim());
+    const host = u.hostname.replace(/^www\./, "");
+    return host === "vimeo.com" && toVideoEmbedUrl(url) === null;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Resolve qualquer link público do Vimeo (inclusive URLs personalizadas sem ID)
+ * pela API pública oEmbed do Vimeo, que permite chamadas do navegador.
+ */
+export async function resolveVimeoEmbed(url: string): Promise<string | null> {
+  try {
+    const res = await fetch(
+      `https://vimeo.com/api/oembed.json?url=${encodeURIComponent(url.trim())}`,
+    );
+    if (!res.ok) return null;
+    const data = (await res.json()) as { html?: string; video_id?: number };
+    const src = data.html?.match(/src="([^"]+)"/)?.[1];
+    if (src) return toVideoEmbedUrl(src.replace(/&amp;/g, "&"));
+    if (data.video_id) return toVideoEmbedUrl(`https://vimeo.com/${data.video_id}`);
+    return null;
+  } catch {
+    return null;
   }
 }
