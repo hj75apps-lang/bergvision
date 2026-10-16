@@ -358,6 +358,22 @@ function StudioPage() {
         </div>
       )}
 
+      {previewTarget && (
+        <PreviewPanel
+          scope="template"
+          targetId={previewTarget.id}
+          mode="modal"
+          open
+          onOpenChange={(o) => !o && setPreviewTarget(null)}
+          defaultResolutionId={
+            (previewTarget.canvas_height ?? 1080) >
+            (previewTarget.canvas_width ?? 1920)
+              ? "p-fhd"
+              : "fhd"
+          }
+        />
+      )}
+
       <CreateDialog
         open={creating}
         onOpenChange={setCreating}
