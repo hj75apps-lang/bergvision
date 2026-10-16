@@ -279,10 +279,10 @@ export type GroupItem = {
 };
 
 function InlineMediaGroup({ c }: { c: Record<string, unknown> }) {
-  const rawItems = Array.isArray(c.items) ? (c.items as unknown[]) : [];
+  const itemsSrc = c.items;
   const items = useMemo(
     () =>
-      rawItems
+      (Array.isArray(itemsSrc) ? (itemsSrc as unknown[]) : [])
         .map((it) => it as Partial<GroupItem>)
         .filter(
           (it): it is GroupItem =>
@@ -290,7 +290,7 @@ function InlineMediaGroup({ c }: { c: Record<string, unknown> }) {
             typeof it.storagePath === "string" &&
             (it.type === "image" || it.type === "video"),
         ),
-    [rawItems],
+    [itemsSrc],
   );
   const loop = (c.loop as boolean | undefined) ?? true;
   const transition = ((c.transition as string) ?? "fade") as "none" | "fade";
@@ -1357,13 +1357,13 @@ function ImageSequenceBody({
   c: Record<string, unknown>;
   appearance?: React.CSSProperties;
 }) {
-  const rawFrames = Array.isArray(c.frames) ? (c.frames as unknown[]) : [];
+  const framesSrc = c.frames;
   const frames = useMemo(
     () =>
-      rawFrames
+      (Array.isArray(framesSrc) ? (framesSrc as unknown[]) : [])
         .map((f) => f as { storagePath?: string })
         .filter((f): f is { storagePath: string } => typeof f?.storagePath === "string"),
-    [rawFrames],
+    [framesSrc],
   );
   const fps = Math.max(1, Math.min(60, (c.fps as number) ?? 12));
   const loop = (c.loop as boolean | undefined) ?? true;
