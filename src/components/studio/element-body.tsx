@@ -420,6 +420,7 @@ function IframeWidget({ config }: { config: Record<string, unknown> }) {
     return () => window.clearInterval(id);
   }, [refresh]);
   const isValid = /^https:\/\//i.test(url);
+  const isYouTube = /^https:\/\/(www\.)?youtube(-nocookie)?\.com\/embed/i.test(url);
   if (vimeoState === "loading" || vimeoState === "failed") {
     return (
       <div className="flex h-full w-full items-center justify-center rounded-md border border-dashed border-white/30 bg-black/60 p-3 text-center text-[11px] text-white/80">
@@ -460,14 +461,30 @@ function IframeWidget({ config }: { config: Record<string, unknown> }) {
         sandbox={isVideo ? undefined : sandboxTokens}
         allow="autoplay *; fullscreen *; geolocation; encrypted-media *; picture-in-picture *"
         allowFullScreen
-        style={{
-          border: 0,
-          width: inverse,
-          height: inverse,
-          transform: `scale(${scale})`,
-          transformOrigin: "top left",
-          display: "block",
-        }}
+        style={
+          isYouTube
+            ? {
+                // Iframe 3x mais alto e centralizado: o vídeo fica do mesmo
+                // tamanho no meio, e título, logo e "Mais vídeos" (presos às
+                // bordas do player) ficam fora da área visível.
+                border: 0,
+                position: "absolute",
+                left: 0,
+                top: "-100%",
+                width: "100%",
+                height: "300%",
+                display: "block",
+                pointerEvents: "none",
+              }
+            : {
+                border: 0,
+                width: inverse,
+                height: inverse,
+                transform: `scale(${scale})`,
+                transformOrigin: "top left",
+                display: "block",
+              }
+        }
       />
       {/* Camada transparente: impede que o iframe "engula" cliques, permitindo
           selecionar, mover, redimensionar, excluir e substituir o widget no editor. */}
