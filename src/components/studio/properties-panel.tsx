@@ -3376,6 +3376,16 @@ function IframeConfig({
   const allowScripts = config.allowScripts !== false;
   const allowSameOrigin = config.allowSameOrigin === true;
   const isValid = /^https:\/\//i.test(url);
+  // Elementos salvos com link de página (ex.: vimeo.com/123) são recusados
+  // pelo serviço dentro do player — grava a URL de incorporação no lugar.
+  useEffect(() => {
+    if (disabled || !url) return;
+    const embed = toVideoEmbedUrl(url);
+    if (embed && embed !== url) {
+      setCfg({ url: embed, allowScripts: true, allowSameOrigin: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [url, disabled]);
   const handleUrlInput = (raw: string) => {
     const trimmed = raw.trim();
     // Aceita colar tanto uma URL crua quanto um snippet completo de <iframe ...>.
