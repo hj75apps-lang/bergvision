@@ -3,7 +3,10 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   FileVideo,
+  Folder,
+  FolderPlus,
   FolderTree,
+  MoreVertical,
   ImageIcon,
   Loader2,
   Pencil,
@@ -45,6 +48,12 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { GridSkeleton } from "@/components/layout/grid-skeleton";
@@ -205,6 +214,33 @@ async function insertMediaFileWithSchemaFallback(payload: Record<string, unknown
   }
 }
 
+const FOLDER_NAME_MAX = 60;
+
+function normalizeFolderName(raw: string): string {
+  return raw.replace(/\s+/g, " ").trim().slice(0, FOLDER_NAME_MAX);
+}
+
+/** Pastas vazias ainda sem arquivos (ficam neste dispositivo até receberem o 1º arquivo). */
+function useLocalFolders(orgId: string | null) {
+  const key = orgId ? `bv:media-folders:${orgId}` : null;
+  const [list, setList] = useState<string[]>([]);
+  useEffect(() => {
+    if (!key) return;
+    try {
+      const raw = window.localStorage.getItem(key);
+      const parsed: unknown = raw ? JSON.parse(raw) : [];
+      setList(Array.isArray(parsed) ? parsed.filter((x): x is string => typeof x === "string") : []);
+    } catch {
+      setList([]);
+    }
+  }, [key]);
+  const save = (next: string[]) => {
+    setList(next);
+    if (key) window.localStorage.setItem(key, JSON.stringify(next));
+  };
+  return { list, save };
+}
+
 function useSignedUrl(path: string | null | undefined) {
   const [url, setUrl] = useState<string | null>(null);
   useEffect(() => {
@@ -235,6 +271,7 @@ function BibliotecaPage() {
   const [kindFilter, setKindFilter] = useState<"all" | "image" | "video">("all");
   const [folderFilter, setFolderFilter] = useState<string>("all");
   const [preview, setPreview] = useState<MediaFile | null>(null);
+  const invalidate = () => qc.invalidateQueries({ queryKey: ["media_files", orgId] });
 
   const filesQ = useQuery({
     queryKey: ["media_files", orgId],
@@ -242,15 +279,93 @@ function BibliotecaPage() {
     queryFn: () => fetchMediaFiles(orgId!),
   });
 
-  const files = filesQ.data ?? [];
+  const files = useMemo(() => filesQ.data ?? [], [filesQ.data]);
+  const localFolders = useLocalFolders(orgId);
+  const [folderDialog, setFolderDialog] = useState<
+    { mode: "create" } | { mode: "rename"; name: string } | null
+  >(null);
+  const [folderToDelete, setFolderToDelete] = useState<string | null>(null);
+
+  const folderCounts = useMemo(() => {
+    const map = new Map<string, number>();
+    files.forEach((f) => {
+      const name = (f.folder ?? "").trim();
+      if (name) map.set(name, (map.get(name) ?? 0) + 1);
+    });
+    return map;
+  }, [files]);
 
   const folders = useMemo(() => {
-    const set = new Set<string>();
-    files.forEach((f) => {
-      if (f.folder && f.folder.trim()) set.add(f.folder.trim());
-    });
-    return Array.from(set).sort();
-  }, [files]);
+    const set = new Set<string>(folderCounts.keys());
+    localFolders.list.forEach((f) => set.add(f));
+    return Array.from(set).sort((a, b) => a.localeCompare(b, "pt-BR"));
+  }, [folderCounts, localFolders.list]);
+
+  const noFolderCount = files.length - Array.from(folderCounts.values()).reduce((a, b) => a + b, 0);
+  const activeFolder = folderFilter !== "all" && folderFilter !== "__none__" ? folderFilter : "";
+
+  const renameFolder = useMutation({
+    mutationFn: async ({ from, to }: { from: string; to: string }) => {
+      if ((folderCounts.get(from) ?? 0) > 0) {
+        const { error } = await supabase
+          .from("media_files")
+          .update({ folder: to })
+          .eq("organization_id", orgId!)
+          .eq("folder", from);
+        if (error) throw error;
+      }
+    },
+    onSuccess: (_d, { from, to }) => {
+      localFolders.save(
+        Array.from(new Set(localFolders.list.map((f) => (f === from ? to : f)))),
+      );
+      if (folderFilter === from) setFolderFilter(to);
+      toast.success("Pasta renomeada.");
+      setFolderDialog(null);
+      invalidate();
+    },
+    onError: (err: any) => toast.error(err?.message || "Falha ao renomear a pasta."),
+  });
+
+  const deleteFolder = useMutation({
+    mutationFn: async (name: string) => {
+      if ((folderCounts.get(name) ?? 0) > 0) {
+        const { error } = await supabase
+          .from("media_files")
+          .update({ folder: null })
+          .eq("organization_id", orgId!)
+          .eq("folder", name);
+        if (error) throw error;
+      }
+    },
+    onSuccess: (_d, name) => {
+      localFolders.save(localFolders.list.filter((f) => f !== name));
+      if (folderFilter === name) setFolderFilter("all");
+      toast.success("Pasta excluída. Os arquivos foram mantidos em \"Sem pasta\".");
+      setFolderToDelete(null);
+      invalidate();
+    },
+    onError: (err: any) => toast.error(err?.message || "Falha ao excluir a pasta."),
+  });
+
+  const submitFolderName = (raw: string) => {
+    const name = normalizeFolderName(raw);
+    if (!name) {
+      toast.error("Digite um nome para a pasta.");
+      return;
+    }
+    if (folderDialog?.mode === "rename") {
+      if (name === folderDialog.name) return setFolderDialog(null);
+      if (folders.includes(name)) return toast.error("Já existe uma pasta com esse nome.");
+      renameFolder.mutate({ from: folderDialog.name, to: name });
+      return;
+    }
+    if (folders.includes(name)) return toast.error("Já existe uma pasta com esse nome.");
+    localFolders.save([...localFolders.list, name]);
+    setFolderFilter(name);
+    setFolderDialog(null);
+    toast.success(`Pasta "${name}" criada. Envie arquivos para ela.`);
+  };
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -267,7 +382,6 @@ function BibliotecaPage() {
     });
   }, [files, search, kindFilter, folderFilter]);
 
-  const invalidate = () => qc.invalidateQueries({ queryKey: ["media_files", orgId] });
 
   return (
     <div className="mx-auto max-w-6xl space-y-6">
@@ -280,7 +394,51 @@ function BibliotecaPage() {
         </div>
       </header>
 
-      {canManage && orgId && <Uploader orgId={orgId} onUploaded={invalidate} />}
+      {canManage && orgId && (
+        <Uploader orgId={orgId} folder={activeFolder} onUploaded={invalidate} />
+      )}
+
+      <section className="space-y-3">
+        <div className="flex items-center justify-between gap-2">
+          <h2 className="text-sm font-medium text-muted-foreground">Pastas</h2>
+          {canManage && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="rounded-xl"
+              onClick={() => setFolderDialog({ mode: "create" })}
+            >
+              <FolderPlus className="mr-1.5 h-4 w-4" />
+              Nova pasta
+            </Button>
+          )}
+        </div>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+          <FolderTile
+            label="Todos os arquivos"
+            count={files.length}
+            active={folderFilter === "all"}
+            onClick={() => setFolderFilter("all")}
+          />
+          <FolderTile
+            label="Sem pasta"
+            count={noFolderCount}
+            active={folderFilter === "__none__"}
+            onClick={() => setFolderFilter("__none__")}
+          />
+          {folders.map((name) => (
+            <FolderTile
+              key={name}
+              label={name}
+              count={folderCounts.get(name) ?? 0}
+              active={folderFilter === name}
+              onClick={() => setFolderFilter(name)}
+              onRename={canManage ? () => setFolderDialog({ mode: "rename", name }) : undefined}
+              onDelete={canManage ? () => setFolderToDelete(name) : undefined}
+            />
+          ))}
+        </div>
+      </section>
 
       <div className="flex flex-wrap items-center gap-3">
         <div className="relative min-w-[220px] flex-1">
@@ -302,21 +460,6 @@ function BibliotecaPage() {
             <SelectItem value="video">Vídeos</SelectItem>
           </SelectContent>
         </Select>
-        <Select value={folderFilter} onValueChange={setFolderFilter}>
-          <SelectTrigger className="h-10 w-[180px] rounded-xl">
-            <FolderTree className="mr-1.5 h-4 w-4 text-muted-foreground" />
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todas as pastas</SelectItem>
-            <SelectItem value="__none__">Sem pasta</SelectItem>
-            {folders.map((f) => (
-              <SelectItem key={f} value={f}>
-                {f}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
       </div>
 
       {filesQ.isLoading ? (
@@ -334,6 +477,7 @@ function BibliotecaPage() {
               key={f.id}
               file={f}
               canManage={canManage}
+              folders={folders}
               onPreview={() => setPreview(f)}
               onChanged={invalidate}
             />
@@ -342,18 +486,179 @@ function BibliotecaPage() {
       )}
 
       <PreviewDialog file={preview} onOpenChange={(o) => !o && setPreview(null)} />
+
+      <FolderNameDialog
+        state={folderDialog}
+        pending={renameFolder.isPending}
+        onOpenChange={(o) => !o && setFolderDialog(null)}
+        onSubmit={submitFolderName}
+      />
+
+      <AlertDialog open={!!folderToDelete} onOpenChange={(o) => !o && setFolderToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir pasta?</AlertDialogTitle>
+            <AlertDialogDescription>
+              A pasta &ldquo;{folderToDelete}&rdquo; será removida. Os arquivos dentro dela não
+              serão apagados — eles irão para &ldquo;Sem pasta&rdquo;.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => folderToDelete && deleteFolder.mutate(folderToDelete)}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Excluir pasta
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
+  );
+}
+
+function FolderTile({
+  label,
+  count,
+  active,
+  onClick,
+  onRename,
+  onDelete,
+}: {
+  label: string;
+  count: number;
+  active: boolean;
+  onClick: () => void;
+  onRename?: () => void;
+  onDelete?: () => void;
+}) {
+  return (
+    <div
+      className={`group relative flex items-center gap-3 rounded-2xl border p-3 transition-colors ${
+        active
+          ? "border-primary/60 bg-primary/10"
+          : "border-border/60 bg-card/50 hover:border-border hover:bg-card/80"
+      }`}
+    >
+      <button type="button" onClick={onClick} className="flex min-w-0 flex-1 items-center gap-3 text-left">
+        <span
+          className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl ${
+            active ? "bg-primary/20 text-primary" : "bg-muted/60 text-muted-foreground"
+          }`}
+        >
+          <Folder className="h-4 w-4" />
+        </span>
+        <span className="min-w-0">
+          <span className="block truncate text-sm font-medium" title={label}>
+            {label}
+          </span>
+          <span className="block text-xs text-muted-foreground">
+            {count} {count === 1 ? "arquivo" : "arquivos"}
+          </span>
+        </span>
+      </button>
+      {(onRename || onDelete) && (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label={`Opções da pasta ${label}`}
+              className="h-8 w-8 shrink-0 rounded-lg text-muted-foreground"
+            >
+              <MoreVertical className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            {onRename && (
+              <DropdownMenuItem onClick={onRename}>
+                <Pencil className="mr-2 h-4 w-4" /> Renomear
+              </DropdownMenuItem>
+            )}
+            {onDelete && (
+              <DropdownMenuItem onClick={onDelete} className="text-destructive focus:text-destructive">
+                <Trash2 className="mr-2 h-4 w-4" /> Excluir pasta
+              </DropdownMenuItem>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      )}
+    </div>
+  );
+}
+
+function FolderNameDialog({
+  state,
+  pending,
+  onOpenChange,
+  onSubmit,
+}: {
+  state: { mode: "create" } | { mode: "rename"; name: string } | null;
+  pending: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSubmit: (name: string) => void;
+}) {
+  const [value, setValue] = useState("");
+  useEffect(() => {
+    if (state) setValue(state.mode === "rename" ? state.name : "");
+  }, [state]);
+  const isRename = state?.mode === "rename";
+  return (
+    <Dialog open={!!state} onOpenChange={onOpenChange}>
+      <DialogContent className="rounded-2xl sm:max-w-sm">
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            onSubmit(value);
+          }}
+          className="space-y-4"
+        >
+          <DialogHeader>
+            <DialogTitle>{isRename ? "Renomear pasta" : "Nova pasta"}</DialogTitle>
+            <DialogDescription>
+              {isRename
+                ? "Todos os arquivos desta pasta passarão a usar o novo nome."
+                : "Dê um nome para organizar seus arquivos."}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="folder-name">Nome da pasta</Label>
+            <Input
+              id="folder-name"
+              autoFocus
+              maxLength={FOLDER_NAME_MAX}
+              value={value}
+              onChange={(e) => setValue(e.target.value)}
+              placeholder="Ex.: Campanha de Verão"
+              className="h-10 rounded-xl"
+            />
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} className="rounded-xl">
+              Cancelar
+            </Button>
+            <Button type="submit" disabled={pending} className="rounded-xl">
+              {pending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {isRename ? "Salvar" : "Criar pasta"}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }
 
 function MediaCard({
   file,
   canManage,
+  folders,
   onPreview,
   onChanged,
 }: {
   file: MediaFile;
   canManage: boolean;
+  folders: string[];
   onPreview: () => void;
   onChanged: () => void;
 }) {
@@ -488,6 +793,7 @@ function MediaCard({
         open={folderOpen}
         onOpenChange={setFolderOpen}
         file={file}
+        folders={folders}
         onSaved={onChanged}
       />
     </Card>
@@ -498,11 +804,13 @@ function FolderDialog({
   open,
   onOpenChange,
   file,
+  folders,
   onSaved,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   file: MediaFile;
+  folders: string[];
   onSaved: () => void;
 }) {
   const [value, setValue] = useState(file.folder ?? "");
@@ -512,7 +820,7 @@ function FolderDialog({
 
   const save = useMutation({
     mutationFn: async () => {
-      const folder = value.trim() || null;
+      const folder = normalizeFolderName(value) || null;
       const { error } = await supabase
         .from("media_files")
         .update({ folder })
@@ -533,13 +841,38 @@ function FolderDialog({
         <DialogHeader>
           <DialogTitle>Mover para pasta</DialogTitle>
           <DialogDescription>
-            Digite o nome da pasta (deixe vazio para tirar da pasta).
+            Escolha uma pasta ou digite um nome novo.
           </DialogDescription>
         </DialogHeader>
-        <div className="space-y-2">
+        <div className="space-y-3">
+          <div className="flex max-h-40 flex-wrap gap-1.5 overflow-y-auto">
+            <Button
+              type="button"
+              size="sm"
+              variant={value.trim() === "" ? "default" : "outline"}
+              className="h-8 rounded-full"
+              onClick={() => setValue("")}
+            >
+              Sem pasta
+            </Button>
+            {folders.map((f) => (
+              <Button
+                key={f}
+                type="button"
+                size="sm"
+                variant={value.trim() === f ? "default" : "outline"}
+                className="h-8 max-w-full rounded-full"
+                onClick={() => setValue(f)}
+              >
+                <Folder className="mr-1 h-3.5 w-3.5" />
+                <span className="truncate">{f}</span>
+              </Button>
+            ))}
+          </div>
           <Label htmlFor="folder-input">Pasta</Label>
           <Input
             id="folder-input"
+            maxLength={FOLDER_NAME_MAX}
             value={value}
             onChange={(e) => setValue(e.target.value)}
             placeholder="Ex.: Campanhas"
@@ -605,13 +938,20 @@ function PreviewDialog({
   );
 }
 
-function Uploader({ orgId, onUploaded }: { orgId: string; onUploaded: () => void }) {
+function Uploader({
+  orgId,
+  folder,
+  onUploaded,
+}: {
+  orgId: string;
+  folder: string;
+  onUploaded: () => void;
+}) {
   const { user } = useAuth();
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
   const [progress, setProgress] = useState<number | null>(null);
   const [currentName, setCurrentName] = useState<string | null>(null);
-  const [folder, setFolder] = useState("");
 
   const uploadFile = async (file: File) => {
     const v = validateFile(file);
@@ -706,7 +1046,6 @@ function Uploader({ orgId, onUploaded }: { orgId: string; onUploaded: () => void
   const uploadMany = async (files: FileList | File[]) => {
     const list = Array.from(files);
     for (const f of list) {
-      // eslint-disable-next-line no-await-in-loop
       await uploadFile(f);
     }
   };
@@ -744,12 +1083,10 @@ function Uploader({ orgId, onUploaded }: { orgId: string; onUploaded: () => void
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <Input
-            placeholder="Pasta (opcional)"
-            value={folder}
-            onChange={(e) => setFolder(e.target.value)}
-            className="h-10 w-40 rounded-xl"
-          />
+          <span className="inline-flex max-w-[200px] items-center gap-1.5 truncate rounded-xl bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
+            <Folder className="h-3.5 w-3.5 shrink-0" />
+            <span className="truncate">{folder ? `Enviar para: ${folder}` : "Enviar sem pasta"}</span>
+          </span>
           <Button
             type="button"
             onClick={() => inputRef.current?.click()}
