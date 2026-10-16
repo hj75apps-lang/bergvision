@@ -771,8 +771,8 @@ function MediaCard({
         setDragging(true);
       }}
       onDragEnd={() => setDragging(false)}
-      className={`group overflow-hidden rounded-2xl transition-opacity ${dragging ? "opacity-40" : ""} ${canManage ? "cursor-grab active:cursor-grabbing" : ""}`}
-      data-x="group overflow-hidden rounded-2xl border-border/60 bg-card/60 backdrop-blur-xl">
+      className={`group overflow-hidden rounded-2xl transition-opacity ${dragging ? "opacity-40" : ""} ${canManage ? "cursor-grab active:cursor-grabbing" : ""} border-border/60 bg-card/60 backdrop-blur-xl`}
+    >
       <button
         type="button"
         onClick={onPreview}
