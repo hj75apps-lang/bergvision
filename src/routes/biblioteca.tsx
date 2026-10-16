@@ -215,6 +215,7 @@ async function insertMediaFileWithSchemaFallback(payload: Record<string, unknown
 }
 
 const FOLDER_NAME_MAX = 60;
+const DRAG_MIME = "application/x-bv-media-id";
 
 function normalizeFolderName(raw: string): string {
   return raw.replace(/\s+/g, " ").trim().slice(0, FOLDER_NAME_MAX);
@@ -348,6 +349,27 @@ function BibliotecaPage() {
     onError: (err: any) => toast.error(err?.message || "Falha ao excluir a pasta."),
   });
 
+  const moveFile = useMutation({
+    mutationFn: async ({ id, folder }: { id: string; folder: string | null }) => {
+      const { error } = await supabase.from("media_files").update({ folder }).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: (_d, { folder }) => {
+      toast.success(folder ? `Arquivo movido para "${folder}".` : "Arquivo movido para \"Sem pasta\".");
+      invalidate();
+    },
+    onError: (err: any) => toast.error(err?.message || "Falha ao mover o arquivo."),
+  });
+
+  const dropOn = (folder: string | null) =>
+    canManage
+      ? (id: string) => {
+          const file = files.find((f) => f.id === id);
+          if (!file || (file.folder ?? null) === folder) return;
+          moveFile.mutate({ id, folder });
+        }
+      : undefined;
+
   const submitFolderName = (raw: string) => {
     const name = normalizeFolderName(raw);
     if (!name) {
@@ -413,6 +435,11 @@ function BibliotecaPage() {
             </Button>
           )}
         </div>
+        {canManage && files.length > 0 && (
+          <p className="text-xs text-muted-foreground">
+            Dica: arraste um arquivo até uma pasta para movê-lo.
+          </p>
+        )}
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
           <FolderTile
             label="Todos os arquivos"
@@ -425,6 +452,7 @@ function BibliotecaPage() {
             count={noFolderCount}
             active={folderFilter === "__none__"}
             onClick={() => setFolderFilter("__none__")}
+            onDropFile={dropOn(null)}
           />
           {folders.map((name) => (
             <FolderTile
@@ -433,6 +461,7 @@ function BibliotecaPage() {
               count={folderCounts.get(name) ?? 0}
               active={folderFilter === name}
               onClick={() => setFolderFilter(name)}
+              onDropFile={dropOn(name)}
               onRename={canManage ? () => setFolderDialog({ mode: "rename", name }) : undefined}
               onDelete={canManage ? () => setFolderToDelete(name) : undefined}
             />
@@ -525,6 +554,7 @@ function FolderTile({
   onClick,
   onRename,
   onDelete,
+  onDropFile,
 }: {
   label: string;
   count: number;
@@ -532,11 +562,30 @@ function FolderTile({
   onClick: () => void;
   onRename?: () => void;
   onDelete?: () => void;
+  onDropFile?: (id: string) => void;
 }) {
+  const [over, setOver] = useState(false);
   return (
     <div
+      onDragOver={(e) => {
+        if (!onDropFile || !e.dataTransfer.types.includes(DRAG_MIME)) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = "move";
+        setOver(true);
+      }}
+      onDragLeave={() => setOver(false)}
+      onDrop={(e) => {
+        setOver(false);
+        const id = e.dataTransfer.getData(DRAG_MIME);
+        if (!onDropFile || !id) return;
+        e.preventDefault();
+        e.stopPropagation();
+        onDropFile(id);
+      }}
       className={`group relative flex items-center gap-3 rounded-2xl border p-3 transition-colors ${
-        active
+        over
+          ? "border-primary bg-primary/20 ring-2 ring-primary/40"
+          : active
           ? "border-primary/60 bg-primary/10"
           : "border-border/60 bg-card/50 hover:border-border hover:bg-card/80"
       }`}
@@ -665,6 +714,7 @@ function MediaCard({
   const thumbUrl = useSignedUrl(file.thumbnail_path ?? file.storage_path);
   const isVideo = (file.type ?? "").toString().toLowerCase() === "video";
   const [folderOpen, setFolderOpen] = useState(false);
+  const [renameOpen, setRenameOpen] = useState(false);
 
   const remove = useMutation({
     mutationFn: async () => {
@@ -697,7 +747,13 @@ function MediaCard({
   });
 
   return (
-    <Card className="group overflow-hidden rounded-2xl border-border/60 bg-card/60 backdrop-blur-xl">
+    <Card
+      draggable={canManage}
+      onDragStart={(e) => {
+        e.dataTransfer.setData(DRAG_MIME, file.id);
+        e.dataTransfer.effectAllowed = "move";
+      }}
+      className="group overflow-hidden rounded-2xl border-border/60 bg-card/60 backdrop-blur-xl">
       <button
         type="button"
         onClick={onPreview}
@@ -756,6 +812,17 @@ function MediaCard({
             {canManage && <Pencil className="h-3 w-3 shrink-0 opacity-60" />}
           </button>
           {canManage && (
+            <div className="flex shrink-0 items-center">
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label="Renomear arquivo"
+              title="Renomear"
+              onClick={() => setRenameOpen(true)}
+              className="h-8 w-8 rounded-lg text-muted-foreground hover:text-foreground"
+            >
+              <Pencil className="h-4 w-4" />
+            </Button>
             <AlertDialog>
               <AlertDialogTrigger asChild>
                 <Button
@@ -785,9 +852,17 @@ function MediaCard({
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
+            </div>
           )}
         </div>
       </CardContent>
+
+      <RenameFileDialog
+        open={renameOpen}
+        onOpenChange={setRenameOpen}
+        file={file}
+        onSaved={onChanged}
+      />
 
       <FolderDialog
         open={folderOpen}
@@ -797,6 +872,77 @@ function MediaCard({
         onSaved={onChanged}
       />
     </Card>
+  );
+}
+
+function RenameFileDialog({
+  open,
+  onOpenChange,
+  file,
+  onSaved,
+}: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  file: MediaFile;
+  onSaved: () => void;
+}) {
+  const [value, setValue] = useState(file.name);
+  useEffect(() => {
+    if (open) setValue(file.name);
+  }, [open, file.name]);
+
+  const save = useMutation({
+    mutationFn: async () => {
+      const name = value.replace(/\s+/g, " ").trim().slice(0, 120);
+      if (!name) throw new Error("Digite um nome para o arquivo.");
+      const { error } = await supabase.from("media_files").update({ name }).eq("id", file.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Arquivo renomeado.");
+      onOpenChange(false);
+      onSaved();
+    },
+    onError: (err: any) => toast.error(err?.message || "Falha ao renomear."),
+  });
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="rounded-2xl sm:max-w-sm">
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            save.mutate();
+          }}
+          className="space-y-4"
+        >
+          <DialogHeader>
+            <DialogTitle>Renomear arquivo</DialogTitle>
+            <DialogDescription>O nome é usado apenas para organização no painel.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor={`rename-${file.id}`}>Nome</Label>
+            <Input
+              id={`rename-${file.id}`}
+              autoFocus
+              maxLength={120}
+              value={value}
+              onChange={(e) => setValue(e.target.value)}
+              className="h-10 rounded-xl"
+            />
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} className="rounded-xl">
+              Cancelar
+            </Button>
+            <Button type="submit" disabled={save.isPending} className="rounded-xl">
+              {save.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Salvar
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }
 
