@@ -394,7 +394,7 @@ function PreviewBody({
       )}
 
       {/* Palco */}
-      <div className={cn("relative flex-1 overflow-hidden bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.04),transparent_70%)] bg-black", compact ? "pointer-events-none p-0" : "p-4")}>
+      <div className={cn("relative flex-1 overflow-hidden bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.04),transparent_70%)] bg-black", compact ? "pointer-events-none !bg-transparent !bg-none p-0" : "p-4")}>
         {toolbarCollapsed && !compact && (
           <Button
             variant="secondary"
