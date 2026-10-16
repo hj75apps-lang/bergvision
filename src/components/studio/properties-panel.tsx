@@ -1,4 +1,4 @@
-import { toVideoEmbedUrl } from "@/lib/studio/video-embed";
+import { needsVimeoOEmbed, resolveVimeoEmbed, toVideoEmbedUrl } from "@/lib/studio/video-embed";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -3383,7 +3383,23 @@ function IframeConfig({
     const embed = toVideoEmbedUrl(url);
     if (embed && embed !== url) {
       setCfg({ url: embed, allowScripts: true, allowSameOrigin: true });
+      return;
     }
+    if (!needsVimeoOEmbed(url)) return;
+    let cancelled = false;
+    void resolveVimeoEmbed(url).then((resolved) => {
+      if (cancelled) return;
+      if (resolved) {
+        setCfg({ url: resolved, allowScripts: true, allowSameOrigin: true });
+      } else {
+        toast.error(
+          "O Vimeo não liberou este vídeo. Verifique se ele é público e se permite incorporação em outros sites.",
+        );
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [url, disabled]);
   const handleUrlInput = (raw: string) => {

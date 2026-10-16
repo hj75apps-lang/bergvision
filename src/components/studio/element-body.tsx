@@ -1,4 +1,9 @@
-import { isVideoEmbedHost, toVideoEmbedUrl } from "@/lib/studio/video-embed";
+import {
+  isVideoEmbedHost,
+  needsVimeoOEmbed,
+  resolveVimeoEmbed,
+  toVideoEmbedUrl,
+} from "@/lib/studio/video-embed";
 import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
@@ -371,7 +376,30 @@ function IframeWidget({ config }: { config: Record<string, unknown> }) {
   const rawUrl = typeof config.url === "string" ? config.url : "";
   // Converte links de página (vimeo.com/..., youtube.com/watch...) que recusam
   // incorporação em URLs de player — corrige também elementos já salvos.
-  const url = toVideoEmbedUrl(rawUrl) ?? rawUrl;
+  const pendingVimeo = needsVimeoOEmbed(rawUrl);
+  const [vimeoResolved, setVimeoResolved] = useState<{ from: string; to: string | null } | null>(null);
+  useEffect(() => {
+    if (!pendingVimeo) return;
+    let cancelled = false;
+    void resolveVimeoEmbed(rawUrl).then((to) => {
+      if (!cancelled) setVimeoResolved({ from: rawUrl, to });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [rawUrl, pendingVimeo]);
+  const vimeoState = pendingVimeo
+    ? vimeoResolved?.from === rawUrl
+      ? vimeoResolved.to
+        ? "ok"
+        : "failed"
+      : "loading"
+    : null;
+  const url = pendingVimeo
+    ? vimeoState === "ok"
+      ? (vimeoResolved?.to as string)
+      : ""
+    : (toVideoEmbedUrl(rawUrl) ?? rawUrl);
   const zoom =
     typeof config.zoomPercent === "number"
       ? Math.max(25, Math.min(400, config.zoomPercent))
@@ -390,6 +418,15 @@ function IframeWidget({ config }: { config: Record<string, unknown> }) {
     return () => window.clearInterval(id);
   }, [refresh]);
   const isValid = /^https:\/\//i.test(url);
+  if (vimeoState === "loading" || vimeoState === "failed") {
+    return (
+      <div className="flex h-full w-full items-center justify-center rounded-md border border-dashed border-white/30 bg-black/60 p-3 text-center text-[11px] text-white/80">
+        {vimeoState === "loading"
+          ? "Carregando vídeo do Vimeo…"
+          : "O Vimeo não liberou este vídeo. Ele precisa ser público e permitir incorporação em outros sites."}
+      </div>
+    );
+  }
   if (!isValid) {
     return (
       <div className="flex h-full w-full items-center justify-center rounded-md border border-dashed border-white/30 bg-black/40 p-3 text-center text-[11px] text-white/70">
