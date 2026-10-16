@@ -2,7 +2,6 @@ import { useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Loader2, Plus, Trash2, Wand2 } from "lucide-react";
-import { PreviewPanel } from "@/components/preview/preview-panel";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -290,12 +289,12 @@ function StudioPage() {
                   })
                 }
               >
-                <div className="relative flex h-56 w-full items-center justify-center overflow-hidden border-b border-border/60 bg-neutral-950/60 p-3">
+                <div className="flex h-56 w-full items-center justify-center overflow-hidden border-b border-border/60 bg-neutral-950/60 p-3">
                   <div
                     className={
                       isPortrait
-                        ? "relative h-full w-auto overflow-hidden rounded-md shadow-md ring-1 ring-white/5"
-                        : "relative w-full h-auto overflow-hidden rounded-md shadow-md ring-1 ring-white/5"
+                        ? "h-full w-auto rounded-md shadow-md ring-1 ring-white/5"
+                        : "w-full h-auto rounded-md shadow-md ring-1 ring-white/5"
                     }
                     style={{
                       aspectRatio: `${w} / ${h}`,
@@ -306,18 +305,7 @@ function StudioPage() {
                       backgroundSize: "cover",
                       backgroundPosition: "center",
                     }}
-                  >
-                    <div className="absolute inset-0">
-                      <PreviewPanel
-                        scope="template"
-                        targetId={t.id}
-                        mode="inline"
-                        compact
-                        defaultResolutionId={isPortrait ? "p-fhd" : "fhd"}
-                        className="[&>div]:rounded-none [&>div]:border-0 [&>div]:bg-transparent"
-                      />
-                    </div>
-                  </div>
+                  />
                 </div>
                 <CardHeader className="pb-2">
                   <div className="flex items-start justify-between gap-2">
