@@ -1,4 +1,4 @@
-import { isVideoEmbedHost } from "@/lib/studio/video-embed";
+import { isVideoEmbedHost, toVideoEmbedUrl } from "@/lib/studio/video-embed";
 import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
@@ -368,7 +368,10 @@ function InlineMediaGroup({ c }: { c: Record<string, unknown> }) {
 }
 
 function IframeWidget({ config }: { config: Record<string, unknown> }) {
-  const url = typeof config.url === "string" ? config.url : "";
+  const rawUrl = typeof config.url === "string" ? config.url : "";
+  // Converte links de página (vimeo.com/..., youtube.com/watch...) que recusam
+  // incorporação em URLs de player — corrige também elementos já salvos.
+  const url = toVideoEmbedUrl(rawUrl) ?? rawUrl;
   const zoom =
     typeof config.zoomPercent === "number"
       ? Math.max(25, Math.min(400, config.zoomPercent))
