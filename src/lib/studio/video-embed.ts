@@ -31,6 +31,10 @@ export function toVideoEmbedUrl(raw: string): string | null {
 
   if (host === "vimeo.com" || host === "player.vimeo.com") {
     const showcase = u.pathname.match(/^\/showcase\/(\d+)/);
+    const videoParam = u.searchParams.get("video");
+    if (showcase && videoParam && /^\d{5,}$/.test(videoParam)) {
+      return `https://player.vimeo.com/video/${videoParam}?autoplay=1&muted=1&loop=1&autopause=0&playsinline=1&title=0&byline=0&portrait=0&dnt=1`;
+    }
     if (showcase && !/\/video\/\d+/.test(u.pathname)) {
       return `https://vimeo.com/showcase/${showcase[1]}/embed`;
     }
