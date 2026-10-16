@@ -395,11 +395,13 @@ function IframeWidget({ config }: { config: Record<string, unknown> }) {
         : "failed"
       : "loading"
     : null;
-  const url = pendingVimeo
-    ? vimeoState === "ok"
-      ? (vimeoResolved?.to as string)
-      : ""
-    : (toVideoEmbedUrl(rawUrl) ?? rawUrl);
+  const url = hideVideoControls(
+    pendingVimeo
+      ? vimeoState === "ok"
+        ? (vimeoResolved?.to as string)
+        : ""
+      : (toVideoEmbedUrl(rawUrl) ?? rawUrl),
+  );
   const zoom =
     typeof config.zoomPercent === "number"
       ? Math.max(25, Math.min(400, config.zoomPercent))
