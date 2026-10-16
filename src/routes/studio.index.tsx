@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Loader2, Plus, Trash2, Wand2 } from "lucide-react";
+import { Eye, Loader2, Plus, Trash2, Wand2 } from "lucide-react";
+import { PreviewPanel } from "@/components/preview/preview-panel";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -79,6 +80,11 @@ function StudioPage() {
   const role = membership?.role ?? "viewer";
   const canManage = role === "owner" || role === "admin";
   const [creating, setCreating] = useState(false);
+  const [previewTarget, setPreviewTarget] = useState<{
+    id: string;
+    canvas_width: number | null;
+    canvas_height: number | null;
+  } | null>(null);
   const qc = useQueryClient();
   const navigate = useNavigate();
 
@@ -289,7 +295,7 @@ function StudioPage() {
                   })
                 }
               >
-                <div className="flex h-56 w-full items-center justify-center overflow-hidden border-b border-border/60 bg-neutral-950/60 p-3">
+                <div className="relative flex h-56 w-full items-center justify-center overflow-hidden border-b border-border/60 bg-neutral-950/60 p-3">
                   <div
                     className={
                       isPortrait
@@ -306,6 +312,18 @@ function StudioPage() {
                       backgroundPosition: "center",
                     }}
                   />
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    className="absolute inset-x-0 mx-auto w-fit rounded-full opacity-90 shadow-lg transition group-hover:opacity-100"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setPreviewTarget(t);
+                    }}
+                  >
+                    <Eye className="mr-1.5 h-4 w-4" />
+                    Visualizar
+                  </Button>
                 </div>
                 <CardHeader className="pb-2">
                   <div className="flex items-start justify-between gap-2">
