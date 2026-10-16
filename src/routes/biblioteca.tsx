@@ -351,8 +351,15 @@ function BibliotecaPage() {
 
   const moveFile = useMutation({
     mutationFn: async ({ id, folder }: { id: string; folder: string | null }) => {
-      const { error } = await supabase.from("media_files").update({ folder }).eq("id", id);
+      const { data, error } = await supabase
+        .from("media_files")
+        .update({ folder })
+        .eq("id", id)
+        .select("id");
       if (error) throw error;
+      if (!data || data.length === 0) {
+        throw new Error("Você não tem permissão para mover este arquivo.");
+      }
     },
     onSuccess: (_d, { folder }) => {
       toast.success(folder ? `Arquivo movido para "${folder}".` : "Arquivo movido para \"Sem pasta\".");
@@ -573,7 +580,14 @@ function FolderTile({
         e.dataTransfer.dropEffect = "move";
         setOver(true);
       }}
-      onDragLeave={() => setOver(false)}
+      onDragEnter={(e) => {
+        if (onDropFile && e.dataTransfer.types.includes(DRAG_MIME)) setOver(true);
+      }}
+      onDragLeave={(e) => {
+        const next = e.relatedTarget as Node | null;
+        if (next && e.currentTarget.contains(next)) return;
+        setOver(false);
+      }}
       onDrop={(e) => {
         setOver(false);
         const id = e.dataTransfer.getData(DRAG_MIME);
@@ -715,6 +729,7 @@ function MediaCard({
   const isVideo = (file.type ?? "").toString().toLowerCase() === "video";
   const [folderOpen, setFolderOpen] = useState(false);
   const [renameOpen, setRenameOpen] = useState(false);
+  const [dragging, setDragging] = useState(false);
 
   const remove = useMutation({
     mutationFn: async () => {
@@ -751,9 +766,13 @@ function MediaCard({
       draggable={canManage}
       onDragStart={(e) => {
         e.dataTransfer.setData(DRAG_MIME, file.id);
+        e.dataTransfer.setData("text/plain", file.name);
         e.dataTransfer.effectAllowed = "move";
+        setDragging(true);
       }}
-      className="group overflow-hidden rounded-2xl border-border/60 bg-card/60 backdrop-blur-xl">
+      onDragEnd={() => setDragging(false)}
+      className={`group overflow-hidden rounded-2xl transition-opacity ${dragging ? "opacity-40" : ""} ${canManage ? "cursor-grab active:cursor-grabbing" : ""} border-border/60 bg-card/60 backdrop-blur-xl`}
+    >
       <button
         type="button"
         onClick={onPreview}
@@ -763,6 +782,7 @@ function MediaCard({
           <img
             src={thumbUrl}
             alt={file.name}
+            draggable={false}
             className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
             loading="lazy"
           />
