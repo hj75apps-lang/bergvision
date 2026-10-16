@@ -9,70 +9,25 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as TemplatesRouteImport } from './routes/templates'
-import { Route as StudioRouteImport } from './routes/studio'
-import { Route as ResetPasswordRouteImport } from './routes/reset-password'
-import { Route as RelatorioRouteImport } from './routes/relatorio'
-import { Route as PlaylistsRouteImport } from './routes/playlists'
-import { Route as PlayersRouteImport } from './routes/players'
-import { Route as EquipeRouteImport } from './routes/equipe'
-import { Route as ConfiguracoesRouteImport } from './routes/configuracoes'
-import { Route as CampanhasRouteImport } from './routes/campanhas'
-import { Route as BibliotecaRouteImport } from './routes/biblioteca'
-import { Route as AuthRouteImport } from './routes/auth'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AuthRouteImport } from './routes/auth'
+import { Route as BibliotecaRouteImport } from './routes/biblioteca'
+import { Route as CampanhasRouteImport } from './routes/campanhas'
+import { Route as ConfiguracoesRouteImport } from './routes/configuracoes'
+import { Route as EquipeRouteImport } from './routes/equipe'
+import { Route as PlayersRouteImport } from './routes/players'
+import { Route as PlaylistsRouteImport } from './routes/playlists'
+import { Route as RelatorioRouteImport } from './routes/relatorio'
+import { Route as ResetPasswordRouteImport } from './routes/reset-password'
+import { Route as StudioRouteImport } from './routes/studio'
+import { Route as TemplatesRouteImport } from './routes/templates'
+import { Route as InviteTokenRouteImport } from './routes/invite.$token'
 import { Route as StudioIndexRouteImport } from './routes/studio.index'
 import { Route as StudioTemplateIdRouteImport } from './routes/studio.$templateId'
-import { Route as InviteTokenRouteImport } from './routes/invite.$token'
 
-const TemplatesRoute = TemplatesRouteImport.update({
-  id: '/templates',
-  path: '/templates',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const StudioRoute = StudioRouteImport.update({
-  id: '/studio',
-  path: '/studio',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ResetPasswordRoute = ResetPasswordRouteImport.update({
-  id: '/reset-password',
-  path: '/reset-password',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const RelatorioRoute = RelatorioRouteImport.update({
-  id: '/relatorio',
-  path: '/relatorio',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const PlaylistsRoute = PlaylistsRouteImport.update({
-  id: '/playlists',
-  path: '/playlists',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const PlayersRoute = PlayersRouteImport.update({
-  id: '/players',
-  path: '/players',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const EquipeRoute = EquipeRouteImport.update({
-  id: '/equipe',
-  path: '/equipe',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ConfiguracoesRoute = ConfiguracoesRouteImport.update({
-  id: '/configuracoes',
-  path: '/configuracoes',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const CampanhasRoute = CampanhasRouteImport.update({
-  id: '/campanhas',
-  path: '/campanhas',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const BibliotecaRoute = BibliotecaRouteImport.update({
-  id: '/biblioteca',
-  path: '/biblioteca',
+const IndexRoute = IndexRouteImport.update({
+  id: '/',
+  path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthRoute = AuthRouteImport.update({
@@ -80,9 +35,59 @@ const AuthRoute = AuthRouteImport.update({
   path: '/auth',
   getParentRoute: () => rootRouteImport,
 } as any)
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
+const BibliotecaRoute = BibliotecaRouteImport.update({
+  id: '/biblioteca',
+  path: '/biblioteca',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CampanhasRoute = CampanhasRouteImport.update({
+  id: '/campanhas',
+  path: '/campanhas',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ConfiguracoesRoute = ConfiguracoesRouteImport.update({
+  id: '/configuracoes',
+  path: '/configuracoes',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const EquipeRoute = EquipeRouteImport.update({
+  id: '/equipe',
+  path: '/equipe',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PlayersRoute = PlayersRouteImport.update({
+  id: '/players',
+  path: '/players',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PlaylistsRoute = PlaylistsRouteImport.update({
+  id: '/playlists',
+  path: '/playlists',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RelatorioRoute = RelatorioRouteImport.update({
+  id: '/relatorio',
+  path: '/relatorio',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ResetPasswordRoute = ResetPasswordRouteImport.update({
+  id: '/reset-password',
+  path: '/reset-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const StudioRoute = StudioRouteImport.update({
+  id: '/studio',
+  path: '/studio',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TemplatesRoute = TemplatesRouteImport.update({
+  id: '/templates',
+  path: '/templates',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const InviteTokenRoute = InviteTokenRouteImport.update({
+  id: '/invite/$token',
+  path: '/invite/$token',
   getParentRoute: () => rootRouteImport,
 } as any)
 const StudioIndexRoute = StudioIndexRouteImport.update({
@@ -94,11 +99,6 @@ const StudioTemplateIdRoute = StudioTemplateIdRouteImport.update({
   id: '/$templateId',
   path: '/$templateId',
   getParentRoute: () => StudioRoute,
-} as any)
-const InviteTokenRoute = InviteTokenRouteImport.update({
-  id: '/invite/$token',
-  path: '/invite/$token',
-  getParentRoute: () => rootRouteImport,
 } as any)
 
 export interface FileRoutesByFullPath {
@@ -223,74 +223,11 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/templates': {
-      id: '/templates'
-      path: '/templates'
-      fullPath: '/templates'
-      preLoaderRoute: typeof TemplatesRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/studio': {
-      id: '/studio'
-      path: '/studio'
-      fullPath: '/studio'
-      preLoaderRoute: typeof StudioRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/reset-password': {
-      id: '/reset-password'
-      path: '/reset-password'
-      fullPath: '/reset-password'
-      preLoaderRoute: typeof ResetPasswordRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/relatorio': {
-      id: '/relatorio'
-      path: '/relatorio'
-      fullPath: '/relatorio'
-      preLoaderRoute: typeof RelatorioRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/playlists': {
-      id: '/playlists'
-      path: '/playlists'
-      fullPath: '/playlists'
-      preLoaderRoute: typeof PlaylistsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/players': {
-      id: '/players'
-      path: '/players'
-      fullPath: '/players'
-      preLoaderRoute: typeof PlayersRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/equipe': {
-      id: '/equipe'
-      path: '/equipe'
-      fullPath: '/equipe'
-      preLoaderRoute: typeof EquipeRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/configuracoes': {
-      id: '/configuracoes'
-      path: '/configuracoes'
-      fullPath: '/configuracoes'
-      preLoaderRoute: typeof ConfiguracoesRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/campanhas': {
-      id: '/campanhas'
-      path: '/campanhas'
-      fullPath: '/campanhas'
-      preLoaderRoute: typeof CampanhasRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/biblioteca': {
-      id: '/biblioteca'
-      path: '/biblioteca'
-      fullPath: '/biblioteca'
-      preLoaderRoute: typeof BibliotecaRouteImport
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/auth': {
@@ -300,11 +237,81 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
+    '/biblioteca': {
+      id: '/biblioteca'
+      path: '/biblioteca'
+      fullPath: '/biblioteca'
+      preLoaderRoute: typeof BibliotecaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/campanhas': {
+      id: '/campanhas'
+      path: '/campanhas'
+      fullPath: '/campanhas'
+      preLoaderRoute: typeof CampanhasRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/configuracoes': {
+      id: '/configuracoes'
+      path: '/configuracoes'
+      fullPath: '/configuracoes'
+      preLoaderRoute: typeof ConfiguracoesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/equipe': {
+      id: '/equipe'
+      path: '/equipe'
+      fullPath: '/equipe'
+      preLoaderRoute: typeof EquipeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/players': {
+      id: '/players'
+      path: '/players'
+      fullPath: '/players'
+      preLoaderRoute: typeof PlayersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/playlists': {
+      id: '/playlists'
+      path: '/playlists'
+      fullPath: '/playlists'
+      preLoaderRoute: typeof PlaylistsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/relatorio': {
+      id: '/relatorio'
+      path: '/relatorio'
+      fullPath: '/relatorio'
+      preLoaderRoute: typeof RelatorioRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reset-password': {
+      id: '/reset-password'
+      path: '/reset-password'
+      fullPath: '/reset-password'
+      preLoaderRoute: typeof ResetPasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/studio': {
+      id: '/studio'
+      path: '/studio'
+      fullPath: '/studio'
+      preLoaderRoute: typeof StudioRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/templates': {
+      id: '/templates'
+      path: '/templates'
+      fullPath: '/templates'
+      preLoaderRoute: typeof TemplatesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/invite/$token': {
+      id: '/invite/$token'
+      path: '/invite/$token'
+      fullPath: '/invite/$token'
+      preLoaderRoute: typeof InviteTokenRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/studio/': {
@@ -320,13 +327,6 @@ declare module '@tanstack/react-router' {
       fullPath: '/studio/$templateId'
       preLoaderRoute: typeof StudioTemplateIdRouteImport
       parentRoute: typeof StudioRoute
-    }
-    '/invite/$token': {
-      id: '/invite/$token'
-      path: '/invite/$token'
-      fullPath: '/invite/$token'
-      preLoaderRoute: typeof InviteTokenRouteImport
-      parentRoute: typeof rootRouteImport
     }
   }
 }
