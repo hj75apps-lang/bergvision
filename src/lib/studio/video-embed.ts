@@ -30,6 +30,15 @@ export function toVideoEmbedUrl(raw: string): string | null {
   }
 
   if (host === "vimeo.com" || host === "player.vimeo.com") {
+    const showcase = u.pathname.match(/^\/showcase\/(\d+)/);
+    if (showcase && !/\/video\/\d+/.test(u.pathname)) {
+      return `https://vimeo.com/showcase/${showcase[1]}/embed`;
+    }
+    const fromVideo = u.pathname.match(/\/video\/(\d{5,})/);
+    if (fromVideo) {
+      const h = u.searchParams.get("h");
+      return `https://player.vimeo.com/video/${fromVideo[1]}?autoplay=1&muted=1&loop=1&background=1${h ? `&h=${h}` : ""}`;
+    }
     const m = u.pathname.match(/(\d{5,})(?:\/([\w]+))?/);
     if (!m) return null;
     const h = u.searchParams.get("h") ?? m[2];
