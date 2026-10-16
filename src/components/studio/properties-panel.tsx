@@ -1,3 +1,4 @@
+import { toVideoEmbedUrl } from "@/lib/studio/video-embed";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -3382,9 +3383,17 @@ function IframeConfig({
     if (/<iframe/i.test(trimmed)) {
       const match = trimmed.match(/\bsrc\s*=\s*["']([^"']+)["']/i);
       if (match?.[1]) {
-        setCfg({ url: match[1].trim() });
+        const src = match[1].trim();
+        const embed = toVideoEmbedUrl(src);
+        setCfg(embed ? { url: embed, allowScripts: true, allowSameOrigin: true } : { url: src });
         return;
       }
+    }
+    // Links de vídeo (YouTube, Vimeo, Drive...) viram URL de incorporação.
+    const embed = toVideoEmbedUrl(trimmed);
+    if (embed) {
+      setCfg({ url: embed, allowScripts: true, allowSameOrigin: true });
+      return;
     }
     setCfg({ url: trimmed });
   };
@@ -3409,7 +3418,7 @@ function IframeConfig({
           </span>
         )}
         <span className="text-[10px] text-muted-foreground">
-          Cole a URL direta ou o código completo do iframe (ex.: Climatempo,
+          Cole um link do YouTube, Vimeo, Google Drive, Dailymotion, Loom ou Streamable (o vídeo toca sozinho, sem som e em loop), uma URL direta ou o código completo do iframe (ex.: Climatempo,
           Google Maps, YouTube). Extraímos o src automaticamente. Sites que
           bloqueiam via X-Frame-Options não serão exibidos.
         </span>

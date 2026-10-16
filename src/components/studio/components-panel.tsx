@@ -24,6 +24,7 @@ import {
   TimerReset,
   Type as TypeIcon,
   Video as VideoIcon,
+  Youtube,
 } from "lucide-react";
 
 import { Input } from "@/components/ui/input";
@@ -334,6 +335,25 @@ export const COMPONENT_LIBRARY: Category[] = [
           },
         },
         defaultSize: { width: 40, height: 15 },
+      },
+      {
+        type: "widget",
+        label: "Vídeo por link",
+        icon: Youtube,
+        defaultContent: {
+          element_type: "widget",
+          widgetType: "iframe",
+          name: "Vídeo por link",
+          widgetConfig: {
+            url: "",
+            zoomPercent: 100,
+            refreshSeconds: 0,
+            allowScripts: true,
+            allowSameOrigin: true,
+            videoLink: true,
+          },
+        },
+        defaultSize: { width: 48, height: 27 },
       },
       {
         type: "text",
