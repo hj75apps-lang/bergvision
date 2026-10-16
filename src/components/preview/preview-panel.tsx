@@ -144,6 +144,8 @@ export type PreviewPanelProps = {
   /** Resolução inicial (default: Full HD). */
   defaultResolutionId?: string;
   className?: string;
+  /** Miniatura: sem cabeçalho, sem interação. */
+  compact?: boolean;
 };
 
 // ---------------------------------------------------------------------------
@@ -295,10 +297,12 @@ function PreviewBody({
   ctrl,
   onClose,
   variant,
+  compact = false,
 }: {
   ctrl: ReturnType<typeof usePreviewController>;
   onClose?: () => void;
   variant: "modal" | "inline";
+  compact?: boolean;
 }) {
   const {
     iframeRef,
@@ -312,7 +316,8 @@ function PreviewBody({
     isDraft,
   } = ctrl;
 
-  const [toolbarCollapsed, setToolbarCollapsed] = useState(false);
+  const [toolbarCollapsedState, setToolbarCollapsed] = useState(false);
+  const toolbarCollapsed = compact || toolbarCollapsedState;
 
   return (
     <div
@@ -389,8 +394,8 @@ function PreviewBody({
       )}
 
       {/* Palco */}
-      <div className="relative flex-1 overflow-hidden bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.04),transparent_70%)] bg-black p-4">
-        {toolbarCollapsed && (
+      <div className={cn("relative flex-1 overflow-hidden bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.04),transparent_70%)] bg-black", compact ? "pointer-events-none !bg-transparent !bg-none p-0" : "p-4")}>
+        {toolbarCollapsed && !compact && (
           <Button
             variant="secondary"
             size="icon"
@@ -402,7 +407,7 @@ function PreviewBody({
           </Button>
         )}
         {!playerConfigured ? (
-          <StatusOverlay
+          compact ? null : <StatusOverlay
             title="Preview do Player não configurado"
             detail={[
               "Você pode criar e configurar templates normalmente — o preview visual aparecerá aqui assim que o Player for publicado.",
@@ -410,12 +415,13 @@ function PreviewBody({
             ].join("\n")}
           />
         ) : error ? (
-          <StatusOverlay title="Falha ao gerar preview" detail={error} />
+          compact ? null : <StatusOverlay title="Falha ao gerar preview" detail={error} />
         ) : (
           <ResolutionStage
             width={ctrl.resolution.width}
             height={ctrl.resolution.height}
             label={ctrl.resolution.label}
+            compact={compact}
           >
             {iframeSrc && (
               <iframe
@@ -432,7 +438,7 @@ function PreviewBody({
             {(isTokenLoading || !ready) && (
               <StatusOverlay
                 spinner
-                title={isTokenLoading ? "Preparando preview…" : "Carregando conteúdo…"}
+                title={compact ? "" : isTokenLoading ? "Preparando preview…" : "Carregando conteúdo…"}
               />
             )}
           </ResolutionStage>
@@ -451,10 +457,12 @@ function ResolutionStage({
   height,
   label,
   children,
+  compact = false,
 }: {
   width: number;
   height: number;
   label: string;
+  compact?: boolean;
   children: React.ReactNode;
 }) {
   const ratio = `${width} / ${height}`;
@@ -472,9 +480,9 @@ function ResolutionStage({
         }}
       >
         {children}
-        <div className="pointer-events-none absolute bottom-2 right-2 rounded-md bg-black/70 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-white/80 ring-1 ring-white/10">
+        {!compact && <div className="pointer-events-none absolute bottom-2 right-2 rounded-md bg-black/70 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-white/80 ring-1 ring-white/10">
           {label}
-        </div>
+        </div>}
       </div>
     </div>
   );
@@ -518,6 +526,7 @@ export function PreviewPanel(props: PreviewPanelProps) {
     onOpenChange,
     defaultResolutionId,
     className,
+    compact,
   } = props;
 
   const active = mode === "inline" ? true : !!open;
@@ -549,7 +558,7 @@ export function PreviewPanel(props: PreviewPanelProps) {
 
   return (
     <div className={cn("h-full w-full", className)}>
-      <PreviewBody ctrl={ctrl} variant="inline" />
+      <PreviewBody ctrl={ctrl} variant="inline" compact={compact} />
     </div>
   );
 }
