@@ -3417,7 +3417,7 @@ function IframeConfig({
           </span>
         )}
         <span className="text-[10px] text-muted-foreground">
-          Cole a URL direta ou o código completo do iframe (ex.: Climatempo,
+          Cole um link do YouTube, Vimeo, Google Drive, Dailymotion, Loom ou Streamable (o vídeo toca sozinho, sem som e em loop), uma URL direta ou o código completo do iframe (ex.: Climatempo,
           Google Maps, YouTube). Extraímos o src automaticamente. Sites que
           bloqueiam via X-Frame-Options não serão exibidos.
         </span>
