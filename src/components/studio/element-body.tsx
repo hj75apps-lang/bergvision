@@ -395,11 +395,13 @@ function IframeWidget({ config }: { config: Record<string, unknown> }) {
         : "failed"
       : "loading"
     : null;
-  const url = pendingVimeo
-    ? vimeoState === "ok"
-      ? (vimeoResolved?.to as string)
-      : ""
-    : (toVideoEmbedUrl(rawUrl) ?? rawUrl);
+  const url = hideVideoControls(
+    pendingVimeo
+      ? vimeoState === "ok"
+        ? (vimeoResolved?.to as string)
+        : ""
+      : (toVideoEmbedUrl(rawUrl) ?? rawUrl),
+  );
   const zoom =
     typeof config.zoomPercent === "number"
       ? Math.max(25, Math.min(400, config.zoomPercent))
@@ -2968,4 +2970,30 @@ function BackgroundMedia({ mediaId }: { mediaId: string }) {
       aria-hidden
     />
   );
+}
+/** Vídeos por link tocam sem som: esconde a interface do player (botão "Ativar som"). */
+function hideVideoControls(url: string): string {
+  if (!url) return url;
+  try {
+    const u = new URL(url);
+    const host = u.hostname.replace(/^www\./, "");
+    if (host === "player.vimeo.com" || host === "vimeo.com") {
+      u.searchParams.set("controls", "0");
+      u.searchParams.set("muted", "1");
+      u.searchParams.set("title", "0");
+      u.searchParams.set("byline", "0");
+      u.searchParams.set("portrait", "0");
+      return u.toString();
+    }
+    if (/youtube(-nocookie)?\.com$/.test(host) && u.pathname.startsWith("/embed")) {
+      u.searchParams.set("controls", "0");
+      u.searchParams.set("mute", "1");
+      u.searchParams.set("modestbranding", "1");
+      u.searchParams.set("rel", "0");
+      return u.toString();
+    }
+    return url;
+  } catch {
+    return url;
+  }
 }
