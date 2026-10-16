@@ -464,6 +464,9 @@ function IframeWidget({ config }: { config: Record<string, unknown> }) {
           display: "block",
         }}
       />
+      {/* Camada transparente: impede que o iframe "engula" cliques, permitindo
+          selecionar, mover, redimensionar, excluir e substituir o widget no editor. */}
+      <div className="absolute inset-0" aria-hidden />
     </div>
   );
 }
