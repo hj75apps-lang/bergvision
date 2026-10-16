@@ -37,14 +37,14 @@ export function toVideoEmbedUrl(raw: string): string | null {
     const fromVideo = u.pathname.match(/\/video\/(\d{5,})/);
     if (fromVideo) {
       const h = u.searchParams.get("h");
-      return `https://player.vimeo.com/video/${fromVideo[1]}?autoplay=1&muted=1&loop=1&autopause=0&title=0&byline=0&portrait=0&dnt=1${h ? `&h=${h}` : ""}`;
+      return `https://player.vimeo.com/video/${fromVideo[1]}?autoplay=1&muted=1&loop=1&autopause=0&playsinline=1&title=0&byline=0&portrait=0&dnt=1${h ? `&h=${h}` : ""}`;
     }
     // ID numérico precisa ser um segmento inteiro do caminho (evita pegar
     // números de "user12345678"). Links "bonitos" sem ID vão para o oEmbed.
     const m = u.pathname.match(/(?:^|\/)(\d{5,})(?:\/([0-9a-f]{6,}))?\/?$/i);
     if (!m) return null;
     const h = u.searchParams.get("h") ?? m[2];
-    return `https://player.vimeo.com/video/${m[1]}?autoplay=1&muted=1&loop=1&autopause=0&title=0&byline=0&portrait=0&dnt=1${h ? `&h=${h}` : ""}`;
+    return `https://player.vimeo.com/video/${m[1]}?autoplay=1&muted=1&loop=1&autopause=0&playsinline=1&title=0&byline=0&portrait=0&dnt=1${h ? `&h=${h}` : ""}`;
   }
 
   if (host === "drive.google.com") {

@@ -451,10 +451,13 @@ function IframeWidget({ config }: { config: Record<string, unknown> }) {
         key={nonce}
         src={src}
         title="Iframe widget"
-        loading="lazy"
+        loading={isVideo ? "eager" : "lazy"}
         referrerPolicy={isVideo ? "strict-origin-when-cross-origin" : "no-referrer"}
-        sandbox={isVideo ? `${sandboxTokens} allow-presentation` : sandboxTokens}
-        allow="autoplay; fullscreen; geolocation; encrypted-media; picture-in-picture"
+        // Players oficiais (Vimeo/YouTube) detectam sandbox e recusam tocar —
+        // por isso não aplicamos sandbox a eles; demais iframes seguem isolados.
+        sandbox={isVideo ? undefined : sandboxTokens}
+        allow="autoplay *; fullscreen *; geolocation; encrypted-media *; picture-in-picture *"
+        allowFullScreen
         style={{
           border: 0,
           width: inverse,
