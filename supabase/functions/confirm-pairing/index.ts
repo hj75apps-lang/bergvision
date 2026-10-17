@@ -149,21 +149,39 @@ Deno.serve(async (req) => {
     return json({ error: "code_already_used" }, 409);
   if (status && status !== "pending")
     return json({ error: "code_not_pending", detail: status }, 409);
-  if (!pairing.device_id)
-    return json({ error: "pairing_without_device" }, 500);
+  // ---- Cria o device (o Player recebe id + token no poll-pairing-status) ----
+  let deviceId: string | null = pairing.device_id ?? null;
+  let deviceToken: string | null = null;
+  if (!deviceId) {
+    const bytes = new Uint8Array(32);
+    crypto.getRandomValues(bytes);
+    deviceToken = Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+    const { data: dev, error: devErr } = await admin
+      .from("devices")
+      .insert({ token: deviceToken, metadata: { confirmed_by: userId } })
+      .select("id")
+      .single();
+    if (devErr || !dev)
+      return json(
+        { error: "device_insert_failed", detail: devErr?.message ?? null },
+        500,
+      );
+    deviceId = dev.id as string;
+  }
 
   // ---- Cria o player usando o MESMO id do device ----
-  // Contrato do backend: players.id === devices.id (pairing_codes.device_id).
+  // Contrato do backend: players.id === devices.id.
   const { data: existingPlayer } = await admin
     .from("players")
     .select("id")
-    .eq("id", pairing.device_id)
+    .eq("id", deviceId)
     .maybeSingle();
 
   if (!existingPlayer) {
     const { error: insertErr } = await admin.from("players").insert({
-      id: pairing.device_id,
+      id: deviceId,
       organization_id: profile.organization_id,
+      auth_user_id: userId,
       name: rawName,
       status: "offline",
     });
@@ -173,14 +191,10 @@ Deno.serve(async (req) => {
         500,
       );
   } else {
-    // Se por algum motivo já existia (re-pareamento), apenas atualiza nome/org.
     const { error: updErr } = await admin
       .from("players")
-      .update({
-        organization_id: profile.organization_id,
-        name: rawName,
-      })
-      .eq("id", pairing.device_id);
+      .update({ organization_id: profile.organization_id, name: rawName })
+      .eq("id", deviceId);
     if (updErr)
       return json(
         { error: "player_update_failed", detail: updErr.message },
@@ -189,12 +203,15 @@ Deno.serve(async (req) => {
   }
 
   // ---- Marca pairing_code como confirmado ----
+  const update: Record<string, unknown> = {
+    status: "confirmed",
+    confirmed_at: new Date().toISOString(),
+    device_id: deviceId,
+  };
+  if (deviceToken) update.device_token = deviceToken;
   const { error: confErr } = await admin
     .from("pairing_codes")
-    .update({
-      status: "confirmed",
-      confirmed_at: new Date().toISOString(),
-    })
+    .update(update)
     .eq("id", pairing.id);
 
   if (confErr)
