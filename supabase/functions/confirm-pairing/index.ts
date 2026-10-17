@@ -222,7 +222,7 @@ Deno.serve(async (req) => {
 
   return json({
     ok: true,
-    player_id: pairing.device_id,
+    player_id: deviceId,
     organization_id: profile.organization_id,
   });
 });
