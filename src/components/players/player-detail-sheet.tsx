@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Loader2, RadioTower, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
   SelectContent,
@@ -90,6 +91,7 @@ export function PlayerDetailSheet({
   lastHeartbeatLabel,
   templates,
   canManage,
+  canEditPlaylists = canManage,
   onChanged,
 }: {
   open: boolean;
@@ -99,10 +101,70 @@ export function PlayerDetailSheet({
   lastHeartbeatLabel: string;
   templates: TemplateOpt[];
   canManage: boolean;
+  canEditPlaylists?: boolean;
   onChanged: () => void;
 }) {
   const [savingTpl, setSavingTpl] = useState(false);
   const [identifying, setIdentifying] = useState(false);
+  const qc = useQueryClient();
+
+  const playlistsQ = useQuery({
+    queryKey: ["player-playlists", player.id],
+    enabled: open,
+    queryFn: async () => {
+      const [{ data: pls, error: e1 }, { data: links, error: e2 }] =
+        await Promise.all([
+          supabase
+            .from("playlists")
+            .select("id, name, is_active")
+            .eq("organization_id", player.organization_id)
+            .order("name"),
+          supabase
+            .from("playlist_players")
+            .select("playlist_id")
+            .eq("player_id", player.id),
+        ]);
+      if (e1) throw e1;
+      if (e2) throw e2;
+      const linked = new Set(
+        (links ?? []).map((l: { playlist_id: string }) => l.playlist_id),
+      );
+      return ((pls ?? []) as Array<{
+        id: string;
+        name: string;
+        is_active: boolean | null;
+      }>).map((p) => ({ ...p, linked: linked.has(p.id) }));
+    },
+  });
+
+  const toggleLink = useMutation({
+    mutationFn: async ({ playlistId, on }: { playlistId: string; on: boolean }) => {
+      if (on) {
+        const { error } = await supabase.from("playlist_players").insert({
+          playlist_id: playlistId,
+          player_id: player.id,
+          organization_id: player.organization_id,
+        });
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from("playlist_players")
+          .delete()
+          .eq("playlist_id", playlistId)
+          .eq("player_id", player.id);
+        if (error) throw error;
+      }
+    },
+    onSuccess: (_d, v) => {
+      qc.invalidateQueries({ queryKey: ["player-playlists", player.id] });
+      qc.invalidateQueries({ queryKey: ["playlist_players", v.playlistId] });
+      qc.invalidateQueries({ queryKey: ["playlists-list", player.organization_id] });
+      qc.invalidateQueries({ queryKey: ["campaigns-list", player.organization_id] });
+      qc.invalidateQueries({ queryKey: ["campaigns-targeting", player.organization_id] });
+      toast.success(v.on ? "Playlist vinculada ao player." : "Playlist desvinculada.");
+    },
+    onError: (err: any) => toast.error(err?.message || "Falha ao atualizar playlist."),
+  });
 
   const changeTemplate = async (tplId: string) => {
     setSavingTpl(true);
@@ -372,6 +434,44 @@ export function PlayerDetailSheet({
                 )}
               </SelectContent>
             </Select>
+          </section>
+
+          <section className="space-y-2">
+            <div className="text-xs text-muted-foreground">
+              Playlists exibidas neste player
+            </div>
+            {playlistsQ.isLoading ? (
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <Loader2 className="h-3.5 w-3.5 animate-spin" /> Carregando…
+              </div>
+            ) : (playlistsQ.data ?? []).length === 0 ? (
+              <div className="rounded-xl border border-dashed border-border/60 p-3 text-xs text-muted-foreground">
+                Nenhuma playlist criada ainda.
+              </div>
+            ) : (
+              <div className="divide-y divide-border/60 rounded-xl border border-border/60">
+                {(playlistsQ.data ?? []).map((pl) => (
+                  <label
+                    key={pl.id}
+                    className="flex cursor-pointer items-center gap-3 px-3 py-2.5 text-sm"
+                  >
+                    <Checkbox
+                      checked={pl.linked}
+                      disabled={!canEditPlaylists || toggleLink.isPending}
+                      onCheckedChange={(v) =>
+                        toggleLink.mutate({ playlistId: pl.id, on: v === true })
+                      }
+                    />
+                    <span className="min-w-0 flex-1 truncate">{pl.name}</span>
+                    {!pl.is_active && (
+                      <Badge variant="secondary" className="rounded-full text-[9px]">
+                        Inativa
+                      </Badge>
+                    )}
+                  </label>
+                ))}
+              </div>
+            )}
           </section>
 
           <section className="space-y-2">
