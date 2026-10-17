@@ -158,6 +158,7 @@ function PlayersPage() {
         },
         () => {
           qc.invalidateQueries({ queryKey: ["players", orgId] });
+          qc.invalidateQueries({ queryKey: ["players-for-playlist", orgId] });
         },
       )
       .subscribe();
@@ -166,6 +167,13 @@ function PlayersPage() {
       supabase.removeChannel(channel);
     };
   }, [orgId, qc]);
+
+  const refreshPlayers = () => {
+    qc.invalidateQueries({ queryKey: ["players", orgId] });
+    qc.invalidateQueries({ queryKey: ["players-for-playlist", orgId] });
+    qc.invalidateQueries({ queryKey: ["players-count", orgId] });
+    qc.invalidateQueries({ queryKey: ["campaigns-targeting", orgId] });
+  };
 
   const players = playersQ.data ?? [];
   const onlineCount = useMemo(
@@ -221,7 +229,7 @@ function PlayersPage() {
               nowMs={nowMs}
               canManage={canManage}
               templates={templatesQ.data ?? []}
-              onChanged={() => qc.invalidateQueries({ queryKey: ["players", orgId] })}
+              onChanged={refreshPlayers}
             />
           ))}
         </div>
@@ -230,7 +238,7 @@ function PlayersPage() {
       <PairDialog
         open={pairOpen}
         onOpenChange={setPairOpen}
-        onPaired={() => qc.invalidateQueries({ queryKey: ["players", orgId] })}
+        onPaired={refreshPlayers}
       />
     </div>
   );
