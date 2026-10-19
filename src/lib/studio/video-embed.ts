@@ -111,17 +111,40 @@ export function needsVimeoOEmbed(url: string): boolean {
  * pela API pública oEmbed do Vimeo, que permite chamadas do navegador.
  */
 export async function resolveVimeoEmbed(url: string): Promise<string | null> {
+  const trimmed = url.trim();
+  // Fallback: qualquer ID numérico longo no caminho (links de canal, grupo,
+  // review, álbum com vídeo...) — usado quando o oEmbed não responde.
+  const fallback = (): string | null => {
+    try {
+      const u = new URL(trimmed);
+      const ids = u.pathname.match(/\d{6,}/g);
+      const id = ids ? ids[ids.length - 1] : null;
+      return id ? toVideoEmbedUrl(`https://vimeo.com/${id}`) : null;
+    } catch {
+      return null;
+    }
+  };
   try {
     const res = await fetch(
-      `https://vimeo.com/api/oembed.json?url=${encodeURIComponent(url.trim())}`,
+      `https://vimeo.com/api/oembed.json?url=${encodeURIComponent(trimmed)}&dnt=1`,
     );
-    if (!res.ok) return null;
-    const data = (await res.json()) as { html?: string; video_id?: number };
+    if (!res.ok) return fallback();
+    const data = (await res.json()) as {
+      html?: string;
+      video_id?: number;
+      domain_status_code?: number;
+    };
+    // 403 = dono restringiu a incorporação a domínios específicos: o player
+    // do Vimeo mostraria "não pode ser reproduzido aqui".
+    if (data.domain_status_code === 403) return null;
     const src = data.html?.match(/src="([^"]+)"/)?.[1];
-    if (src) return toVideoEmbedUrl(src.replace(/&amp;/g, "&"));
+    if (src) {
+      const embed = toVideoEmbedUrl(src.replace(/&amp;/g, "&"));
+      if (embed) return embed;
+    }
     if (data.video_id) return toVideoEmbedUrl(`https://vimeo.com/${data.video_id}`);
-    return null;
+    return fallback();
   } catch {
-    return null;
+    return fallback();
   }
 }
