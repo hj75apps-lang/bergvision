@@ -98,19 +98,25 @@ Deno.serve(async (req) => {
 
   const city = String(body?.city ?? "").trim().slice(0, 120);
   const units = body?.units === "imperial" ? "imperial" : "metric";
-  if (!city) return json({ error: "missing_city" }, 400);
+  const latIn = body?.latitude == null ? NaN : Number(body.latitude);
+  const lonIn = body?.longitude == null ? NaN : Number(body.longitude);
+  const hasCoords = Number.isFinite(latIn) && Number.isFinite(lonIn);
+  if (!city && !hasCoords) return json({ error: "missing_city" }, 400);
 
   try {
-    const geoUrl = new URL("https://geocoding-api.open-meteo.com/v1/search");
-    geoUrl.searchParams.set("name", city);
-    geoUrl.searchParams.set("count", "1");
-    geoUrl.searchParams.set("language", "pt");
-    geoUrl.searchParams.set("format", "json");
-    const geoRes = await fetch(geoUrl);
-    if (!geoRes.ok) return json({ error: "geocoding_failed" }, 502);
-    const geo = await geoRes.json();
-    const place = geo?.results?.[0];
-    if (!place) return json({ error: "city_not_found" }, 404);
+    let place: any = { latitude: latIn, longitude: lonIn, name: city, country_code: "" };
+    if (!hasCoords) {
+      const geoUrl = new URL("https://geocoding-api.open-meteo.com/v1/search");
+      geoUrl.searchParams.set("name", city);
+      geoUrl.searchParams.set("count", "1");
+      geoUrl.searchParams.set("language", "pt");
+      geoUrl.searchParams.set("format", "json");
+      const geoRes = await fetch(geoUrl);
+      if (!geoRes.ok) return json({ error: "geocoding_failed" }, 502);
+      const geo = await geoRes.json();
+      place = geo?.results?.[0];
+      if (!place) return json({ error: "city_not_found" }, 404);
+    }
 
     const unit = units === "imperial" ? "fahrenheit" : "celsius";
     const wUrl = new URL("https://api.open-meteo.com/v1/forecast");
@@ -153,6 +159,12 @@ Deno.serve(async (req) => {
     return json(
       {
         temp: Math.round(Number(cur.temperature_2m)),
+        // Campos do contrato do app da tela (compatibilidade)
+        temperature: Number(cur.temperature_2m),
+        units,
+        windSpeed: Number(cur.wind_speed_10m ?? 0),
+        observedAt: cur.time ?? new Date().toISOString(),
+        source: "open-meteo",
         feelsLike: Math.round(Number(cur.apparent_temperature ?? cur.temperature_2m)),
         unit: units === "imperial" ? "°F" : "°C",
         code,
