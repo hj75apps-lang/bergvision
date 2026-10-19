@@ -66,22 +66,34 @@ Deno.serve(async (req) => {
     Deno.env.get("ANON_KEY") ?? Deno.env.get("SUPABASE_ANON_KEY");
   if (!supabaseUrl || !anonKey) return json({ error: "missing_env" }, 500);
 
-  const authHeader = req.headers.get("Authorization") ?? "";
-  const token = authHeader.replace(/^Bearer\s+/i, "").trim();
-  if (!token) return json({ error: "missing_authorization" }, 401);
-
-  const userClient = createClient(supabaseUrl, anonKey, {
-    global: { headers: { Authorization: `Bearer ${token}` } },
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
-  const { data: userData, error: userErr } = await userClient.auth.getUser();
-  if (userErr || !userData?.user) return json({ error: "invalid_token" }, 401);
-
   let body: any;
   try {
     body = await req.json();
   } catch {
     return json({ error: "invalid_json" }, 400);
+  }
+
+  // Aceita JWT de usuário do Admin OU device_token da tela pareada.
+  const deviceToken = String(body?.device_token ?? "").trim();
+  if (deviceToken) {
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    if (!serviceKey) return json({ error: "missing_env" }, 500);
+    const admin = createClient(supabaseUrl, serviceKey, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+    const { data: dev } = await admin
+      .from("devices").select("id").eq("token", deviceToken).maybeSingle();
+    if (!dev) return json({ error: "invalid_device_token" }, 401);
+  } else {
+    const authHeader = req.headers.get("Authorization") ?? "";
+    const token = authHeader.replace(/^Bearer\s+/i, "").trim();
+    if (!token) return json({ error: "missing_authorization" }, 401);
+    const userClient = createClient(supabaseUrl, anonKey, {
+      global: { headers: { Authorization: `Bearer ${token}` } },
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+    const { data: userData, error: userErr } = await userClient.auth.getUser();
+    if (userErr || !userData?.user) return json({ error: "invalid_token" }, 401);
   }
 
   const city = String(body?.city ?? "").trim().slice(0, 120);
