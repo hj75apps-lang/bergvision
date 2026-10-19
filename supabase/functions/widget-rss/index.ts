@@ -127,7 +127,7 @@ Deno.serve(async (req) => {
   }
 
   const url = String(body?.url ?? "").trim();
-  const max = Math.max(1, Math.min(20, Number(body?.max ?? 5) || 5));
+  const max = Math.max(1, Math.min(30, Number(body?.max ?? body?.limit ?? 10) || 10));
 
   let parsed: URL;
   try {
@@ -165,9 +165,12 @@ Deno.serve(async (req) => {
         pick(block, "published") ||
         "",
       image: pickImage(block),
+      summary: (pick(block, "description") || pick(block, "summary") || pick(block, "content")).slice(0, 280),
     }));
+    const head = xml.split(/<item|<entry/i)[0];
+    const feedTitle = pick(head, "title");
 
-    return json({ items });
+    return json({ feedTitle, fetchedAt: new Date().toISOString(), items });
   } catch (e) {
     return json({ error: "fetch_error", detail: (e as Error).message }, 502);
   }
