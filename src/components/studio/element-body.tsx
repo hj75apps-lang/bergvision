@@ -426,7 +426,7 @@ function IframeWidget({ config }: { config: Record<string, unknown> }) {
       <div className="flex h-full w-full items-center justify-center rounded-md border border-dashed border-white/30 bg-black/60 p-3 text-center text-[11px] text-white/80">
         {vimeoState === "loading"
           ? "Carregando vídeo do Vimeo…"
-          : "O Vimeo não liberou este vídeo. Ele precisa ser público e permitir incorporação em outros sites."}
+          : "O Vimeo bloqueou este vídeo aqui. No Vimeo, em Privacidade › Incorporar, escolha \"Qualquer lugar\" (o dono restringiu a domínios específicos)."}
       </div>
     );
   }
