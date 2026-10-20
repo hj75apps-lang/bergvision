@@ -85,7 +85,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { GridSkeleton } from "@/components/layout/grid-skeleton";
 import { PreviewPanel } from "@/components/preview/preview-panel";
-import { PlaylistLocalPreview } from "@/components/preview/playlist-local-preview";
 import {
   usePlaylistDraftPayload,
   type PlaylistDraftItem,
