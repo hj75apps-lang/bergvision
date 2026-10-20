@@ -731,9 +731,6 @@ export function PlaylistEditor({
   );
 
   const draftPayload = usePlaylistDraftPayload(draftMeta, draftItems, open);
-  const [previewTab, setPreviewTab] = useState<"player" | "local" | "both">(
-    "local",
-  );
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
