@@ -190,14 +190,12 @@ function PlayersPage() {
             {players.length} player(s) · {onlineCount} online agora
           </p>
         </div>
-        {canManage && (
-          <Button
-            onClick={() => setPairOpen(true)}
-            className="h-10 rounded-xl"
-          >
-            <Plus className="mr-2 h-4 w-4" /> Adicionar player
-          </Button>
-        )}
+        <Button
+          onClick={() => setPairOpen(true)}
+          className="h-10 rounded-xl"
+        >
+          <Plus className="mr-2 h-4 w-4" /> Adicionar player
+        </Button>
       </header>
 
       {playersQ.isLoading ? (
@@ -213,11 +211,9 @@ function PlayersPage() {
               Abra o app do player, gere um PIN de 6 dígitos e clique em
               &ldquo;Adicionar player&rdquo; para parear.
             </p>
-            {canManage && (
-              <Button onClick={() => setPairOpen(true)} className="mt-2 rounded-xl">
-                <Plus className="mr-2 h-4 w-4" /> Adicionar player
-              </Button>
-            )}
+            <Button onClick={() => setPairOpen(true)} className="mt-2 rounded-xl">
+              <Plus className="mr-2 h-4 w-4" /> Adicionar player
+            </Button>
           </CardContent>
         </Card>
       ) : (
