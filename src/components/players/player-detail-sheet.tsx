@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { KeyRound, Loader2, RadioTower, Trash2 } from "lucide-react";
+import { Loader2, RadioTower, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import {
@@ -316,26 +316,6 @@ export function PlayerDetailSheet({
     onError: (err: any) => toast.error(err?.message || "Falha ao remover."),
   });
 
-  const repair = useMutation({
-    mutationFn: async () => {
-      const { data, error } = await supabase.functions.invoke("confirm-pairing", {
-        body: { action: "repair", player_id: player.id },
-      });
-      if (error) throw error;
-      const d = data as { code?: string; error?: string };
-      if (!d?.code) throw new Error(d?.error || "Falha ao gerar código.");
-      return d.code;
-    },
-    onSuccess: (code) => {
-      toast.success(`Novo código de pareamento: ${code}`, {
-        description:
-          "Ele aparece na tela do player em até 30s. Confirme em Players › Novo Player (válido por 15 min).",
-        duration: 20000,
-      });
-    },
-    onError: (err: any) => toast.error(err?.message || "Falha ao gerar código."),
-  });
-
   const system = templates.filter((t) => t.is_system);
   const custom = templates.filter((t) => !t.is_system);
 
@@ -532,22 +512,6 @@ export function PlayerDetailSheet({
             )}
             Identificar
           </Button>
-          {canManage && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => repair.mutate()}
-              disabled={repair.isPending}
-              className="h-9 rounded-xl"
-            >
-              {repair.isPending ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <KeyRound className="mr-2 h-4 w-4" />
-              )}
-              Novo código
-            </Button>
-          )}
           {canManage && (
             <AlertDialog>
               <AlertDialogTrigger asChild>

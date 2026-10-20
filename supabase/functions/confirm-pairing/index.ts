@@ -63,142 +63,6 @@ function normalizeCode(raw: unknown): string | null {
   return cleaned;
 }
 
-// =====================================================================
-// Novo código de pareamento para player existente (re-pareamento)
-//
-// Admin: POST { action: "repair", player_id }  (JWT owner/admin)
-//   -> { ok, code, pairing_id, expires_at }
-// Tela:  POST { action: "repair_status", device_token }
-//   -> { repair_requested, code?, pairing_id?, expires_at?, repaired?, expired? }
-// Ao confirmar o código (fluxo normal deste endpoint), o mesmo device e
-// device_token são reaproveitados — a tela não perde a credencial.
-// =====================================================================
-const REPAIR_TTL_MS = 15 * 60 * 1000;
-const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-
-function randomCode(): string {
-  const bytes = new Uint8Array(6);
-  crypto.getRandomValues(bytes);
-  return Array.from(bytes, (b) => CODE_ALPHABET[b % CODE_ALPHABET.length]).join("");
-}
-
-type Env = { supabaseUrl: string; serviceRole: string; anonKey: string };
-
-async function handleRepairStatus(env: Env, deviceToken: string) {
-  if (!deviceToken) return json({ error: "missing_device_token" }, 400);
-  const admin = createClient(env.supabaseUrl, env.serviceRole, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
-  const { data: dev } = await admin
-    .from("devices")
-    .select("id, metadata")
-    .eq("token", deviceToken)
-    .maybeSingle();
-  if (!dev) return json({ error: "invalid_device_token" }, 401);
-  const meta = (dev.metadata ?? {}) as Record<string, any>;
-  const rp = meta.repair as
-    | { pairing_id: string; code: string; expires_at: string }
-    | undefined;
-  if (!rp) return json({ repair_requested: false });
-
-  const { data: pc } = await admin
-    .from("pairing_codes")
-    .select("id, status, confirmed_at, expires_at")
-    .eq("id", rp.pairing_id)
-    .maybeSingle();
-  const confirmed =
-    !!pc && (String(pc.status).toLowerCase() === "confirmed" || !!pc.confirmed_at);
-  const expired = !pc || new Date(pc.expires_at).getTime() < Date.now();
-  if (confirmed || expired) {
-    const { repair: _r, ...rest } = meta;
-    await admin.from("devices").update({ metadata: rest }).eq("id", dev.id);
-    return json({ repair_requested: false, repaired: confirmed, expired: !confirmed });
-  }
-  return json({
-    repair_requested: true,
-    code: rp.code,
-    pairing_id: rp.pairing_id,
-    expires_at: rp.expires_at,
-  });
-}
-
-async function handleRepairRequest(env: Env, userId: string, body: any) {
-  const playerId = String(body?.player_id ?? "").trim();
-  if (!/^[0-9a-f-]{36}$/i.test(playerId))
-    return json({ error: "invalid_player_id" }, 400);
-  const admin = createClient(env.supabaseUrl, env.serviceRole, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
-  const { data: profile } = await admin
-    .from("users")
-    .select("organization_id, role")
-    .eq("id", userId)
-    .maybeSingle();
-  if (!profile?.organization_id) return json({ error: "no_organization" }, 403);
-  if (!ALLOWED_ROLES.has(String(profile.role)))
-    return json({ error: "forbidden_role" }, 403);
-
-  const { data: player } = await admin
-    .from("players")
-    .select("id, organization_id")
-    .eq("id", playerId)
-    .maybeSingle();
-  if (!player || player.organization_id !== profile.organization_id)
-    return json({ error: "player_not_found" }, 404);
-
-  const { data: dev } = await admin
-    .from("devices")
-    .select("id, token, metadata")
-    .eq("id", playerId)
-    .maybeSingle();
-  if (!dev) return json({ error: "device_not_found" }, 404);
-
-  await admin
-    .from("pairing_codes")
-    .update({ status: "expired" })
-    .eq("device_id", dev.id)
-    .eq("status", "pending");
-
-  const expiresAt = new Date(Date.now() + REPAIR_TTL_MS).toISOString();
-  let inserted: { id: string; code: string } | null = null;
-  let lastErr: string | null = null;
-  for (let i = 0; i < 5 && !inserted; i++) {
-    const { data, error } = await admin
-      .from("pairing_codes")
-      .insert({
-        code: randomCode(),
-        status: "pending",
-        device_id: dev.id,
-        device_token: dev.token,
-        expires_at: expiresAt,
-      })
-      .select("id, code")
-      .single();
-    if (!error && data) inserted = data as { id: string; code: string };
-    else lastErr = error?.message ?? null;
-  }
-  if (!inserted) return json({ error: "code_generation_failed", detail: lastErr }, 500);
-
-  const meta = (dev.metadata ?? {}) as Record<string, unknown>;
-  await admin
-    .from("devices")
-    .update({
-      metadata: {
-        ...meta,
-        repair: {
-          pairing_id: inserted.id,
-          code: inserted.code,
-          expires_at: expiresAt,
-          requested_at: new Date().toISOString(),
-          requested_by: userId,
-        },
-      },
-    })
-    .eq("id", dev.id);
-
-  return json({ ok: true, code: inserted.code, pairing_id: inserted.id, expires_at: expiresAt });
-}
-
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS")
     return new Response(null, { status: 204, headers: CORS });
@@ -207,19 +71,6 @@ Deno.serve(async (req) => {
   const env = readEnv();
   if ("missing" in env)
     return json({ error: "missing_env", missing: env.missing }, 500);
-
-  let preBody: any;
-  try {
-    preBody = await req.json();
-  } catch {
-    return json({ error: "invalid_json" }, 400);
-  }
-
-  // ---- Ação da TELA: consultar se o Admin pediu novo código ----
-  // POST { action: "repair_status", device_token }
-  if (preBody?.action === "repair_status") {
-    return await handleRepairStatus(env, String(preBody?.device_token ?? "").trim());
-  }
 
   // ---- Auth: valida o JWT do operador (Admin logado) ----
   const authHeader = req.headers.get("Authorization") ?? "";
@@ -239,11 +90,11 @@ Deno.serve(async (req) => {
   const userId = userData.user.id;
 
   // ---- Body ----
-  const body = preBody;
-
-  // ---- Ação: gerar novo código para um player existente (Admin) ----
-  if (body?.action === "repair") {
-    return await handleRepairRequest(env, userId, body);
+  let body: any;
+  try {
+    body = await req.json();
+  } catch {
+    return json({ error: "invalid_json" }, 400);
   }
   const code = normalizeCode(body?.code ?? body?.pairing_code ?? body?.pin_code);
   if (!code) return json({ error: "invalid_code" }, 400);
