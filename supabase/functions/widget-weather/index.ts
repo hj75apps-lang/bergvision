@@ -111,10 +111,24 @@ Deno.serve(async (req) => {
     const n = num(v);
     return n == null ? fb : Math.round(n);
   };
-  const timed = (input: string | URL, ms: number, init: RequestInit = {}) => {
+  const once = (input: string | URL, ms: number, init: RequestInit = {}) => {
     const ctrl = new AbortController();
     const t = setTimeout(() => ctrl.abort(), ms);
     return fetch(input, { ...init, signal: ctrl.signal }).finally(() => clearTimeout(t));
+  };
+  // Até 3 tentativas: falhas de rede/timeout ou 5xx/429 transitórios do provedor.
+  const timed = async (input: string | URL, ms: number, init: RequestInit = {}) => {
+    let lastErr: unknown = null;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        const r = await once(input, ms + attempt * 4000, init);
+        if (r.ok || (r.status < 500 && r.status !== 429) || attempt === 2) return r;
+      } catch (e) {
+        lastErr = e;
+      }
+      await new Promise((res) => setTimeout(res, 400 * (attempt + 1)));
+    }
+    throw lastErr ?? new Error("fetch_failed");
   };
 
   // Geocodificação reversa: BigDataCloud → Nominatim → coordenadas formatadas.
