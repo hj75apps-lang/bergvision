@@ -1,4 +1,6 @@
+import { useEffect, useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
 import {
   Activity,
   CalendarClock,
@@ -16,79 +18,173 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/use-auth";
+import { GridSkeleton } from "@/components/layout/grid-skeleton";
+import { format, isAfter, isBefore, parseISO } from "date-fns";
+import { ptBR } from "date-fns/locale";
 
 export const Route = createFileRoute("/")({
-  head: () => ({
-    meta: [
-      { title: "Berg Vision" },
-      {
-        name: "description",
-        content:
-          "Visão geral da sua rede de mídia indoor: players, agendamentos e desempenho em tempo real.",
-      },
-    ],
-  }),
+  head: () => (
+    {
+      meta: [
+        { title: "Berg Vision" },
+        {
+          name: "description",
+          content:
+            "Visão geral da sua rede de mídia indoor: players, agendamentos e desempenho em tempo real.",
+        },
+      ],
+    }
+  ),
   component: DashboardPage,
 });
 
-type Stat = {
-  label: string;
-  value: string;
-  hint: string;
-  trend?: string;
-  icon: typeof MonitorPlay;
-  tone: "primary" | "success" | "danger" | "warning";
+type Player = {
+  id: string;
+  organization_id: string;
+  name: string;
+  status: string | null;
+  last_heartbeat: string | null;
+  resolution: string | null;
+  orientation: string | null;
+  created_at?: string | null;
 };
 
-const stats: Stat[] = [
-  {
-    label: "Total de players",
-    value: "42",
-    hint: "12 unidades ativas nesta semana",
-    trend: "+3",
-    icon: MonitorPlay,
-    tone: "primary",
-  },
-  {
-    label: "Players online",
-    value: "38",
-    hint: "90% da rede conectada agora",
-    trend: "+2",
-    icon: Signal,
-    tone: "success",
-  },
-  {
-    label: "Players offline",
-    value: "4",
-    hint: "Última desconexão há 12 min",
-    trend: "-1",
-    icon: SignalZero,
-    tone: "danger",
-  },
-  {
-    label: "Próximos agendamentos",
-    value: "07",
-    hint: "Nas próximas 24 horas",
-    icon: CalendarClock,
-    tone: "warning",
-  },
-];
-
-const upcoming = [
-  { title: "Campanha de Verão · Loja Centro", when: "Hoje, 14:00", tag: "Playlist" },
-  { title: "Promoção Relâmpago · Shopping Norte", when: "Hoje, 18:30", tag: "Template" },
-  { title: "Cardápio Digital · Filial Sul", when: "Amanhã, 07:00", tag: "Mídia" },
-  { title: "Institucional Q4 · Recepção HQ", when: "Amanhã, 09:00", tag: "Template" },
-];
-
-const toneRing: Record<Stat["tone"], string> = {
-  primary: "from-primary/25 to-primary/0 text-primary",
-  success: "from-success/25 to-success/0 text-success",
-  danger: "from-destructive/25 to-destructive/0 text-destructive",
-  warning: "from-warning/25 to-warning/0 text-warning",
+type PlaylistRow = {
+  id: string;
+  name: string;
+  is_active: boolean;
+  schedule_start: string | null;
+  schedule_end: string | null;
+  schedule_date_start: string | null;
+  schedule_date_end: string | null;
+  created_at: string | null;
 };
+
+const HEARTBEAT_OFFLINE_MS = 60_000;
+
+function isOnline(p: Player, nowMs: number): boolean {
+  if (!p.last_heartbeat) return false;
+  const last = new Date(p.last_heartbeat).getTime();
+  if (Number.isNaN(last)) return false;
+  if (nowMs - last > HEARTBEAT_OFFLINE_MS) return false;
+  return (p.status ?? "").toLowerCase() === "online";
+}
 
 function DashboardPage() {
+  const { membership } = useAuth();
+  const orgId = membership?.organization_id ?? null;
+  const [nowMs, setNowMs] = useState(() => Date.now());
+
+  useEffect(() => {
+    const t = setInterval(() => setNowMs(Date.now()), 15_000);
+    return () => clearInterval(t);
+  }, []);
+
+  const playersQ = useQuery({
+    queryKey: ["dashboard-players", orgId],
+    enabled: !!orgId,
+    queryFn: async (): Promise<Player[]> => {
+      const { data, error } = await supabase
+        .from("players")
+        .select("id, organization_id, name, status, last_heartbeat, resolution, orientation, created_at")
+        .eq("organization_id", orgId!);
+      if (error) throw error;
+      return (data ?? []) as Player[];
+    },
+  });
+
+  const playlistsQ = useQuery({
+    queryKey: ["dashboard-playlists", orgId],
+    enabled: !!orgId,
+    queryFn: async (): Promise<PlaylistRow[]> => {
+      const { data, error } = await supabase
+        .from("playlists")
+        .select("id, name, is_active, schedule_start, schedule_end, schedule_date_start, schedule_date_end, created_at")
+        .eq("organization_id", orgId!)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return (data ?? []) as PlaylistRow[];
+    },
+  });
+
+  const players = playersQ.data ?? [];
+  const playlists = playlistsQ.data ?? [];
+
+  const totalPlayers = players.length;
+  const onlinePlayers = useMemo(
+    () => players.filter((p) => isOnline(p, nowMs)).length,
+    [players, nowMs],
+  );
+  const offlinePlayers = Math.max(0, totalPlayers - onlinePlayers);
+
+  // Próximos agendamentos: playlists ativas com horário ou data
+  const upcoming = useMemo(() => {
+    const now = new Date();
+    return playlists
+      .filter((pl) => pl.is_active)
+      .slice(0, 5)
+      .map((pl) => {
+        let when = "Programação contínua";
+        if (pl.schedule_start) {
+          when = `Diariamente às ${pl.schedule_start.slice(0, 5)}`;
+        } else if (pl.schedule_date_start) {
+          try {
+            when = `Início em ${format(parseISO(pl.schedule_date_start), "dd/MM/yyyy", { locale: ptBR })}`;
+          } catch {
+            when = pl.schedule_date_start;
+          }
+        }
+        return {
+          id: pl.id,
+          title: pl.name,
+          when,
+          tag: pl.schedule_start ? "Horário" : pl.schedule_date_start ? "Campanha" : "Playlist",
+        };
+      });
+  }, [playlists]);
+
+  const stats = [
+    {
+      label: "Total de players",
+      value: totalPlayers.toString(),
+      hint: `${onlinePlayers} conectados agora`,
+      icon: MonitorPlay,
+      tone: "primary" as const,
+    },
+    {
+      label: "Players online",
+      value: onlinePlayers.toString(),
+      hint: totalPlayers > 0 ? `${Math.round((onlinePlayers / totalPlayers) * 100)}% da rede conectada` : "0% da rede",
+      icon: Signal,
+      tone: "success" as const,
+    },
+    {
+      label: "Players offline",
+      value: offlinePlayers.toString(),
+      hint: offlinePlayers > 0 ? "Atenção necessária" : "Nenhum player offline",
+      icon: SignalZero,
+      tone: "danger" as const,
+    },
+    {
+      label: "Playlists ativas",
+      value: playlists.filter((p) => p.is_active).length.toString(),
+      hint: `${playlists.length} cadastradas no total`,
+      icon: CalendarClock,
+      tone: "warning" as const,
+    },
+  ];
+
+  const toneRing: Record<string, string> = {
+    primary: "from-primary/25 to-primary/0 text-primary",
+    success: "from-success/25 to-success/0 text-success",
+    danger: "from-destructive/25 to-destructive/0 text-destructive",
+    warning: "from-warning/25 to-warning/0 text-warning",
+  };
+
+  const isLoading = playersQ.isLoading || playlistsQ.isLoading;
+
   return (
     <div className="mx-auto flex w-full max-w-7xl flex-col gap-8">
       <header className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-4 sm:flex sm:flex-wrap sm:justify-between">
@@ -105,50 +201,48 @@ function DashboardPage() {
         </div>
         <Badge className="rounded-full border-none bg-primary/15 px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary/20">
           <Activity className="mr-1.5 h-3.5 w-3.5" />
-          Dados mockados
+          Sistema em tempo real
         </Badge>
       </header>
 
-      <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {stats.map((stat) => (
-          <Card
-            key={stat.label}
-            className="group relative overflow-hidden rounded-3xl border-border/60 bg-card/70 backdrop-blur-xl transition-shadow hover:shadow-lg hover:shadow-primary/5"
-          >
-            <div
-              className={`pointer-events-none absolute -right-8 -top-8 h-32 w-32 rounded-full bg-linear-to-br ${toneRing[stat.tone]} blur-2xl opacity-70`}
-            />
-            <CardHeader className="pb-2">
-              <div className="flex items-center justify-between">
-                <CardDescription className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                  {stat.label}
-                </CardDescription>
-                <div
-                  className={`grid h-9 w-9 place-items-center rounded-xl bg-linear-to-br ${toneRing[stat.tone]}`}
-                >
-                  <stat.icon className="h-4 w-4" />
+      {isLoading ? (
+        <GridSkeleton count={4} heightClass="h-36" />
+      ) : (
+        <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          {stats.map((stat) => (
+            <Card
+              key={stat.label}
+              className="group relative overflow-hidden rounded-3xl border-border/60 bg-card/70 backdrop-blur-xl transition-shadow hover:shadow-lg hover:shadow-primary/5"
+            >
+              <div
+                className={`pointer-events-none absolute -right-8 -top-8 h-32 w-32 rounded-full bg-linear-to-br ${toneRing[stat.tone]} blur-2xl opacity-70`}
+              />
+              <CardHeader className="pb-2">
+                <div className="flex items-center justify-between">
+                  <CardDescription className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                    {stat.label}
+                  </CardDescription>
+                  <div
+                    className={`grid h-9 w-9 place-items-center rounded-xl bg-linear-to-br ${toneRing[stat.tone]}`}
+                  >
+                    <stat.icon className="h-4 w-4" />
+                  </div>
                 </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <CardTitle className="text-4xl font-semibold tracking-tight tabular-nums">
-                {stat.value}
-              </CardTitle>
-              <div className="mt-2 flex items-center gap-2">
-                {stat.trend && (
-                  <span className="inline-flex items-center gap-0.5 rounded-md bg-muted/60 px-1.5 py-0.5 text-[11px] font-medium text-foreground/80">
-                    <TrendingUp className="h-3 w-3" />
-                    {stat.trend}
-                  </span>
-                )}
-                <p className="truncate text-xs text-muted-foreground">
-                  {stat.hint}
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </section>
+              </CardHeader>
+              <CardContent>
+                <CardTitle className="text-4xl font-semibold tracking-tight tabular-nums">
+                  {stat.value}
+                </CardTitle>
+                <div className="mt-2 flex items-center gap-2">
+                  <p className="truncate text-xs text-muted-foreground">
+                    {stat.hint}
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </section>
+      )}
 
       <section className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <Card className="rounded-3xl border-border/60 bg-card/70 backdrop-blur-xl lg:col-span-2">
@@ -159,7 +253,7 @@ function DashboardPage() {
                   Próximos agendamentos
                 </CardTitle>
                 <CardDescription>
-                  Campanhas programadas nas próximas 24 horas.
+                  Playlists e campanhas ativas cadastradas.
                 </CardDescription>
               </div>
               <Badge variant="secondary" className="rounded-full">
@@ -168,23 +262,29 @@ function DashboardPage() {
             </div>
           </CardHeader>
           <CardContent className="divide-y divide-border/60 p-0">
-            {upcoming.map((item) => (
-              <div
-                key={item.title}
-                className="flex items-center justify-between gap-3 px-6 py-3.5 first:pt-4 last:pb-4"
-              >
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-medium">{item.title}</p>
-                  <p className="text-xs text-muted-foreground">{item.when}</p>
-                </div>
-                <Badge
-                  variant="outline"
-                  className="shrink-0 rounded-full border-border/70 text-[11px] font-normal text-muted-foreground"
-                >
-                  {item.tag}
-                </Badge>
+            {upcoming.length === 0 ? (
+              <div className="p-6 text-center text-sm text-muted-foreground">
+                Nenhuma playlist ativa no momento.
               </div>
-            ))}
+            ) : (
+              upcoming.map((item) => (
+                <div
+                  key={item.id}
+                  className="flex items-center justify-between gap-3 px-6 py-3.5 first:pt-4 last:pb-4"
+                >
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium">{item.title}</p>
+                    <p className="text-xs text-muted-foreground">{item.when}</p>
+                  </div>
+                  <Badge
+                    variant="outline"
+                    className="shrink-0 rounded-full border-border/70 text-[11px] font-normal text-muted-foreground"
+                  >
+                    {item.tag}
+                  </Badge>
+                </div>
+              ))
+            )}
           </CardContent>
         </Card>
 
@@ -194,9 +294,24 @@ function DashboardPage() {
             <CardDescription>Status agregado dos players.</CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-4">
-            <StatusRow label="Online" value={38} total={42} tone="success" />
-            <StatusRow label="Offline" value={4} total={42} tone="danger" />
-            <StatusRow label="Sincronizando" value={2} total={42} tone="warning" />
+            <StatusRow
+              label="Online"
+              value={onlinePlayers}
+              total={totalPlayers}
+              tone="success"
+            />
+            <StatusRow
+              label="Offline"
+              value={offlinePlayers}
+              total={totalPlayers}
+              tone="danger"
+            />
+            <StatusRow
+              label="Total registrados"
+              value={totalPlayers}
+              total={Math.max(totalPlayers, 1)}
+              tone="warning"
+            />
           </CardContent>
         </Card>
       </section>
@@ -215,20 +330,20 @@ function StatusRow({
   total: number;
   tone: "success" | "danger" | "warning";
 }) {
-  const pct = Math.round((value / total) * 100);
+  const pct = total > 0 ? Math.round((value / total) * 100) : 0;
   const bar =
     tone === "success"
-      ? "bg-success"
+      ? "bg-emerald-500"
       : tone === "danger"
-        ? "bg-destructive"
-        : "bg-warning";
+        ? "bg-rose-500"
+        : "bg-amber-500";
   return (
     <div>
       <div className="mb-1.5 flex items-center justify-between text-sm">
         <span className="text-muted-foreground">{label}</span>
         <span className="font-medium tabular-nums">
           {value}
-          <span className="text-muted-foreground">/{total}</span>
+          {total > 0 && <span className="text-muted-foreground">/{total}</span>}
         </span>
       </div>
       <div className="h-2 w-full overflow-hidden rounded-full bg-muted/60">
