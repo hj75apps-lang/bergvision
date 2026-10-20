@@ -148,8 +148,8 @@ Deno.serve(async (req) => {
     if (!res.ok) return json({ error: "fetch_failed", status: res.status }, 502);
     const buf = new Uint8Array(await res.arrayBuffer());
     const headerCs = /charset=["']?([\w-]+)/i.exec(res.headers.get("content-type") ?? "")?.[1];
-    const head = new TextDecoder("latin1").decode(buf.slice(0, 300));
-    const declCs = /encoding=["']([\w-]+)["']/i.exec(head)?.[1];
+    const prolog = new TextDecoder("windows-1252").decode(buf.slice(0, 300));
+    const declCs = /encoding=["']([\w-]+)["']/i.exec(prolog)?.[1];
     let charset = (declCs || headerCs || "utf-8").toLowerCase();
     let xml: string;
     try {
