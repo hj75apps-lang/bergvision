@@ -146,7 +146,21 @@ Deno.serve(async (req) => {
       },
     });
     if (!res.ok) return json({ error: "fetch_failed", status: res.status }, 502);
-    const xml = await res.text();
+    const buf = new Uint8Array(await res.arrayBuffer());
+    const headerCs = /charset=["']?([\w-]+)/i.exec(res.headers.get("content-type") ?? "")?.[1];
+    const head = new TextDecoder("latin1").decode(buf.slice(0, 300));
+    const declCs = /encoding=["']([\w-]+)["']/i.exec(head)?.[1];
+    let charset = (declCs || headerCs || "utf-8").toLowerCase();
+    let xml: string;
+    try {
+      xml = new TextDecoder(charset, { fatal: charset === "utf-8" }).decode(buf);
+    } catch {
+      charset = "windows-1252";
+      xml = new TextDecoder(charset).decode(buf);
+    }
+    if (xml.includes("\uFFFD")) {
+      try { xml = new TextDecoder("windows-1252").decode(buf); } catch { /* keep */ }
+    }
 
     // Itens de RSS (<item>) ou Atom (<entry>)
     const blocks = [
