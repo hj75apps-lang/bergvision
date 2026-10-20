@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
 import {
   Activity,
   CalendarClock,
@@ -16,6 +17,9 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/use-auth";
+import { useState, useEffect } from "react";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -40,46 +44,15 @@ type Stat = {
   tone: "primary" | "success" | "danger" | "warning";
 };
 
-const stats: Stat[] = [
-  {
-    label: "Total de players",
-    value: "42",
-    hint: "12 unidades ativas nesta semana",
-    trend: "+3",
-    icon: MonitorPlay,
-    tone: "primary",
-  },
-  {
-    label: "Players online",
-    value: "38",
-    hint: "90% da rede conectada agora",
-    trend: "+2",
-    icon: Signal,
-    tone: "success",
-  },
-  {
-    label: "Players offline",
-    value: "4",
-    hint: "Última desconexão há 12 min",
-    trend: "-1",
-    icon: SignalZero,
-    tone: "danger",
-  },
-  {
-    label: "Próximos agendamentos",
-    value: "07",
-    hint: "Nas próximas 24 horas",
-    icon: CalendarClock,
-    tone: "warning",
-  },
-];
+const HEARTBEAT_OFFLINE_MS = 60_000;
 
-const upcoming = [
-  { title: "Campanha de Verão · Loja Centro", when: "Hoje, 14:00", tag: "Playlist" },
-  { title: "Promoção Relâmpago · Shopping Norte", when: "Hoje, 18:30", tag: "Template" },
-  { title: "Cardápio Digital · Filial Sul", when: "Amanhã, 07:00", tag: "Mídia" },
-  { title: "Institucional Q4 · Recepção HQ", when: "Amanhã, 09:00", tag: "Template" },
-];
+function isOnline(lastHeartbeat: string | null, status: string | null, nowMs: number): boolean {
+  if (!lastHeartbeat) return false;
+  const last = new Date(lastHeartbeat).getTime();
+  if (Number.isNaN(last)) return false;
+  if (nowMs - last > HEARTBEAT_OFFLINE_MS) return false;
+  return (status ?? "").toLowerCase() === "online";
+}
 
 const toneRing: Record<Stat["tone"], string> = {
   primary: "from-primary/25 to-primary/0 text-primary",
@@ -89,6 +62,88 @@ const toneRing: Record<Stat["tone"], string> = {
 };
 
 function DashboardPage() {
+  const { membership } = useAuth();
+  const orgId = membership?.organization_id ?? null;
+  const [nowMs, setNowMs] = useState(() => Date.now());
+
+  useEffect(() => {
+    const t = setInterval(() => setNowMs(Date.now()), 15_000);
+    return () => clearInterval(t);
+  }, []);
+
+  const playersQ = useQuery({
+    queryKey: ["dashboard-players", orgId],
+    enabled: !!orgId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("players")
+        .select("id, name, status, last_heartbeat, created_at")
+        .eq("organization_id", orgId!);
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
+  const playlistsQ = useQuery({
+    queryKey: ["dashboard-playlists", orgId],
+    enabled: !!orgId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("playlists")
+        .select("id, name, is_active, schedule_date_start, schedule_date_end, schedule_start, created_at")
+        .eq("organization_id", orgId!)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
+  const players = playersQ.data ?? [];
+  const playlists = playlistsQ.data ?? [];
+
+  const totalPlayers = players.length;
+  const onlinePlayers = players.filter((p) => isOnline(p.last_heartbeat, p.status, nowMs)).length;
+  const offlinePlayers = totalPlayers - onlinePlayers;
+
+  const activePlaylists = playlists.filter((p) => p.is_active);
+
+  const stats: Stat[] = [
+    {
+      label: "Total de players",
+      value: String(totalPlayers),
+      hint: "Players cadastrados na organização",
+      icon: MonitorPlay,
+      tone: "primary",
+    },
+    {
+      label: "Players online",
+      value: String(onlinePlayers),
+      hint: totalPlayers > 0 ? `${Math.round((onlinePlayers / totalPlayers) * 100)}% da rede conectada` : "0% da rede conectada",
+      icon: Signal,
+      tone: "success",
+    },
+    {
+      label: "Players offline",
+      value: String(offlinePlayers),
+      hint: "Sem conexão recente",
+      icon: SignalZero,
+      tone: "danger",
+    },
+    {
+      label: "Playlists ativas",
+      value: String(activePlaylists.length),
+      hint: "Campanhas prontas para exibição",
+      icon: CalendarClock,
+      tone: "warning",
+    },
+  ];
+
+  const upcoming = activePlaylists.slice(0, 5).map((pl) => ({
+    title: pl.name,
+    when: pl.schedule_date_start ? `Início: ${pl.schedule_date_start}` : "Ativa agora",
+    tag: pl.schedule_start ? `Horário: ${pl.schedule_start}` : "Playlist",
+  }));
+
   return (
     <div className="mx-auto flex w-full max-w-7xl flex-col gap-8">
       <header className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-4 sm:flex sm:flex-wrap sm:justify-between">
@@ -100,12 +155,12 @@ function DashboardPage() {
             Bem-vindo de volta 👋
           </h1>
           <p className="mt-1.5 text-sm text-muted-foreground">
-            Uma visão em tempo real da sua rede Berg Vision.
+            Uma visão em tempo real da sua rede Berg Vision com dados reais.
           </p>
         </div>
         <Badge className="rounded-full border-none bg-primary/15 px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary/20">
           <Activity className="mr-1.5 h-3.5 w-3.5" />
-          Dados mockados
+          Sistema sincronizado
         </Badge>
       </header>
 
@@ -156,10 +211,10 @@ function DashboardPage() {
             <div className="flex items-center justify-between">
               <div>
                 <CardTitle className="text-lg font-semibold">
-                  Próximos agendamentos
+                  Playlists e Campanhas Ativas
                 </CardTitle>
                 <CardDescription>
-                  Campanhas programadas nas próximas 24 horas.
+                  Playlists cadastradas e ativas na sua rede.
                 </CardDescription>
               </div>
               <Badge variant="secondary" className="rounded-full">
@@ -168,23 +223,29 @@ function DashboardPage() {
             </div>
           </CardHeader>
           <CardContent className="divide-y divide-border/60 p-0">
-            {upcoming.map((item) => (
-              <div
-                key={item.title}
-                className="flex items-center justify-between gap-3 px-6 py-3.5 first:pt-4 last:pb-4"
-              >
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-medium">{item.title}</p>
-                  <p className="text-xs text-muted-foreground">{item.when}</p>
-                </div>
-                <Badge
-                  variant="outline"
-                  className="shrink-0 rounded-full border-border/70 text-[11px] font-normal text-muted-foreground"
+            {upcoming.length === 0 ? (
+              <p className="px-6 py-8 text-center text-sm text-muted-foreground">
+                Nenhuma playlist ativa no momento.
+              </p>
+            ) : (
+              upcoming.map((item, idx) => (
+                <div
+                  key={idx}
+                  className="flex items-center justify-between gap-3 px-6 py-3.5 first:pt-4 last:pb-4"
                 >
-                  {item.tag}
-                </Badge>
-              </div>
-            ))}
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium">{item.title}</p>
+                    <p className="text-xs text-muted-foreground">{item.when}</p>
+                  </div>
+                  <Badge
+                    variant="outline"
+                    className="shrink-0 rounded-full border-border/70 text-[11px] font-normal text-muted-foreground"
+                  >
+                    {item.tag}
+                  </Badge>
+                </div>
+              ))
+            )}
           </CardContent>
         </Card>
 
@@ -194,9 +255,9 @@ function DashboardPage() {
             <CardDescription>Status agregado dos players.</CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-4">
-            <StatusRow label="Online" value={38} total={42} tone="success" />
-            <StatusRow label="Offline" value={4} total={42} tone="danger" />
-            <StatusRow label="Sincronizando" value={2} total={42} tone="warning" />
+            <StatusRow label="Online" value={onlinePlayers} total={totalPlayers} tone="success" />
+            <StatusRow label="Offline" value={offlinePlayers} total={totalPlayers} tone="danger" />
+            <StatusRow label="Sincronizados" value={totalPlayers} total={totalPlayers} tone="warning" />
           </CardContent>
         </Card>
       </section>
@@ -215,7 +276,7 @@ function StatusRow({
   total: number;
   tone: "success" | "danger" | "warning";
 }) {
-  const pct = Math.round((value / total) * 100);
+  const pct = total > 0 ? Math.round((value / total) * 100) : 0;
   const bar =
     tone === "success"
       ? "bg-success"
