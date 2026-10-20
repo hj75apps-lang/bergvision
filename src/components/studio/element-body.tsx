@@ -4,7 +4,7 @@ import {
   resolveVimeoEmbed,
   toVideoEmbedUrl,
 } from "@/lib/studio/video-embed";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
 
@@ -1190,6 +1190,37 @@ function RssWidget({ config }: { config: Record<string, unknown> }) {
     return () => clearInterval(id);
   }, [items.length, motion]);
 
+  // Ajustes de texto controlados pelo usuário
+  const textColor = (config.textColor as string) || "#FFFFFF";
+  const maxLines = Math.max(1, Math.min(8, (config.maxLines as number) ?? 3));
+  const fontWeight = (config.fontWeight as number) ?? 600;
+  const textAlign = ((config.textAlign as string) ?? "left") as
+    | "left"
+    | "center"
+    | "right";
+  const autoFit = (config.autoFit as boolean | undefined) ?? true;
+
+  // Ajuste automático: reduz a fonte até o título caber inteiro, sem "...".
+  const fitBoxRef = useRef<HTMLDivElement | null>(null);
+  const fitTextRef = useRef<HTMLSpanElement | null>(null);
+  const [fitScale, setFitScale] = useState(1);
+  const currentTitle = items[idx] ? items[idx].title : "";
+  useLayoutEffect(() => {
+    setFitScale(1);
+  }, [currentTitle, sizeCqh, maxLines, autoFit, showImage]);
+  useLayoutEffect(() => {
+    if (!autoFit) return;
+    const box = fitBoxRef.current;
+    const txt = fitTextRef.current;
+    if (!box || !txt) return;
+    const overflowing =
+      txt.scrollHeight > txt.clientHeight + 1 ||
+      txt.offsetHeight > box.clientHeight + 1;
+    if (overflowing && fitScale > 0.35) {
+      setFitScale((s) => Math.max(0.35, s - 0.07));
+    }
+  });
+
   const wrapperStyle: React.CSSProperties = {
     containerType: "size",
     fontFamily: "Inter, system-ui",
@@ -1293,6 +1324,18 @@ function RssWidget({ config }: { config: Record<string, unknown> }) {
     showImage && current?.image && !imgFailed[idx] ? current.image : null;
   const onImgError = () =>
     setImgFailed((prev) => ({ ...prev, [idx]: true }));
+  const textStyle: React.CSSProperties = {
+    fontSize: `${sizeCqh * fitScale}cqh`,
+    fontWeight,
+    lineHeight: 1.2,
+    color: textColor,
+    display: "-webkit-box",
+    WebkitBoxOrient: "vertical",
+    WebkitLineClamp: maxLines,
+    overflow: "hidden",
+    overflowWrap: "break-word",
+    textAlign,
+  };
 
   // Background: imagem cobre tudo, texto por cima com sombra
   if (curImg && imagePosition === "background") {
@@ -1310,19 +1353,22 @@ function RssWidget({ config }: { config: Record<string, unknown> }) {
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
         {showText && (
-          <span
-            key={motion === "fade" ? idx : "static"}
-            style={{
-              fontSize: `${sizeCqh}cqh`,
-              fontWeight: 600,
-              lineHeight: 1.2,
-              animation:
-                motion === "fade" ? "bv-fade 0.6s ease-out" : undefined,
-            }}
-            className="relative mt-auto line-clamp-3 p-3"
+          <div
+            ref={fitBoxRef}
+            className="relative mt-auto flex max-h-full min-h-0 w-full items-end overflow-hidden p-3"
           >
-            {current?.title}
-          </span>
+            <span
+              ref={fitTextRef}
+              key={motion === "fade" ? idx : "static"}
+              style={{
+                ...textStyle,
+                animation:
+                  motion === "fade" ? "bv-fade 0.6s ease-out" : undefined,
+              }}
+            >
+              {current?.title}
+            </span>
+          </div>
         )}
         <style>{`@keyframes bv-fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}`}</style>
       </div>
@@ -1364,18 +1410,21 @@ function RssWidget({ config }: { config: Record<string, unknown> }) {
         />
       )}
       {showText && (
-        <span
-          key={motion === "fade" ? idx : "static"}
-          style={{
-            fontSize: `${sizeCqh}cqh`,
-            fontWeight: 600,
-            lineHeight: 1.2,
-            animation: motion === "fade" ? "bv-fade 0.6s ease-out" : undefined,
-          }}
-          className="line-clamp-3 self-center"
+        <div
+          ref={fitBoxRef}
+          className="flex min-h-0 min-w-0 flex-1 items-center overflow-hidden"
         >
-          {current?.title}
-        </span>
+          <span
+            ref={fitTextRef}
+            key={motion === "fade" ? idx : "static"}
+            style={{
+              ...textStyle,
+              animation: motion === "fade" ? "bv-fade 0.6s ease-out" : undefined,
+            }}
+          >
+            {current?.title}
+          </span>
+        </div>
       )}
       <style>{`@keyframes bv-fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}`}</style>
     </div>
