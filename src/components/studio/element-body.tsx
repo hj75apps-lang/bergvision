@@ -1225,6 +1225,7 @@ function RssWidget({ config }: { config: Record<string, unknown> }) {
     containerType: "size",
     fontFamily: "Inter, system-ui",
     ...widgetBgStyle(config, 0.4),
+    color: textColor,
   };
 
   if (!url) {
