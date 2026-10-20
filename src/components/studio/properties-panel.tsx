@@ -3284,6 +3284,87 @@ function WidgetContent({
               Menor = mais rápido. Aplica-se a marquee e scroll vertical.
             </span>
           </div>
+          <div className="flex flex-col gap-2 rounded-md border border-border/50 bg-muted/30 p-2">
+            <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+              Texto
+            </span>
+            <div className="flex flex-col gap-1">
+              <span className="text-[11px]">
+                Tamanho da fonte ({(config.sizePercent as number) ?? 14}%)
+              </span>
+              <Slider
+                value={[(config.sizePercent as number) ?? 14]}
+                min={3}
+                max={60}
+                step={1}
+                disabled={disabled}
+                onValueChange={([v]) => setCfg({ sizePercent: v })}
+              />
+            </div>
+            <label className="flex items-center justify-between gap-2">
+              <span className="text-[11px]">Cor do texto</span>
+              <input
+                type="color"
+                value={(config.textColor as string) || "#FFFFFF"}
+                disabled={disabled}
+                onChange={(e) => setCfg({ textColor: e.target.value })}
+                className="h-7 w-10 cursor-pointer rounded border border-border bg-transparent"
+              />
+            </label>
+            <NumberField
+              label="Máximo de linhas"
+              value={(config.maxLines as number) ?? 3}
+              min={1}
+              max={8}
+              step={1}
+              disabled={disabled}
+              onCommit={(v) => setCfg({ maxLines: v })}
+            />
+            <label className="flex flex-col gap-1">
+              <span className="text-[11px]">Peso</span>
+              <Select
+                value={String((config.fontWeight as number) ?? 600)}
+                onValueChange={(v) => setCfg({ fontWeight: Number(v) })}
+                disabled={disabled}
+              >
+                <SelectTrigger className="h-8 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="400">Normal</SelectItem>
+                  <SelectItem value="500">Médio</SelectItem>
+                  <SelectItem value="600">Semi-negrito</SelectItem>
+                  <SelectItem value="700">Negrito</SelectItem>
+                  <SelectItem value="800">Extra-negrito</SelectItem>
+                </SelectContent>
+              </Select>
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className="text-[11px]">Alinhamento</span>
+              <Select
+                value={(config.textAlign as string) ?? "left"}
+                onValueChange={(v) => setCfg({ textAlign: v })}
+                disabled={disabled}
+              >
+                <SelectTrigger className="h-8 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="left">Esquerda</SelectItem>
+                  <SelectItem value="center">Centro</SelectItem>
+                  <SelectItem value="right">Direita</SelectItem>
+                </SelectContent>
+              </Select>
+            </label>
+            <div className="flex items-center justify-between">
+              <span className="text-[11px]">Ajustar automaticamente (sem cortes)</span>
+              <Switch
+                checked={(config.autoFit as boolean | undefined) ?? true}
+                disabled={disabled}
+                onCheckedChange={(v) => setCfg({ autoFit: v })}
+              />
+            </div>
+          </div>
         </>
       )}
 
