@@ -110,8 +110,9 @@ const toneRing = {
 } as const;
 
 function DashboardPage() {
-  const { membership } = useAuth();
+  const { membership, loading: authLoading } = useAuth();
   const orgId = membership?.organization_id;
+  const noOrg = !authLoading && !orgId;
   const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
@@ -161,7 +162,8 @@ function DashboardPage() {
   const offline = players.filter((p) => !isOnline(p, now));
   const activePlaylists = playlists.filter((p) => p.is_active).length;
   const upcoming = nextOccurrences(playlists, new Date(now));
-  const loading = !orgId || playersQ.isLoading || playlistsQ.isLoading;
+  // Só mostra "carregando" enquanto há algo realmente sendo buscado.
+  const loading = !noOrg && (authLoading || playersQ.isPending || playlistsQ.isPending);
   const pctOnline = players.length ? Math.round((online.length / players.length) * 100) : 0;
 
   const stats = [
@@ -171,7 +173,9 @@ function DashboardPage() {
     { label: "Próximos agendamentos", value: upcoming.length, hint: "Nas próximas 24 horas", icon: CalendarClock, tone: "warning" as const },
   ];
 
-  const error = playersQ.error || playlistsQ.error;
+  const error = noOrg
+    ? new Error("sua conta não está vinculada a uma organização. Peça um convite ao responsável.")
+    : playersQ.error || playlistsQ.error;
 
   return (
     <div className="mx-auto flex w-full max-w-7xl flex-col gap-8">

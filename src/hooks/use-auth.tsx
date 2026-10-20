@@ -83,9 +83,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let mounted = true;
 
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, s) => {
+    const { data: sub } = supabase.auth.onAuthStateChange((event, s) => {
       if (!mounted) return;
       setSession(s);
+      // Renovação de token/foco da aba não muda a organização: não recarrega
+      // o vínculo (evitava o Painel voltar a "carregando" periodicamente).
+      if (event === "TOKEN_REFRESHED" || event === "INITIAL_SESSION") return;
       if (s?.user) {
         // Defer to avoid deadlock inside the callback.
         setTimeout(() => {
