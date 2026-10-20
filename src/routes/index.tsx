@@ -98,6 +98,7 @@ function DashboardPage() {
     },
   });
 
+  const isLoading = playersQ.isLoading || playlistsQ.isLoading;
   const players = playersQ.data ?? [];
   const playlists = playlistsQ.data ?? [];
 
@@ -110,28 +111,28 @@ function DashboardPage() {
   const stats: Stat[] = [
     {
       label: "Total de players",
-      value: String(totalPlayers),
+      value: isLoading ? "..." : String(totalPlayers),
       hint: "Players cadastrados na organização",
       icon: MonitorPlay,
       tone: "primary",
     },
     {
       label: "Players online",
-      value: String(onlinePlayers),
-      hint: totalPlayers > 0 ? `${Math.round((onlinePlayers / totalPlayers) * 100)}% da rede conectada` : "0% da rede conectada",
+      value: isLoading ? "..." : String(onlinePlayers),
+      hint: totalPlayers > 0 ? `${Math.round((onlinePlayers / totalPlayers) * 100)}% da rede conectada` : "Nenhum player conectado",
       icon: Signal,
       tone: "success",
     },
     {
       label: "Players offline",
-      value: String(offlinePlayers),
+      value: isLoading ? "..." : String(offlinePlayers),
       hint: "Sem conexão recente",
       icon: SignalZero,
       tone: "danger",
     },
     {
       label: "Playlists ativas",
-      value: String(activePlaylists.length),
+      value: isLoading ? "..." : String(activePlaylists.length),
       hint: "Campanhas prontas para exibição",
       icon: CalendarClock,
       tone: "warning",
