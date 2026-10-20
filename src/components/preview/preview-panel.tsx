@@ -199,26 +199,28 @@ function usePreviewController({
 
   useEffect(() => {
     if (!active) return;
-    if (isDraft) return;
     if (!PLAYER_CONFIGURED) return;
+    if (!targetId) return;
     setReady(false);
     setToken(null);
     tokenMut.mutate();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [active, isDraft, scope, targetId]);
+  }, [active, scope, targetId]);
 
   // URL do iframe
   const iframeSrc = useMemo(() => {
     if (!PLAYER_CONFIGURED) return "";
-    if (isDraft) return `${PLAYER_PREVIEW_URL}/preview`;
-    if (!token) return "";
+    if (!token) {
+      // Sem alvo salvo: rascunho puro via postMessage.
+      return isDraft && !targetId ? `${PLAYER_PREVIEW_URL}/preview` : "";
+    }
     const qs = new URLSearchParams({
       token,
       resolution: `${resolution.width}x${resolution.height}`,
       orientation: resolution.orientation,
     });
     return `${PLAYER_PREVIEW_URL}/preview?${qs.toString()}`;
-  }, [isDraft, token, resolution]);
+  }, [isDraft, token, resolution, targetId]);
 
   // Recebe PREVIEW_READY do iframe
   useEffect(() => {
@@ -278,7 +280,7 @@ function usePreviewController({
     error,
     playerConfigured: PLAYER_CONFIGURED,
     isTokenLoading:
-      !isDraft && PLAYER_CONFIGURED && (tokenMut.isPending || (!token && !error)),
+      PLAYER_CONFIGURED && !!targetId && (tokenMut.isPending || (!token && !error)),
     resolutionId,
     setResolutionId,
     resolution,
