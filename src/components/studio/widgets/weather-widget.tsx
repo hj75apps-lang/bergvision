@@ -27,7 +27,7 @@ type Theme = "gradient" | "dark" | "light" | "glass";
 const WEEKDAYS_PT = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 
 /* ---------- Cache persistente (sobrevive a recarregar a página) ---------- */
-const CACHE_PREFIX = "bv:weather:v1:";
+const CACHE_PREFIX = "bv:weather:v2:";
 const STALE_AFTER_MS = 30 * 60 * 1000; // 2x o intervalo de atualização (15 min)
 const CACHE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 
