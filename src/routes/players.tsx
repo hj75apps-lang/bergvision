@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { ChevronRight, Loader2, MonitorPlay, Plus } from "lucide-react";
+import { ChevronRight, Download, ExternalLink, Loader2, MonitorPlay, Plus, QrCode, Smartphone } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -107,6 +107,7 @@ function PlayersPage() {
   const qc = useQueryClient();
   const [nowMs, setNowMs] = useState(() => Date.now());
   const [pairOpen, setPairOpen] = useState(false);
+  const [apkDialogOpen, setApkDialogOpen] = useState(false);
 
   // Tick para re-avaliar status offline (last_heartbeat > 60s).
   useEffect(() => {
@@ -190,14 +191,23 @@ function PlayersPage() {
             {players.length} player(s) · {onlineCount} online agora
           </p>
         </div>
-        {canManage && (
+        <div className="flex flex-wrap items-center gap-2">
           <Button
-            onClick={() => setPairOpen(true)}
-            className="h-10 rounded-xl"
+            variant="outline"
+            onClick={() => setApkDialogOpen(true)}
+            className="h-10 rounded-xl border-border/80 bg-background/50 backdrop-blur"
           >
-            <Plus className="mr-2 h-4 w-4" /> Adicionar player
+            <Download className="mr-2 h-4 w-4 text-primary" /> Baixar APK do Player
           </Button>
-        )}
+          {canManage && (
+            <Button
+              onClick={() => setPairOpen(true)}
+              className="h-10 rounded-xl"
+            >
+              <Plus className="mr-2 h-4 w-4" /> Adicionar player
+            </Button>
+          )}
+        </div>
       </header>
 
       {playersQ.isLoading ? (
@@ -240,7 +250,102 @@ function PlayersPage() {
         onOpenChange={setPairOpen}
         onPaired={refreshPlayers}
       />
+
+      <ApkDownloadDialog
+        open={apkDialogOpen}
+        onOpenChange={setApkDialogOpen}
+      />
     </div>
+  );
+}
+
+function ApkDownloadDialog({
+  open,
+  onOpenChange,
+}: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+}) {
+  const apkVersion = "v2.4.1";
+  const lastUpdate = "Outubro de 2026";
+  const apkFileName = "berg-vision-player-v2.4.1.apk";
+
+  const handleDownload = () => {
+    // Dispara o download ou direciona para o binário do APK
+    const link = document.createElement("a");
+    link.href = `/uploads/${apkFileName}`;
+    link.download = apkFileName;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    toast.success("Download do APK iniciado com sucesso!");
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-xl rounded-2xl">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2 text-xl">
+            <Smartphone className="h-5 w-5 text-primary" /> Pacote APK do Player Android
+          </DialogTitle>
+          <DialogDescription>
+            Instale o aplicativo Berg Vision Player em suas TVs, TV Boxes ou tablets Android.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4 py-2 text-sm">
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border/60 bg-muted/30 p-4">
+            <div>
+              <div className="font-semibold">Versão Atual: {apkVersion}</div>
+              <div className="text-xs text-muted-foreground">
+                Atualizado em {lastUpdate} · Compatível com Android 7.0+
+              </div>
+            </div>
+            <Badge className="bg-primary/15 text-primary hover:bg-primary/15 rounded-full">
+              Estável
+            </Badge>
+          </div>
+
+          <div className="space-y-2">
+            <h4 className="font-medium text-foreground">Novidades desta atualização:</h4>
+            <ul className="list-inside list-disc space-y-1 text-xs text-muted-foreground">
+              <li>Desempenho otimizado para reprodução contínua de vídeos em 4K e Full HD.</li>
+              <li>Reconexão automática melhorada em caso de queda de internet.</li>
+              <li>Sincronização instantânea de templates via WebSocket / Realtime.</li>
+              <li>Suporte a pareamento rápido por PIN de 6 dígitos.</li>
+            </ul>
+          </div>
+
+          <div className="rounded-xl border border-border/60 bg-card p-4 space-y-3">
+            <h4 className="font-medium text-foreground">Como instalar na TV / Dispositivo Android:</h4>
+            <ol className="list-inside list-decimal space-y-1.5 text-xs text-muted-foreground">
+              <li>Baixe o arquivo APK diretamente no seu dispositivo ou envie via pendrive.</li>
+              <li>Habilite a instalação de fontes desconhecidas nas configurações do Android.</li>
+              <li>Instale o arquivo <code className="font-mono text-primary">{apkFileName}</code>.</li>
+              <li>Abra o aplicativo, anote o PIN de pareamento de 6 dígitos e vincule no painel web.</li>
+            </ol>
+          </div>
+        </div>
+
+        <DialogFooter className="flex-col sm:flex-row gap-2">
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={() => onOpenChange(false)}
+            className="rounded-xl"
+          >
+            Fechar
+          </Button>
+          <Button
+            type="button"
+            onClick={handleDownload}
+            className="rounded-xl gap-2"
+          >
+            <Download className="h-4 w-4" /> Baixar APK ({apkVersion})
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
