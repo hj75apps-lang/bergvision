@@ -26,6 +26,43 @@ type Theme = "gradient" | "dark" | "light" | "glass";
 
 const WEEKDAYS_PT = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 
+/* ---------- Cache persistente (sobrevive a recarregar a página) ---------- */
+const CACHE_PREFIX = "bv:weather:v1:";
+const STALE_AFTER_MS = 30 * 60 * 1000; // 2x o intervalo de atualização (15 min)
+const CACHE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+
+function isValidWeather(v: unknown): v is WeatherData {
+  if (!v || typeof v !== "object") return false;
+  const o = v as Record<string, unknown>;
+  return typeof o.temp === "number" && Number.isFinite(o.temp) && typeof o.code === "number";
+}
+function readWeatherCache(
+  city: string,
+  units: string,
+): { data: WeatherData; savedAt: number } | null {
+  try {
+    if (typeof window === "undefined") return null;
+    const raw = window.localStorage.getItem(CACHE_PREFIX + units + ":" + city.toLowerCase());
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { data: unknown; savedAt: number };
+    if (!isValidWeather(parsed.data) || typeof parsed.savedAt !== "number") return null;
+    if (Date.now() - parsed.savedAt > CACHE_MAX_AGE_MS) return null;
+    return { data: parsed.data, savedAt: parsed.savedAt };
+  } catch {
+    return null;
+  }
+}
+function writeWeatherCache(city: string, units: string, data: WeatherData) {
+  try {
+    window.localStorage.setItem(
+      CACHE_PREFIX + units + ":" + city.toLowerCase(),
+      JSON.stringify({ data, savedAt: Date.now() }),
+    );
+  } catch {
+    /* armazenamento cheio ou indisponível — segue sem cache */
+  }
+}
+
 function themeStyle(
   theme: Theme,
   code: number,
@@ -184,18 +221,27 @@ export function WeatherWidget({ config }: { config: Record<string, unknown> }) {
   };
 
   const results = useQueries({
-    queries: cities.map((c) => ({
-      queryKey: ["widget-weather", c, units] as const,
-      staleTime: 10 * 60 * 1000,
-      refetchInterval: 15 * 60 * 1000,
-      queryFn: async () => {
-        const { data, error } = await supabase.functions.invoke("widget-weather", {
-          body: { city: c, units },
-        });
-        if (error) throw error;
-        return data as WeatherData;
-      },
-    })),
+    queries: cities.map((c) => {
+      const cached = readWeatherCache(c, units);
+      return {
+        queryKey: ["widget-weather", c, units] as const,
+        staleTime: 10 * 60 * 1000,
+        refetchInterval: 15 * 60 * 1000,
+        retry: 2,
+        // Último boletim salvo aparece na hora; atualização roda em segundo plano.
+        initialData: cached ? cached.data : undefined,
+        initialDataUpdatedAt: cached ? cached.savedAt : undefined,
+        queryFn: async () => {
+          const { data, error } = await supabase.functions.invoke("widget-weather", {
+            body: { city: c, units },
+          });
+          if (error) throw error;
+          if (!isValidWeather(data)) throw new Error("invalid_weather_payload");
+          writeWeatherCache(c, units, data as WeatherData);
+          return data as WeatherData;
+        },
+      };
+    }),
   });
 
   const [index, setIndex] = useState(0);
@@ -239,7 +285,8 @@ export function WeatherWidget({ config }: { config: Record<string, unknown> }) {
       </div>)
     );
   }
-  if (current.isError || !current.data) {
+  // Erro só aparece quando não há nenhum boletim salvo; senão mantém o último.
+  if (!current.data) {
     return (
       withBg(<div
         className="flex h-full w-full items-center justify-center text-white/80"
@@ -274,16 +321,41 @@ export function WeatherWidget({ config }: { config: Record<string, unknown> }) {
     color: t.color,
   };
 
-  if (preset === "minimal") {
-    return withBg(<PresetMinimal d={d} shell={shell} accent={t.accent} animated={animated} />);
-  }
-  if (preset === "forecast") {
-    return withBg(<PresetForecast d={d} shell={shell} accent={t.accent} animated={animated} />);
-  }
-  if (preset === "vertical") {
-    return withBg(<PresetVertical d={d} shell={shell} accent={t.accent} animated={animated} />);
-  }
-  return withBg(<PresetComplete d={d} shell={shell} accent={t.accent} animated={animated} />);
+  const isStale =
+    current.dataUpdatedAt > 0 && Date.now() - current.dataUpdatedAt > STALE_AFTER_MS;
+  const body =
+    preset === "minimal" ? (
+      <PresetMinimal d={d} shell={shell} accent={t.accent} animated={animated} />
+    ) : preset === "forecast" ? (
+      <PresetForecast d={d} shell={shell} accent={t.accent} animated={animated} />
+    ) : preset === "vertical" ? (
+      <PresetVertical d={d} shell={shell} accent={t.accent} animated={animated} />
+    ) : (
+      <PresetComplete d={d} shell={shell} accent={t.accent} animated={animated} />
+    );
+  if (!isStale) return withBg(body);
+  return withBg(
+    <div className="relative h-full w-full">
+      {body}
+      <span
+        role="img"
+        aria-label="Dados do clima desatualizados"
+        title="Dados desatualizados — tentando atualizar"
+        style={{
+          position: "absolute",
+          top: "3cqmin",
+          right: "3cqmin",
+          width: "2.5cqmin",
+          height: "2.5cqmin",
+          minWidth: 6,
+          minHeight: 6,
+          borderRadius: "50%",
+          background: "#F59E0B",
+          opacity: 0.85,
+        }}
+      />
+    </div>,
+  );
 }
 
 function fmtDate(iso: string) {
