@@ -478,6 +478,38 @@ function PresetComplete({
   );
 }
 
+const WEEKDAYS_FULL_PT = [
+  "domingo",
+  "segunda-feira",
+  "terça-feira",
+  "quarta-feira",
+  "quinta-feira",
+  "sexta-feira",
+  "sábado",
+];
+const MONTHS_PT = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
+
+function wmoLabel(code: number): string {
+  if (code === 0) return "Céu limpo";
+  if (code <= 2) return "Poucas nuvens";
+  if (code === 3) return "Nublado";
+  if (code === 45 || code === 48) return "Neblina";
+  if (code >= 51 && code <= 57) return "Garoa";
+  if (code >= 61 && code <= 67) return "Chuva";
+  if (code >= 71 && code <= 77) return "Neve";
+  if (code >= 80 && code <= 82) return "Pancadas";
+  if (code >= 95) return "Tempestade";
+  return "—";
+}
+
+function parseIsoDate(iso: string): Date | null {
+  const p = iso.split("-").map(Number);
+  if (p.length < 3 || p.some((n) => !Number.isFinite(n))) return null;
+  return new Date(Date.UTC(p[0], p[1] - 1, p[2]));
+}
+
+type ForecastDay = WeatherData["forecast"][number] & { precipitationMax?: number };
+
 function PresetForecast({
   d,
   shell,
@@ -489,66 +521,136 @@ function PresetForecast({
   accent: string;
   animated: boolean;
 }) {
-  const days = (d.forecast ?? []).slice(0, 4);
+  const all = (d.forecast ?? []) as ForecastDay[];
+  const today = all[0];
+  // Próximos 5 dias (exclui hoje quando a previsão inclui o dia atual).
+  const days = (all.length > 5 ? all.slice(1) : all).slice(0, 5);
+  const muted: React.CSSProperties = { opacity: 0.72 };
+  const card: React.CSSProperties = {
+    background: "rgba(0,0,0,0.28)",
+    border: "1px solid rgba(255,255,255,0.08)",
+    borderRadius: "2.2cqmin",
+    backdropFilter: "blur(6px)",
+    WebkitBackdropFilter: "blur(6px)",
+  };
   return (
-    <div className="flex h-full w-full flex-col p-[4cqmin]" style={shell}>
-      <div className="flex items-center justify-between gap-[3cqmin]">
-        <div className="flex min-w-0 flex-col">
-          <span
-            style={{ fontSize: "6.5cqh", fontWeight: 600, opacity: 0.85 }}
-            className="truncate"
-          >
-            {d.city}
-          </span>
-          <span
-            className="leading-none"
-            style={{
-              fontSize: "34cqh",
-              fontWeight: 700,
-              letterSpacing: "-0.03em",
-              marginTop: "1cqh",
-            }}
-          >
-            {d.temp}
-            <span style={{ fontSize: "14cqh", fontWeight: 500, opacity: 0.75 }}>
-              {d.unit}
-            </span>
-          </span>
-          <span
-            className="truncate"
-            style={{ fontSize: "5.5cqh", opacity: 0.9, marginTop: "1cqh" }}
-          >
-            {d.description}
-          </span>
-        </div>
-        <div style={{ width: "34cqh", height: "34cqh", flexShrink: 0 }}>
-          <WeatherIcon code={d.code} isDay={d.isDay} accent={accent} animated={animated} />
-        </div>
-      </div>
+    <div className="flex h-full w-full flex-col p-[3.5cqmin]" style={shell}>
+      {/* Hoje */}
       <div
-        className="mt-auto grid gap-[2cqmin] pt-[3cqmin]"
-        style={{
-          gridTemplateColumns: `repeat(${days.length || 1}, minmax(0, 1fr))`,
-          borderTop: "1px solid rgba(255,255,255,0.18)",
-        }}
+        className="flex items-center justify-between gap-[3cqw]"
+        style={{ paddingBottom: "2.5cqh", borderBottom: "1px solid rgba(255,255,255,0.14)" }}
       >
-        {days.map((day, i) => (
-          <div
-            key={day.date}
-            className="flex flex-col items-center gap-[0.6cqh]"
-            style={{ fontSize: "5cqh", opacity: 0.95 }}
-          >
-            <span style={{ opacity: 0.8 }}>
-              {i === 0 ? "Hoje" : fmtDate(day.date)}
+        <div className="flex min-w-0 items-center gap-[2cqw]">
+          <div style={{ width: "13cqh", height: "13cqh", flexShrink: 0 }}>
+            <WeatherIcon code={d.code} isDay={d.isDay} accent={accent} animated={animated} />
+          </div>
+          <span className="leading-none" style={{ fontSize: "13cqh", fontWeight: 700, letterSpacing: "-0.03em" }}>
+            {d.temp}
+            <span style={{ fontSize: "6cqh", fontWeight: 500, verticalAlign: "top" }}>{d.unit}</span>
+          </span>
+          <div className="flex min-w-0 flex-col" style={{ gap: "0.6cqh" }}>
+            <span className="truncate" style={{ fontSize: "4.2cqh", fontWeight: 600 }}>
+              {d.description}
+              {d.city ? <span style={{ ...muted, fontWeight: 400 }}> · {d.city}</span> : null}
             </span>
-            <div style={{ width: "14cqh", height: "14cqh" }}>
-              <WeatherIcon code={day.code} accent={accent} animated={animated} />
-            </div>
-            <span style={{ fontWeight: 600 }}>
-              {day.max}° <span style={{ opacity: 0.6 }}>{day.min}°</span>
+            <span style={{ fontSize: "3.4cqh", ...muted }}>Sensação de {d.feelsLike}°</span>
+            {today ? (
+              <span style={{ fontSize: "3.4cqh", ...muted }}>
+                Máx. {today.max}° · Mín. {today.min}°
+              </span>
+            ) : null}
+          </div>
+        </div>
+        <div className="flex shrink-0 gap-[3cqw]">
+          <div className="flex flex-col" style={{ gap: "1cqh" }}>
+            <span className="flex items-center gap-[0.6cqw]" style={{ fontSize: "3.4cqh", ...muted }}>
+              <span style={{ width: "4cqh", height: "4cqh", display: "inline-block" }}>
+                <WeatherIcon code={61} accent={accent} animated={animated} />
+              </span>
+              Umidade
+            </span>
+            <span style={{ fontSize: "5.5cqh", fontWeight: 700 }}>{d.humidity}%</span>
+          </div>
+          <div className="flex flex-col" style={{ gap: "1cqh" }}>
+            <span className="flex items-center gap-[0.6cqw]" style={{ fontSize: "3.4cqh", ...muted }}>
+              <span
+                aria-hidden
+                style={{
+                  display: "inline-block",
+                  animation: animated ? "bv-wind-sway 2.4s ease-in-out infinite" : undefined,
+                }}
+              >
+                ≋
+              </span>
+              Vento atual
+            </span>
+            <span style={{ fontSize: "5.5cqh", fontWeight: 700 }}>
+              {d.wind} <span style={{ fontSize: "3.4cqh", fontWeight: 500 }}>{d.windUnit}</span>
             </span>
           </div>
-        ))}
+        </div>
+      </div>
+      <style>{`@keyframes bv-wind-sway{0%,100%{transform:translateX(0)}50%{transform:translateX(18%)}}`}</style>
+
+      {/* Próximos 5 dias */}
+      <span style={{ fontSize: "4.4cqh", fontWeight: 700, margin: "2.4cqh 0 1.8cqh" }}>
+        Próximos {days.length} dias
+      </span>
+      <div
+        className="grid min-h-0 flex-1 gap-[1.2cqw]"
+        style={{ gridTemplateColumns: `repeat(${days.length || 1}, minmax(0, 1fr))` }}
+      >
+        {days.map((day) => {
+          const dt = parseIsoDate(day.date);
+          return (
+            <div
+              key={day.date}
+              className="flex min-w-0 flex-col items-center justify-between text-center"
+              style={{ ...card, padding: "2.4cqh 1cqw" }}
+            >
+              <div className="flex flex-col" style={{ gap: "0.6cqh" }}>
+                <span className="truncate" style={{ fontSize: "3.8cqh", fontWeight: 700 }}>
+                  {dt ? WEEKDAYS_FULL_PT[dt.getUTCDay()] : day.date}
+                </span>
+                <span style={{ fontSize: "3cqh", ...muted }}>
+                  {dt ? `${dt.getUTCDate()} de ${MONTHS_PT[dt.getUTCMonth()]}` : ""}
+                </span>
+              </div>
+              <div className="flex flex-col items-center" style={{ gap: "1cqh" }}>
+                <div style={{ width: "13cqh", height: "13cqh" }}>
+                  <WeatherIcon code={day.code} accent={accent} animated={animated} />
+                </div>
+                <span style={{ fontSize: "3.4cqh" }}>{wmoLabel(day.code)}</span>
+              </div>
+              <div className="flex items-end justify-center gap-[1.2cqw]">
+                <div className="flex flex-col items-center">
+                  <span style={{ fontSize: "6cqh", fontWeight: 700, lineHeight: 1 }}>
+                    {day.max}
+                    <span style={{ fontSize: "2.8cqh" }}>{d.unit}</span>
+                  </span>
+                  <span style={{ fontSize: "2.8cqh", ...muted }}>Máxima</span>
+                </div>
+                <div className="flex flex-col items-center">
+                  <span style={{ fontSize: "5cqh", fontWeight: 400, lineHeight: 1 }}>
+                    {day.min}
+                    <span style={{ fontSize: "2.8cqh" }}>{d.unit}</span>
+                  </span>
+                  <span style={{ fontSize: "2.8cqh", ...muted }}>Mínima</span>
+                </div>
+              </div>
+              <div
+                className="flex w-full flex-col items-center"
+                style={{ borderTop: "1px solid rgba(255,255,255,0.12)", paddingTop: "1.6cqh" }}
+              >
+                <span style={{ fontSize: "4.4cqh", fontWeight: 700 }}>
+                  ☂ {typeof day.precipitationMax === "number" ? day.precipitationMax : 0}
+                  <span style={{ fontSize: "2.8cqh" }}> %</span>
+                </span>
+                <span style={{ fontSize: "2.8cqh", ...muted }}>Chance de chuva</span>
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
