@@ -173,7 +173,9 @@ function DashboardPage() {
     { label: "Próximos agendamentos", value: upcoming.length, hint: "Nas próximas 24 horas", icon: CalendarClock, tone: "warning" as const },
   ];
 
-  const error = playersQ.error || playlistsQ.error;
+  const error = noOrg
+    ? new Error("sua conta não está vinculada a uma organização. Peça um convite ao responsável.")
+    : playersQ.error || playlistsQ.error;
 
   return (
     <div className="mx-auto flex w-full max-w-7xl flex-col gap-8">
