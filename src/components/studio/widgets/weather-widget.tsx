@@ -285,7 +285,8 @@ export function WeatherWidget({ config }: { config: Record<string, unknown> }) {
       </div>)
     );
   }
-  if (current.isError || !current.data) {
+  // Erro só aparece quando não há nenhum boletim salvo; senão mantém o último.
+  if (!current.data) {
     return (
       withBg(<div
         className="flex h-full w-full items-center justify-center text-white/80"
@@ -320,16 +321,41 @@ export function WeatherWidget({ config }: { config: Record<string, unknown> }) {
     color: t.color,
   };
 
-  if (preset === "minimal") {
-    return withBg(<PresetMinimal d={d} shell={shell} accent={t.accent} animated={animated} />);
-  }
-  if (preset === "forecast") {
-    return withBg(<PresetForecast d={d} shell={shell} accent={t.accent} animated={animated} />);
-  }
-  if (preset === "vertical") {
-    return withBg(<PresetVertical d={d} shell={shell} accent={t.accent} animated={animated} />);
-  }
-  return withBg(<PresetComplete d={d} shell={shell} accent={t.accent} animated={animated} />);
+  const isStale =
+    current.dataUpdatedAt > 0 && Date.now() - current.dataUpdatedAt > STALE_AFTER_MS;
+  const body =
+    preset === "minimal" ? (
+      <PresetMinimal d={d} shell={shell} accent={t.accent} animated={animated} />
+    ) : preset === "forecast" ? (
+      <PresetForecast d={d} shell={shell} accent={t.accent} animated={animated} />
+    ) : preset === "vertical" ? (
+      <PresetVertical d={d} shell={shell} accent={t.accent} animated={animated} />
+    ) : (
+      <PresetComplete d={d} shell={shell} accent={t.accent} animated={animated} />
+    );
+  if (!isStale) return withBg(body);
+  return withBg(
+    <div className="relative h-full w-full">
+      {body}
+      <span
+        role="img"
+        aria-label="Dados do clima desatualizados"
+        title="Dados desatualizados — tentando atualizar"
+        style={{
+          position: "absolute",
+          top: "3cqmin",
+          right: "3cqmin",
+          width: "2.5cqmin",
+          height: "2.5cqmin",
+          minWidth: 6,
+          minHeight: 6,
+          borderRadius: "50%",
+          background: "#F59E0B",
+          opacity: 0.85,
+        }}
+      />
+    </div>,
+  );
 }
 
 function fmtDate(iso: string) {
