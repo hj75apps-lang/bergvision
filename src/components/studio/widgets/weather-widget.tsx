@@ -31,10 +31,17 @@ const CACHE_PREFIX = "bv:weather:v1:";
 const STALE_AFTER_MS = 30 * 60 * 1000; // 2x o intervalo de atualização (15 min)
 const CACHE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 
+// Aceita os dois formatos já vistos na resposta: "temp" ou "temperature".
+function pickTemp(o: Record<string, unknown>): number {
+  const v = typeof o.temp === "number" ? o.temp : o.temperature;
+  return typeof v === "number" && Number.isFinite(v) ? Math.round(v) : 0;
+}
 function isValidWeather(v: unknown): v is WeatherData {
   if (!v || typeof v !== "object") return false;
   const o = v as Record<string, unknown>;
-  return typeof o.temp === "number" && Number.isFinite(o.temp) && typeof o.code === "number";
+  const t = typeof o.temp === "number" ? o.temp : o.temperature;
+  // Exige temperatura real e previsão — formatos incompletos não viram cache.
+  return typeof t === "number" && Number.isFinite(t) && Array.isArray(o.forecast);
 }
 function readWeatherCache(
   city: string,
@@ -299,8 +306,8 @@ export function WeatherWidget({ config }: { config: Record<string, unknown> }) {
 
   const raw = current.data as Partial<WeatherData> & Record<string, unknown>;
   const d: WeatherData = {
-    temp: typeof raw.temp === "number" ? raw.temp : 0,
-    feelsLike: typeof raw.feelsLike === "number" ? raw.feelsLike : (typeof raw.temp === "number" ? raw.temp : 0),
+    temp: pickTemp(raw),
+    feelsLike: typeof raw.feelsLike === "number" ? Math.round(raw.feelsLike) : pickTemp(raw),
     unit: typeof raw.unit === "string" ? raw.unit : "°C",
     code: typeof raw.code === "number" ? raw.code : 0,
     isDay: raw.isDay !== false,
