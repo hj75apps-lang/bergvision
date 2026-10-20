@@ -103,6 +103,54 @@ Deno.serve(async (req) => {
   const hasCoords = Number.isFinite(latIn) && Number.isFinite(lonIn);
   if (!city && !hasCoords) return json({ error: "missing_city" }, 400);
 
+  const num = (v: unknown): number | null => {
+    const n = typeof v === "number" ? v : v == null ? NaN : Number(v);
+    return Number.isFinite(n) ? n : null;
+  };
+  const round = (v: unknown, fb: number | null = null) => {
+    const n = num(v);
+    return n == null ? fb : Math.round(n);
+  };
+  const timed = (input: string | URL, ms: number, init: RequestInit = {}) => {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), ms);
+    return fetch(input, { ...init, signal: ctrl.signal }).finally(() => clearTimeout(t));
+  };
+
+  // Geocodificação reversa: BigDataCloud → Nominatim → coordenadas formatadas.
+  async function reverseGeocode(lat: number, lon: number) {
+    try {
+      const u = new URL("https://api.bigdatacloud.net/data/reverse-geocode-client");
+      u.searchParams.set("latitude", String(lat));
+      u.searchParams.set("longitude", String(lon));
+      u.searchParams.set("localityLanguage", "pt");
+      const r = await timed(u, 5000);
+      if (r.ok) {
+        const j = await r.json();
+        const name = String(j?.city || j?.locality || "").trim();
+        if (name) return { name, country: String(j?.countryCode ?? "") };
+      }
+    } catch { /* fallback */ }
+    try {
+      const u = new URL("https://nominatim.openstreetmap.org/reverse");
+      u.searchParams.set("lat", String(lat));
+      u.searchParams.set("lon", String(lon));
+      u.searchParams.set("format", "jsonv2");
+      u.searchParams.set("accept-language", "pt-BR");
+      u.searchParams.set("zoom", "10");
+      const r = await timed(u, 5000, {
+        headers: { "User-Agent": "BergVision-Widget/1.0 (+https://bergvision.lovable.app)" },
+      });
+      if (r.ok) {
+        const j = await r.json();
+        const a = j?.address ?? {};
+        const name = String(a.city || a.town || a.village || a.municipality || a.county || "").trim();
+        if (name) return { name, country: String(a.country_code ?? "").toUpperCase() };
+      }
+    } catch { /* fallback */ }
+    return { name: `${lat.toFixed(3)}, ${lon.toFixed(3)}`, country: "" };
+  }
+
   try {
     let place: any = { latitude: latIn, longitude: lonIn, name: city, country_code: "" };
     if (!hasCoords) {
@@ -111,11 +159,15 @@ Deno.serve(async (req) => {
       geoUrl.searchParams.set("count", "1");
       geoUrl.searchParams.set("language", "pt");
       geoUrl.searchParams.set("format", "json");
-      const geoRes = await fetch(geoUrl);
+      const geoRes = await timed(geoUrl, 8000);
       if (!geoRes.ok) return json({ error: "geocoding_failed" }, 502);
       const geo = await geoRes.json();
       place = geo?.results?.[0];
       if (!place) return json({ error: "city_not_found" }, 404);
+    } else if (!city) {
+      const rg = await reverseGeocode(latIn, lonIn);
+      place.name = rg.name;
+      place.country_code = rg.country;
     }
 
     const unit = units === "imperial" ? "fahrenheit" : "celsius";
@@ -124,62 +176,90 @@ Deno.serve(async (req) => {
     wUrl.searchParams.set("longitude", String(place.longitude));
     wUrl.searchParams.set(
       "current",
-      "temperature_2m,weather_code,relative_humidity_2m,wind_speed_10m,apparent_temperature,is_day",
+      "temperature_2m,apparent_temperature,relative_humidity_2m,wind_speed_10m,weather_code,is_day",
+    );
+    wUrl.searchParams.set(
+      "hourly",
+      "temperature_2m,apparent_temperature,relative_humidity_2m,wind_speed_10m,weather_code,precipitation_probability",
     );
     wUrl.searchParams.set(
       "daily",
-      "temperature_2m_max,temperature_2m_min,weather_code",
+      "weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset,precipitation_probability_max",
     );
-    wUrl.searchParams.set("forecast_days", "4");
+    wUrl.searchParams.set("forecast_days", "6");
     wUrl.searchParams.set("temperature_unit", unit);
-    wUrl.searchParams.set(
-      "wind_speed_unit",
-      units === "imperial" ? "mph" : "kmh",
-    );
+    wUrl.searchParams.set("wind_speed_unit", units === "imperial" ? "mph" : "kmh");
     wUrl.searchParams.set("timezone", "auto");
-    const wRes = await fetch(wUrl);
-    if (!wRes.ok) return json({ error: "weather_failed" }, 502);
+    const wRes = await timed(wUrl, 10000);
+    if (!wRes.ok) return json({ error: "weather_failed", status: wRes.status }, 502);
     const w = await wRes.json();
     const cur = w?.current;
-    if (!cur) return json({ error: "no_current" }, 502);
+    if (!cur || num(cur.temperature_2m) == null) return json({ error: "no_current" }, 502);
 
-    const code = Number(cur.weather_code ?? 0);
+    const code = round(cur.weather_code, 0) as number;
     const daily = w?.daily ?? {};
-    const days: Array<{ date: string; max: number; min: number; code: number }> =
-      [];
-    const dates: string[] = daily.time ?? [];
-    for (let i = 0; i < dates.length; i++) {
-      days.push({
-        date: dates[i],
-        max: Math.round(Number(daily.temperature_2m_max?.[i] ?? 0)),
-        min: Math.round(Number(daily.temperature_2m_min?.[i] ?? 0)),
-        code: Number(daily.weather_code?.[i] ?? 0),
-      });
-    }
+    const dates: string[] = Array.isArray(daily.time) ? daily.time : [];
+    const days = dates.map((date, i) => ({
+      date,
+      max: round(daily.temperature_2m_max?.[i], 0) as number,
+      min: round(daily.temperature_2m_min?.[i], 0) as number,
+      code: round(daily.weather_code?.[i], 0) as number,
+      sunrise: daily.sunrise?.[i] ?? null,
+      sunset: daily.sunset?.[i] ?? null,
+      precipitationMax: round(daily.precipitation_probability_max?.[i]),
+      description: WMO[round(daily.weather_code?.[i], 0) as number] ?? "—",
+    }));
+
+    // Previsão horária: próximas 24h a partir da hora atual local.
+    const hourly = w?.hourly ?? {};
+    const hTimes: string[] = Array.isArray(hourly.time) ? hourly.time : [];
+    const curHour = String(cur.time ?? "").slice(0, 13);
+    let start = hTimes.findIndex((t) => t.slice(0, 13) >= curHour);
+    if (start < 0) start = 0;
+    const hours = hTimes.slice(start, start + 24).map((time, k) => {
+      const i = start + k;
+      return {
+        time,
+        temp: round(hourly.temperature_2m?.[i]),
+        feelsLike: round(hourly.apparent_temperature?.[i]),
+        humidity: round(hourly.relative_humidity_2m?.[i]),
+        wind: round(hourly.wind_speed_10m?.[i]),
+        code: round(hourly.weather_code?.[i], 0) as number,
+        precipitation: round(hourly.precipitation_probability?.[i]),
+      };
+    });
+
+    const temp = num(cur.temperature_2m) as number;
     return json(
       {
-        temp: Math.round(Number(cur.temperature_2m)),
+        temp: Math.round(temp),
         // Campos do contrato do app da tela (compatibilidade)
-        temperature: Number(cur.temperature_2m),
+        temperature: temp,
         units,
-        windSpeed: Number(cur.wind_speed_10m ?? 0),
+        windSpeed: num(cur.wind_speed_10m) ?? 0,
         observedAt: cur.time ?? new Date().toISOString(),
+        fetchedAt: new Date().toISOString(),
+        timezone: w?.timezone ?? null,
+        latitude: num(place.latitude),
+        longitude: num(place.longitude),
         source: "open-meteo",
-        feelsLike: Math.round(Number(cur.apparent_temperature ?? cur.temperature_2m)),
+        feelsLike: round(cur.apparent_temperature, Math.round(temp)),
         unit: units === "imperial" ? "°F" : "°C",
         code,
-        isDay: Number(cur.is_day ?? 1) === 1,
-        humidity: Math.round(Number(cur.relative_humidity_2m ?? 0)),
-        wind: Math.round(Number(cur.wind_speed_10m ?? 0)),
+        isDay: num(cur.is_day) !== 0,
+        humidity: round(cur.relative_humidity_2m, 0),
+        wind: round(cur.wind_speed_10m, 0),
         windUnit: units === "imperial" ? "mph" : "km/h",
         description: WMO[code] ?? "—",
         city: place.name,
         country: place.country_code ?? place.country ?? "",
         forecast: days,
+        hourly: hours,
       },
       200,
     );
   } catch (e) {
-    return json({ error: "fetch_failed", detail: (e as Error).message }, 502);
+    console.log("[widget-weather:error]", (e as Error).name);
+    return json({ error: "fetch_failed" }, 502);
   }
 });
