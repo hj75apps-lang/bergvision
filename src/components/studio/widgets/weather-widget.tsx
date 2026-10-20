@@ -1,6 +1,5 @@
-import { useEffect, useState } from "react";
-import { useQueries } from "@tanstack/react-query";
-import { Loader2 } from "lucide-react";
+import { useEffect, useState, useCallback } from "react";
+import { Loader2, WifiOff } from "lucide-react";
 
 import { supabase } from "@/integrations/supabase/client";
 import { useSignedUrl } from "@/lib/studio/use-signed-url";
@@ -19,6 +18,8 @@ type WeatherData = {
   city: string;
   country: string;
   forecast: { date: string; max: number; min: number; code: number }[];
+  observedAt?: string;
+  isStale?: boolean;
 };
 
 type Preset = "minimal" | "complete" | "forecast" | "vertical";
@@ -63,6 +64,47 @@ function themeStyle(
   }
 }
 
+async function reverseGeocode(lat: number, lon: number): Promise<string> {
+  try {
+    const bdcRes = await fetch(
+      `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lon}&localityLanguage=pt`,
+      { signal: AbortSignal.timeout(4000) }
+    );
+    if (bdcRes.ok) {
+      const bdcData = await bdcRes.json();
+      const locality = bdcData.city || bdcData.locality || bdcData.principalSubdivision;
+      if (locality) return String(locality);
+    }
+  } catch (_e) {
+    // Fallback to Nominatim
+  }
+
+  try {
+    const nomRes = await fetch(
+      `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&accept-language=pt`,
+      {
+        headers: { "User-Agent": "BergVisionWeatherWidget/1.0" },
+        signal: AbortSignal.timeout(4000),
+      }
+    );
+    if (nomRes.ok) {
+      const nomData = await nomRes.json();
+      const addr = nomData.address;
+      const place =
+        addr?.city ||
+        addr?.town ||
+        addr?.village ||
+        addr?.municipality ||
+        addr?.state;
+      if (place) return String(place);
+    }
+  } catch (_e) {
+    // Fallback to coordinates
+  }
+
+  return `${lat.toFixed(2)}, ${lon.toFixed(2)}`;
+}
+
 export function WeatherWidget({ config }: { config: Record<string, unknown> }) {
   const normalize = (raw: string) =>
     raw
@@ -85,6 +127,7 @@ export function WeatherWidget({ config }: { config: Record<string, unknown> }) {
       (rawList.length > 0 ? rawList : legacy).map(normalize).filter((c) => c.length > 0),
     ),
   );
+
   const rotationSeconds = Math.max(
     3,
     Math.min(300, (config.rotationSeconds as number | undefined) ?? 15),
@@ -124,11 +167,162 @@ export function WeatherWidget({ config }: { config: Record<string, unknown> }) {
     Math.min(120, (config.backgroundImageAnimationDuration as number | undefined) ?? 30),
   );
 
-  const withBg = (node: React.ReactNode) => {
-    if (!bgUrl) return node;
-    // Escala inicial extra evita bordas expostas durante pan.
-    // Animações suaves (alternate) mantêm o loop imperceptível e
-    // gastam apenas transform+opacity — GPU-accelerated, sem repaint.
+  const [index, setIndex] = useState(0);
+  const [coords, setCoords] = useState<{ lat: number; lon: number } | null>(null);
+  const [weatherMap, setWeatherMap] = useState<Record<string, WeatherData>>({});
+  const [loadingMap, setLoadingMap] = useState<Record<string, boolean>>({});
+  const [errorMap, setErrorMap] = useState<Record<string, boolean>>({});
+
+  // Get GPS if no cities configured or GPS requested
+  useEffect(() => {
+    if (cities.length === 0 && "geolocation" in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        async (pos) => {
+          const lat = pos.coords.latitude;
+          const lon = pos.coords.longitude;
+          setCoords({ lat, lon });
+          const cityName = await reverseGeocode(lat, lon);
+          if (cityName) {
+            // Add resolved GPS city dynamically
+            if (!cities.includes(cityName)) {
+              cities.push(cityName);
+            }
+          }
+        },
+        (err) => {
+          console.warn("[WeatherWidget] Geolocation error:", err.message);
+        },
+        { timeout: 10000, maximumAge: 300000 }
+      );
+    }
+  }, [cities]);
+
+  const currentCity = cities[Math.min(index, cities.length - 1)] || "";
+
+  // Load persistent cache on mount
+  useEffect(() => {
+    try {
+      const cachedStr = localStorage.getItem("bv_weather_cache_v1");
+      if (cachedStr) {
+        const parsed = JSON.parse(cachedStr);
+        if (parsed && typeof parsed === "object") {
+          setWeatherMap(parsed);
+        }
+      }
+    } catch (e) {
+      console.error("[WeatherWidget:cacheRead]", e);
+    }
+  }, []);
+
+  const fetchWeatherForCity = useCallback(
+    async (cityName: string, targetCoords?: { lat: number; lon: number }) => {
+      if (!cityName && !targetCoords) return;
+      const cacheKey = targetCoords ? `${targetCoords.lat},${targetCoords.lon}` : cityName;
+      
+      setLoadingMap((prev) => ({ ...prev, [cacheKey]: true }));
+      setErrorMap((prev) => ({ ...prev, [cacheKey]: false }));
+
+      try {
+        const bodyPayload: Record<string, unknown> = { units };
+        if (targetCoords) {
+          bodyPayload.latitude = targetCoords.lat;
+          bodyPayload.longitude = targetCoords.lon;
+        } else {
+          bodyPayload.city = cityName;
+        }
+
+        const { data, error } = await supabase.functions.invoke("widget-weather", {
+          body: bodyPayload,
+        });
+
+        if (error) throw error;
+        if (!data || typeof data !== "object") throw new Error("invalid_response");
+
+        const freshData: WeatherData = {
+          temp: Number((data as any).temp ?? 0),
+          feelsLike: Number((data as any).feelsLike ?? (data as any).temp ?? 0),
+          unit: String((data as any).unit ?? "°C"),
+          code: Number((data as any).code ?? 0),
+          isDay: (data as any).isDay !== false,
+          humidity: Number((data as any).humidity ?? 0),
+          wind: Number((data as any).wind ?? 0),
+          windUnit: String((data as any).windUnit ?? "km/h"),
+          description: String((data as any).description ?? "—"),
+          city: String((data as any).city ?? cityName),
+          country: String((data as any).country ?? ""),
+          forecast: Array.isArray((data as any).forecast) ? (data as any).forecast : [],
+          observedAt: new Date().toISOString(),
+          isStale: false,
+        };
+
+        setWeatherMap((prev) => {
+          const next = { ...prev, [cacheKey]: freshData };
+          try {
+            localStorage.setItem("bv_weather_cache_v1", JSON.stringify(next));
+          } catch (err) {
+            console.error("[WeatherWidget:cacheWrite]", err);
+          }
+          return next;
+        });
+      } catch (err) {
+        console.error("[WeatherWidget:fetch]", err);
+        setErrorMap((prev) => ({ ...prev, [cacheKey]: true }));
+        // Mark existing cache as stale if available
+        setWeatherMap((prev) => {
+          if (prev[cacheKey]) {
+            return { ...prev, [cacheKey]: { ...prev[cacheKey], isStale: true } };
+          }
+          return prev;
+        });
+      } finally {
+        setLoadingMap((prev) => ({ ...prev, [cacheKey]: false }));
+      }
+    },
+    [units]
+  );
+
+  // Fetch on mount or city change / coords change
+  useEffect(() => {
+    if (coords) {
+      fetchWeatherForCity("", coords);
+    } else if (currentCity) {
+      fetchWeatherForCity(currentCity);
+    }
+  }, [currentCity, coords, fetchWeatherForCity]);
+
+  // Rotation interval
+  useEffectRef: {
+    if (cities.length <= 1) break useEffectRef;
+    const id = window.setInterval(() => {
+      setIndex((i) => (i + 1) % cities.length);
+    }, rotationSeconds * 1000);
+    return () => window.clearInterval(id);
+  }
+
+  useEffect(() => {
+    if (index >= cities.length) setIndex(0);
+  }, [cities.length, index]);
+
+  const activeCacheKey = coords ? `${coords.lat},${coords.lon}` : currentCity;
+  const currentData = weatherMap[activeCacheKey];
+  const isLoading = loadingMap[activeCacheKey] && !currentData;
+  const isError = errorMap[activeCacheKey] && !currentData;
+
+  const shellBase: React.CSSProperties = {
+    containerType: "size",
+    fontFamily: "Inter, system-ui",
+    borderRadius: "3cqmin",
+    overflow: "hidden",
+  };
+
+  const withBg = (node: React.ReactNode, customBg?: string) => {
+    if (!bgUrl) {
+      return (
+        <div className="relative h-full w-full" style={{ ...shellBase, background: customBg }}>
+          {node}
+        </div>
+      );
+    }
     const animMap: Record<string, string | undefined> = {
       none: undefined,
       "ken-burns": `bv-wbg-kenburns ${bgAnimDuration}s ease-in-out infinite alternate`,
@@ -140,7 +334,6 @@ export function WeatherWidget({ config }: { config: Record<string, unknown> }) {
       "pan-down": `bv-wbg-pan-down ${bgAnimDuration}s ease-in-out infinite alternate`,
     };
     const animation = animMap[bgAnim];
-    // Base scale para cobrir a translação sem revelar bordas.
     const baseScale = bgBlur > 0 ? 1.08 : 1;
     return (
       <div
@@ -178,112 +371,82 @@ export function WeatherWidget({ config }: { config: Record<string, unknown> }) {
             backfaceVisibility: animation ? "hidden" : undefined,
           }}
         />
-        <div className="relative h-full w-full">{node}</div>
+        <div className="relative h-full w-full" style={{ background: customBg }}>{node}</div>
       </div>
     );
   };
 
-  const results = useQueries({
-    queries: cities.map((c) => ({
-      queryKey: ["widget-weather", c, units] as const,
-      staleTime: 10 * 60 * 1000,
-      refetchInterval: 15 * 60 * 1000,
-      queryFn: async () => {
-        const { data, error } = await supabase.functions.invoke("widget-weather", {
-          body: { city: c, units },
-        });
-        if (error) throw error;
-        return data as WeatherData;
-      },
-    })),
-  });
-
-  const [index, setIndex] = useState(0);
-  useEffect(() => {
-    if (cities.length <= 1) return;
-    const id = window.setInterval(() => {
-      setIndex((i) => (i + 1) % cities.length);
-    }, rotationSeconds * 1000);
-    return () => window.clearInterval(id);
-  }, [cities.length, rotationSeconds]);
-  useEffect(() => {
-    if (index >= cities.length) setIndex(0);
-  }, [cities.length, index]);
-
-  const current = cities.length > 0 ? results[Math.min(index, results.length - 1)] : undefined;
-
-  const shellBase: React.CSSProperties = {
-    containerType: "size",
-    fontFamily: "Inter, system-ui",
-    borderRadius: "3cqmin",
-    overflow: "hidden",
-  };
-
-  if (cities.length === 0) {
+  if (cities.length === 0 && !coords) {
     return (
-      withBg(<div
-        className="flex h-full w-full items-center justify-center text-white/70"
-        style={{ ...shellBase, background: "#1E293B" }}
-      >
-        <span style={{ fontSize: "8cqh" }}>Configure a cidade</span>
-      </div>)
-    );
-  }
-  if (!current || current.isLoading) {
-    return (
-      withBg(<div
-        className="flex h-full w-full items-center justify-center text-white/70"
-        style={{ ...shellBase, background: "#0F172A" }}
-      >
-        <Loader2 className="h-4 w-4 animate-spin" />
-      </div>)
-    );
-  }
-  if (current.isError || !current.data) {
-    return (
-      withBg(<div
-        className="flex h-full w-full items-center justify-center text-white/80"
-        style={{ ...shellBase, background: "#7F1D1D" }}
-      >
-        <span style={{ fontSize: "7cqh" }}>Clima indisponível</span>
-      </div>)
+      withBg(
+        <div
+          className="flex h-full w-full items-center justify-center text-white/70"
+          style={{ fontSize: "8cqh" }}
+        >
+          Configure a cidade
+        </div>,
+        "#1E293B"
+      )
     );
   }
 
-  const raw = current.data as Partial<WeatherData> & Record<string, unknown>;
-  const d: WeatherData = {
-    temp: typeof raw.temp === "number" ? raw.temp : 0,
-    feelsLike: typeof raw.feelsLike === "number" ? raw.feelsLike : (typeof raw.temp === "number" ? raw.temp : 0),
-    unit: typeof raw.unit === "string" ? raw.unit : "°C",
-    code: typeof raw.code === "number" ? raw.code : 0,
-    isDay: raw.isDay !== false,
-    humidity: typeof raw.humidity === "number" ? raw.humidity : 0,
-    wind: typeof raw.wind === "number" ? raw.wind : 0,
-    windUnit: typeof raw.windUnit === "string" ? raw.windUnit : "km/h",
-    description: typeof raw.description === "string" ? raw.description : "—",
-    city: typeof raw.city === "string" ? raw.city : cities[Math.min(index, cities.length - 1)] ?? "",
-    country: typeof raw.country === "string" ? raw.country : "",
-    forecast: Array.isArray(raw.forecast) ? (raw.forecast as WeatherData["forecast"]) : [],
-  };
-  const t = themeStyle(theme, d.code, d.isDay, accentColor);
-  // Quando há imagem de fundo personalizada, o fundo do tema fica transparente
-  // para não sobrepor a imagem — mantemos apenas a cor de texto do tema.
+  if (isLoading) {
+    return (
+      withBg(
+        <div className="flex h-full w-full items-center justify-center text-white/70">
+          <Loader2 className="h-6 w-6 animate-spin" />
+        </div>,
+        "#0F172A"
+      )
+    );
+  }
+
+  if (isError || !currentData) {
+    return (
+      withBg(
+        <div className="flex h-full w-full items-center justify-center text-white/80">
+          <span style={{ fontSize: "7cqh" }}>Clima indisponível</span>
+        </div>,
+        "#7F1D1D"
+      )
+    );
+  }
+
+  const t = themeStyle(theme, currentData.code, currentData.isDay, accentColor);
   const shell: React.CSSProperties = {
     ...shellBase,
     background: bgUrl ? "transparent" : t.background,
     color: t.color,
   };
 
+  const staleBadge = currentData.isStale ? (
+    <div
+      className="absolute top-2 right-2 flex items-center gap-1 rounded-full bg-black/40 px-2 py-0.5 text-xs text-white/90 backdrop-blur-sm"
+      style={{ fontSize: "3.5cqh" }}
+      title="Dados desatualizados (offline)"
+    >
+      <WifiOff className="h-3 w-3" />
+      <span>Offline</span>
+    </div>
+  ) : null;
+
+  let contentNode = null;
   if (preset === "minimal") {
-    return withBg(<PresetMinimal d={d} shell={shell} accent={t.accent} animated={animated} />);
+    contentNode = <PresetMinimal d={currentData} shell={shell} accent={t.accent} animated={animated} />;
+  } else if (preset === "forecast") {
+    contentNode = <PresetForecast d={currentData} shell={shell} accent={t.accent} animated={animated} />;
+  } else if (preset === "vertical") {
+    contentNode = <PresetVertical d={currentData} shell={shell} accent={t.accent} animated={animated} />;
+  } else {
+    contentNode = <PresetComplete d={currentData} shell={shell} accent={t.accent} animated={animated} />;
   }
-  if (preset === "forecast") {
-    return withBg(<PresetForecast d={d} shell={shell} accent={t.accent} animated={animated} />);
-  }
-  if (preset === "vertical") {
-    return withBg(<PresetVertical d={d} shell={shell} accent={t.accent} animated={animated} />);
-  }
-  return withBg(<PresetComplete d={d} shell={shell} accent={t.accent} animated={animated} />);
+
+  return withBg(
+    <div className="relative h-full w-full">
+      {staleBadge}
+      {contentNode}
+    </div>
+  );
 }
 
 function fmtDate(iso: string) {
@@ -293,8 +456,6 @@ function fmtDate(iso: string) {
   const dt = new Date(Date.UTC(y, (m ?? 1) - 1, day));
   return WEEKDAYS_PT[dt.getUTCDay()] ?? "";
 }
-
-/* ---------- Presets ---------- */
 
 function PresetMinimal({
   d,
@@ -410,7 +571,7 @@ function PresetForecast({
   accent: string;
   animated: boolean;
 }) {
-  const days = (d.forecast ?? []).slice(0, 4);
+  const days = (d.forecast ?? []).slice(0, 6);
   return (
     <div className="flex h-full w-full flex-col p-[4cqmin]" style={shell}>
       <div className="flex items-center justify-between gap-[3cqmin]">
@@ -447,7 +608,7 @@ function PresetForecast({
         </div>
       </div>
       <div
-        className="mt-auto grid gap-[2cqmin] pt-[3cqmin]"
+        className="mt-auto grid gap-[1.5cqmin] pt-[2cqmin]"
         style={{
           gridTemplateColumns: `repeat(${days.length || 1}, minmax(0, 1fr))`,
           borderTop: "1px solid rgba(255,255,255,0.18)",
@@ -456,16 +617,16 @@ function PresetForecast({
         {days.map((day, i) => (
           <div
             key={day.date}
-            className="flex flex-col items-center gap-[0.6cqh]"
-            style={{ fontSize: "5cqh", opacity: 0.95 }}
+            className="flex flex-col items-center gap-[0.4cqh]"
+            style={{ fontSize: "4.2cqh", opacity: 0.95 }}
           >
             <span style={{ opacity: 0.8 }}>
               {i === 0 ? "Hoje" : fmtDate(day.date)}
             </span>
-            <div style={{ width: "14cqh", height: "14cqh" }}>
+            <div style={{ width: "12cqh", height: "12cqh" }}>
               <WeatherIcon code={day.code} accent={accent} animated={animated} />
             </div>
-            <span style={{ fontWeight: 600 }}>
+            <span style={{ fontWeight: 600, whiteSpace: "nowrap" }}>
               {day.max}° <span style={{ opacity: 0.6 }}>{day.min}°</span>
             </span>
           </div>
@@ -486,45 +647,45 @@ function PresetVertical({
   accent: string;
   animated: boolean;
 }) {
-  const days = (d.forecast ?? []).slice(0, 4);
+  const days = (d.forecast ?? []).slice(0, 6);
   return (
     <div
-      className="flex h-full w-full flex-col items-center gap-[2cqh] p-[5cqmin] text-center"
+      className="flex h-full w-full flex-col items-center gap-[1.5cqh] p-[4cqmin] text-center overflow-y-auto"
       style={shell}
     >
       <span
-        style={{ fontSize: "5cqh", fontWeight: 600, letterSpacing: "0.1em" }}
+        style={{ fontSize: "4.5cqh", fontWeight: 600, letterSpacing: "0.1em" }}
         className="uppercase opacity-80"
       >
         {d.city}
       </span>
-      <div style={{ width: "40cqmin", height: "40cqmin" }}>
+      <div style={{ width: "32cqmin", height: "32cqmin" }}>
         <WeatherIcon code={d.code} isDay={d.isDay} accent={accent} animated={animated} />
       </div>
       <span
         className="leading-none"
-        style={{ fontSize: "22cqh", fontWeight: 700, letterSpacing: "-0.03em" }}
+        style={{ fontSize: "18cqh", fontWeight: 700, letterSpacing: "-0.03em" }}
       >
         {d.temp}
-        <span style={{ fontSize: "9cqh", fontWeight: 500, opacity: 0.75 }}>
+        <span style={{ fontSize: "8cqh", fontWeight: 500, opacity: 0.75 }}>
           {d.unit}
         </span>
       </span>
-      <span style={{ fontSize: "4.5cqh", opacity: 0.9 }}>{d.description}</span>
+      <span style={{ fontSize: "4cqh", opacity: 0.9 }}>{d.description}</span>
       <div
-        className="mt-auto flex w-full flex-col gap-[1.2cqh] pt-[2cqh]"
+        className="mt-auto flex w-full flex-col gap-[0.8cqh] pt-[1.5cqh]"
         style={{ borderTop: "1px solid rgba(255,255,255,0.18)" }}
       >
         {days.map((day, i) => (
           <div
             key={day.date}
             className="flex items-center justify-between gap-[2cqmin] px-[1cqh]"
-            style={{ fontSize: "4.5cqh" }}
+            style={{ fontSize: "4cqh" }}
           >
             <span style={{ opacity: 0.85, minWidth: "10cqh", textAlign: "left" }}>
               {i === 0 ? "Hoje" : fmtDate(day.date)}
             </span>
-            <div style={{ width: "8cqh", height: "8cqh" }}>
+            <div style={{ width: "7cqh", height: "7cqh" }}>
               <WeatherIcon code={day.code} accent={accent} animated={animated} />
             </div>
             <span style={{ fontWeight: 600, minWidth: "12cqh", textAlign: "right" }}>

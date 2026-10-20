@@ -127,10 +127,21 @@ Deno.serve(async (req) => {
       "temperature_2m,weather_code,relative_humidity_2m,wind_speed_10m,apparent_temperature,is_day",
     );
     wUrl.searchParams.set(
-      "daily",
-      "temperature_2m_max,temperature_2m_min,weather_code",
+      "current",
+      "temperature_2m,apparent_temperature,relative_humidity_2m,wind_speed_10m,weather_code,is_day",
     );
-    wUrl.searchParams.set("forecast_days", "4");
+    wUrl.searchParams.set(
+      "hourly",
+      "temperature_2m,apparent_temperature,relative_humidity_2m,wind_speed_10m,weather_code,precipitation_probability",
+    );
+    wUrl.searchParams.set(
+      "daily",
+      "weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset,precipitation_probability_max",
+    );
+    wUrl.searchParams.set(
+      "forecast_days",
+      "6",
+    );
     wUrl.searchParams.set("temperature_unit", unit);
     wUrl.searchParams.set(
       "wind_speed_unit",
@@ -156,10 +167,24 @@ Deno.serve(async (req) => {
         code: Number(daily.weather_code?.[i] ?? 0),
       });
     }
+    const hourly = w?.hourly ?? {};
+    const hourlyList: Array<{ time: string; temp: number; feelsLike: number; humidity: number; wind: number; code: number; pop: number }> = [];
+    const hTimes: string[] = hourly.time ?? [];
+    for (let i = 0; i < hTimes.length; i++) {
+      hourlyList.push({
+        time: hTimes[i],
+        temp: Math.round(Number(hourly.temperature_2m?.[i] ?? 0)),
+        feelsLike: Math.round(Number(hourly.apparent_temperature?.[i] ?? 0)),
+        humidity: Math.round(Number(hourly.relative_humidity_2m?.[i] ?? 0)),
+        wind: Math.round(Number(hourly.wind_speed_10m?.[i] ?? 0)),
+        code: Number(hourly.weather_code?.[i] ?? 0),
+        pop: Number(hourly.precipitation_probability?.[i] ?? 0),
+      });
+    }
+
     return json(
       {
         temp: Math.round(Number(cur.temperature_2m)),
-        // Campos do contrato do app da tela (compatibilidade)
         temperature: Number(cur.temperature_2m),
         units,
         windSpeed: Number(cur.wind_speed_10m ?? 0),
@@ -176,6 +201,7 @@ Deno.serve(async (req) => {
         city: place.name,
         country: place.country_code ?? place.country ?? "",
         forecast: days,
+        hourly: hourlyList,
       },
       200,
     );
