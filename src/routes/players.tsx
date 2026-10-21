@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ChevronRight, Loader2, MonitorPlay, Plus } from "lucide-react";
 import { toast } from "sonner";
@@ -45,6 +45,8 @@ export const Route = createFileRoute("/players")({
       },
     ],
   }),
+  validateSearch: (s: Record<string, unknown>): { status?: "online" | "offline" } =>
+    s.status === "online" || s.status === "offline" ? { status: s.status } : {},
   component: PlayersPage,
 });
 
@@ -100,6 +102,7 @@ function formatRelative(iso: string | null): string {
 }
 
 function PlayersPage() {
+  const { status: statusFilter } = Route.useSearch();
   const { membership } = useAuth();
   const orgId = membership?.organization_id ?? null;
   const role = membership?.role ?? "viewer";
@@ -175,10 +178,19 @@ function PlayersPage() {
     qc.invalidateQueries({ queryKey: ["campaigns-targeting", orgId] });
   };
 
-  const players = playersQ.data ?? [];
+  const allPlayers = playersQ.data ?? [];
   const onlineCount = useMemo(
-    () => players.filter((p) => isOnline(p, nowMs)).length,
-    [players, nowMs],
+    () => allPlayers.filter((p) => isOnline(p, nowMs)).length,
+    [allPlayers, nowMs],
+  );
+  const players = useMemo(
+    () =>
+      statusFilter === "online"
+        ? allPlayers.filter((p) => isOnline(p, nowMs))
+        : statusFilter === "offline"
+          ? allPlayers.filter((p) => !isOnline(p, nowMs))
+          : allPlayers,
+    [allPlayers, statusFilter, nowMs],
   );
 
   return (
@@ -187,7 +199,7 @@ function PlayersPage() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Players</h1>
           <p className="text-sm text-muted-foreground">
-            {players.length} player(s) · {onlineCount} online agora
+            {allPlayers.length} player(s) · {onlineCount} online agora
           </p>
         </div>
         <Button
@@ -198,9 +210,30 @@ function PlayersPage() {
         </Button>
       </header>
 
+      <div className="flex flex-wrap gap-2">
+        {([
+          { key: undefined, label: "Todos" },
+          { key: "online", label: "Online" },
+          { key: "offline", label: "Offline" },
+        ] as const).map((f) => (
+          <Link
+            key={f.label}
+            to="/players"
+            search={f.key ? { status: f.key } : {}}
+            className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
+              statusFilter === f.key
+                ? "border-primary/40 bg-primary/15 text-primary"
+                : "border-border/60 text-muted-foreground hover:bg-muted/40"
+            }`}
+          >
+            {f.label}
+          </Link>
+        ))}
+      </div>
+
       {playersQ.isLoading ? (
         <GridSkeleton count={6} heightClass="h-48" />
-      ) : players.length === 0 ? (
+      ) : allPlayers.length === 0 ? (
         <Card className="rounded-2xl border-dashed border-border/60 bg-card/40 backdrop-blur-xl">
           <CardContent className="flex flex-col items-center gap-3 py-16 text-center">
             <div className="grid h-14 w-14 place-items-center rounded-2xl bg-primary/15 text-primary">
@@ -216,6 +249,10 @@ function PlayersPage() {
             </Button>
           </CardContent>
         </Card>
+      ) : players.length === 0 ? (
+        <p className="py-12 text-center text-sm text-muted-foreground">
+          Nenhum player {statusFilter} no momento.
+        </p>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {players.map((p) => (
