@@ -28,7 +28,9 @@ import {
   Video,
   Calendar as CalendarIcon,
   MonitorPlay,
+  Timer,
 } from "lucide-react";
+import { detectTemplateDuration } from "@/lib/studio/video-duration";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -614,13 +616,15 @@ export function PlaylistEditor({
         });
         if (error) throw error;
       } else {
+        const detected = await detectTemplateDuration(input.id);
+        if (detected) toast.success(`Tempo do vídeo detectado: ${detected}s`);
         const { error } = await supabase.from("playlist_items").insert({
           playlist_id: playlist.id,
           item_type: "template",
           media_file_id: null,
           template_id: input.id,
           position: nextPos,
-          duration: 10,
+          duration: detected ?? 10,
           transition: "fade",
         });
         if (error) throw error;
@@ -1226,6 +1230,7 @@ function SortableItem({
   // Template: sempre precisa de duração (como imagem)
   const needsDuration = isImage || isTemplate;
   const [duration, setDuration] = useState<string>(String(item.duration ?? ""));
+  const [detecting, setDetecting] = useState(false);
 
   useEffect(() => {
     setDuration(String(item.duration ?? ""));
@@ -1295,6 +1300,32 @@ function SortableItem({
               className="h-9 w-20 rounded-xl text-xs"
             />
             <span className="text-[11px] text-muted-foreground">s</span>
+            {isTemplate && canManage && item.template_id && (
+              <button
+                type="button"
+                title="Detectar o tempo do vídeo pelo link"
+                aria-label="Detectar o tempo do vídeo pelo link"
+                disabled={detecting}
+                onClick={async () => {
+                  setDetecting(true);
+                  try {
+                    const d = await detectTemplateDuration(item.template_id as string);
+                    if (d) {
+                      setDuration(String(d));
+                      if (d !== item.duration) onDurationChange(d);
+                      toast.success(`Tempo do vídeo detectado: ${d}s`);
+                    } else {
+                      toast.error("Não foi possível detectar o tempo. Defina manualmente.");
+                    }
+                  } finally {
+                    setDetecting(false);
+                  }
+                }}
+                className="grid h-9 w-9 place-items-center rounded-xl text-muted-foreground hover:bg-muted/50 disabled:opacity-50"
+              >
+                <Timer className={`h-4 w-4 ${detecting ? "animate-pulse" : ""}`} />
+              </button>
+            )}
           </div>
         ) : isVideo ? (
           <span className="text-[11px] italic text-muted-foreground">
