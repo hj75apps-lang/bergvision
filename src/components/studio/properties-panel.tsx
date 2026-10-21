@@ -3483,27 +3483,56 @@ function IframeConfig({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [url, disabled]);
+  const savedUrls = Array.isArray(config.urls)
+    ? (config.urls as unknown[]).filter((u): u is string => typeof u === "string" && u.length > 0)
+    : [];
+  const rotation =
+    typeof config.rotationSeconds === "number"
+      ? Math.max(5, Math.min(600, Math.round(config.rotationSeconds)))
+      : 30;
+  const [text, setText] = useState<string>(() =>
+    savedUrls.length > 1 ? savedUrls.join(", ") : url,
+  );
+  const normalizeOne = (s: string): string => {
+    const t = s.trim();
+    if (/<iframe/i.test(t)) {
+      const m = t.match(/\bsrc\s*=\s*["']([^"']+)["']/i);
+      if (m?.[1]) return toVideoEmbedUrl(m[1].trim()) ?? m[1].trim();
+    }
+    return toVideoEmbedUrl(t) ?? t;
+  };
   const handleUrlInput = (raw: string) => {
+    setText(raw);
     const trimmed = raw.trim();
-    // Aceita colar tanto uma URL crua quanto um snippet completo de <iframe ...>.
-    // Extrai o atributo src="..." | src='...' quando presente.
-    if (/<iframe/i.test(trimmed)) {
-      const match = trimmed.match(/\bsrc\s*=\s*["']([^"']+)["']/i);
+    // Vários links separados por vírgula (ou quebra de linha) — cada um
+    // vira URL de incorporação e o quadro alterna entre eles.
+    const parts = /<iframe/i.test(trimmed)
+      ? [trimmed]
+      : trimmed.split(/[,\n]+/).map((p) => p.trim()).filter(Boolean);
+    if (parts.length > 1) {
+      const list = parts.map(normalizeOne);
+      setCfg({ url: list[0], urls: list, allowScripts: true, allowSameOrigin: true });
+      return;
+    }
+    const single = parts[0] ?? "";
+    if (/<iframe/i.test(single)) {
+      const match = single.match(/\bsrc\s*=\s*["']([^"']+)["']/i);
       if (match?.[1]) {
         const src = match[1].trim();
         const embed = toVideoEmbedUrl(src);
-        setCfg(embed ? { url: embed, allowScripts: true, allowSameOrigin: true } : { url: src });
+        setCfg(embed ? { url: embed, urls: [], allowScripts: true, allowSameOrigin: true } : { url: src, urls: [] });
         return;
       }
     }
     // Links de vídeo (YouTube, Vimeo, Drive...) viram URL de incorporação.
-    const embed = toVideoEmbedUrl(trimmed);
+    const embed = toVideoEmbedUrl(single);
     if (embed) {
-      setCfg({ url: embed, allowScripts: true, allowSameOrigin: true });
+      setCfg({ url: embed, urls: [], allowScripts: true, allowSameOrigin: true });
       return;
     }
-    setCfg({ url: trimmed });
+    setCfg({ url: single, urls: [] });
   };
+  const invalidCount = savedUrls.filter((u) => !/^https:\/\//i.test(u)).length;
   return (
     <div className="flex flex-col gap-3">
       <Separator />
@@ -3512,24 +3541,46 @@ function IframeConfig({
           URL ou código de incorporação
         </span>
         <Textarea
-          placeholder={'https://exemplo.com/widget-clima\nou cole aqui o <iframe src="..."></iframe>'}
-          value={url}
+          placeholder={'https://youtu.be/abc, https://vimeo.com/123\nou cole aqui o <iframe src="..."></iframe>'}
+          value={text}
           disabled={disabled}
           onChange={(e) => handleUrlInput(e.target.value)}
           className="min-h-16 text-xs"
           rows={3}
         />
-        {!isValid && url.length > 0 && (
-          <span className="text-[10px] text-destructive">
-            Não foi possível extrair uma URL https:// válida.
+        {savedUrls.length > 1 ? (
+          <span className={invalidCount > 0 ? "text-[10px] text-destructive" : "text-[10px] text-muted-foreground"}>
+            {savedUrls.length} links — o quadro alterna entre eles.
+            {invalidCount > 0 ? ` ${invalidCount} link(s) sem https:// serão pulados.` : ""}
           </span>
+        ) : (
+          !isValid && url.length > 0 && (
+            <span className="text-[10px] text-destructive">
+              Não foi possível extrair uma URL https:// válida.
+            </span>
+          )
         )}
         <span className="text-[10px] text-muted-foreground">
-          Cole um link do YouTube, Vimeo, Google Drive, Dailymotion, Loom ou Streamable (o vídeo toca sozinho, sem som e em loop), uma URL direta ou o código completo do iframe (ex.: Climatempo,
-          Google Maps, YouTube). Extraímos o src automaticamente. Sites que
+          Cole um ou vários links separados por vírgula (YouTube, Vimeo, Google Drive, Dailymotion, Loom, Streamable — tocam sozinhos, sem som), uma URL direta ou o código completo do iframe. Sites que
           bloqueiam via X-Frame-Options não serão exibidos.
         </span>
       </label>
+
+      {savedUrls.length > 1 && (
+        <div className="flex flex-col gap-1">
+          <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+            Trocar de link a cada ({rotation}s)
+          </span>
+          <Slider
+            value={[rotation]}
+            min={5}
+            max={600}
+            step={5}
+            disabled={disabled}
+            onValueChange={([v]) => setCfg({ rotationSeconds: v })}
+          />
+        </div>
+      )}
 
       <div className="flex flex-col gap-1">
         <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">

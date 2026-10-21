@@ -373,6 +373,28 @@ function InlineMediaGroup({ c }: { c: Record<string, unknown> }) {
 }
 
 function IframeWidget({ config }: { config: Record<string, unknown> }) {
+  const urls = Array.isArray(config.urls)
+    ? (config.urls as unknown[]).filter(
+        (u): u is string => typeof u === "string" && /^https:\/\//i.test(u.trim()),
+      )
+    : [];
+  const rotation =
+    typeof config.rotationSeconds === "number"
+      ? Math.max(5, Math.min(600, Math.round(config.rotationSeconds)))
+      : 30;
+  const [idx, setIdx] = useState(0);
+  const count = urls.length;
+  useEffect(() => {
+    if (count < 2) return;
+    const id = window.setInterval(() => setIdx((i) => (i + 1) % count), rotation * 1000);
+    return () => window.clearInterval(id);
+  }, [count, rotation]);
+  if (count < 2) return <SingleIframe config={config} />;
+  const cur = urls[idx % count];
+  return <SingleIframe key={`${idx % count}:${cur}`} config={{ ...config, url: cur }} />;
+}
+
+function SingleIframe({ config }: { config: Record<string, unknown> }) {
   const rawUrl = typeof config.url === "string" ? config.url : "";
   // Converte links de página (vimeo.com/..., youtube.com/watch...) que recusam
   // incorporação em URLs de player — corrige também elementos já salvos.
