@@ -28,7 +28,9 @@ import {
   Video,
   Calendar as CalendarIcon,
   MonitorPlay,
+  Timer,
 } from "lucide-react";
+import { detectTemplateDuration } from "@/lib/studio/video-duration";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
