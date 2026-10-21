@@ -614,13 +614,15 @@ export function PlaylistEditor({
         });
         if (error) throw error;
       } else {
+        const detected = await detectTemplateDuration(input.id);
+        if (detected) toast.success(`Tempo do vídeo detectado: ${detected}s`);
         const { error } = await supabase.from("playlist_items").insert({
           playlist_id: playlist.id,
           item_type: "template",
           media_file_id: null,
           template_id: input.id,
           position: nextPos,
-          duration: 10,
+          duration: detected ?? 10,
           transition: "fade",
         });
         if (error) throw error;
