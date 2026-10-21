@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   DndContext,
@@ -103,6 +103,8 @@ export const Route = createFileRoute("/playlists")({
       },
     ],
   }),
+  validateSearch: (s: Record<string, unknown>): { edit?: string } =>
+    typeof s.edit === "string" && s.edit ? { edit: s.edit } : {},
   component: PlaylistsPage,
 });
 
@@ -184,6 +186,8 @@ function scheduleSummary(p: Playlist): string | null {
 }
 
 function PlaylistsPage() {
+  const { edit: editId } = Route.useSearch();
+  const navigate = useNavigate();
   const { membership } = useAuth();
   const orgId = membership?.organization_id ?? null;
   const role = membership?.role ?? "viewer";
@@ -242,6 +246,14 @@ function PlaylistsPage() {
   });
 
   const playlists = playlistsQ.data ?? [];
+
+  // Abre direto a edição quando vier ?edit=<id> (ex.: links do Dashboard).
+  useEffect(() => {
+    if (!editId || playlists.length === 0) return;
+    const found = playlists.find((p) => p.id === editId);
+    if (found) setEditing(found);
+    navigate({ to: "/playlists", search: {}, replace: true });
+  }, [editId, playlists, navigate]);
 
   return (
     <div className="mx-auto max-w-6xl space-y-6">

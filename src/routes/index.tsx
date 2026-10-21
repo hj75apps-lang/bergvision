@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import {
   Activity,
@@ -152,6 +152,7 @@ function DashboardPage() {
       hint: `${onlinePlayers} conectados agora`,
       icon: MonitorPlay,
       tone: "primary" as const,
+      link: { to: "/players" as const, search: {} },
     },
     {
       label: "Players online",
@@ -159,6 +160,7 @@ function DashboardPage() {
       hint: totalPlayers > 0 ? `${Math.round((onlinePlayers / totalPlayers) * 100)}% da rede conectada` : "0% da rede",
       icon: Signal,
       tone: "success" as const,
+      link: { to: "/players" as const, search: { status: "online" as const } },
     },
     {
       label: "Players offline",
@@ -166,6 +168,7 @@ function DashboardPage() {
       hint: offlinePlayers > 0 ? "Atenção necessária" : "Nenhum player offline",
       icon: SignalZero,
       tone: "danger" as const,
+      link: { to: "/players" as const, search: { status: "offline" as const } },
     },
     {
       label: "Playlists ativas",
@@ -173,6 +176,7 @@ function DashboardPage() {
       hint: `${playlists.length} cadastradas no total`,
       icon: CalendarClock,
       tone: "warning" as const,
+      link: { to: "/playlists" as const, search: {} },
     },
   ];
 
@@ -210,9 +214,14 @@ function DashboardPage() {
       ) : (
         <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {stats.map((stat) => (
-            <Card
+            <Link
               key={stat.label}
-              className="group relative overflow-hidden rounded-3xl border-border/60 bg-card/70 backdrop-blur-xl transition-shadow hover:shadow-lg hover:shadow-primary/5"
+              to={stat.link.to}
+              search={stat.link.search}
+              className="block rounded-3xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+            <Card
+              className="group relative h-full cursor-pointer overflow-hidden rounded-3xl border-border/60 bg-card/70 backdrop-blur-xl transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-lg hover:shadow-primary/5"
             >
               <div
                 className={`pointer-events-none absolute -right-8 -top-8 h-32 w-32 rounded-full bg-linear-to-br ${toneRing[stat.tone]} blur-2xl opacity-70`}
@@ -240,6 +249,7 @@ function DashboardPage() {
                 </div>
               </CardContent>
             </Card>
+            </Link>
           ))}
         </section>
       )}
@@ -248,14 +258,14 @@ function DashboardPage() {
         <Card className="rounded-3xl border-border/60 bg-card/70 backdrop-blur-xl lg:col-span-2">
           <CardHeader>
             <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className="text-lg font-semibold">
+              <Link to="/relatorio" className="group/title">
+                <CardTitle className="text-lg font-semibold group-hover/title:text-primary">
                   Próximos agendamentos
                 </CardTitle>
                 <CardDescription>
                   Playlists e campanhas ativas cadastradas.
                 </CardDescription>
-              </div>
+              </Link>
               <Badge variant="secondary" className="rounded-full">
                 {upcoming.length} itens
               </Badge>
@@ -268,9 +278,11 @@ function DashboardPage() {
               </div>
             ) : (
               upcoming.map((item) => (
-                <div
+                <Link
                   key={item.id}
-                  className="flex items-center justify-between gap-3 px-6 py-3.5 first:pt-4 last:pb-4"
+                  to="/playlists"
+                  search={{ edit: item.id }}
+                  className="flex items-center justify-between gap-3 px-6 py-3.5 transition-colors first:pt-4 last:pb-4 hover:bg-muted/40"
                 >
                   <div className="min-w-0">
                     <p className="truncate text-sm font-medium">{item.title}</p>
@@ -282,7 +294,7 @@ function DashboardPage() {
                   >
                     {item.tag}
                   </Badge>
-                </div>
+                </Link>
               ))
             )}
           </CardContent>
