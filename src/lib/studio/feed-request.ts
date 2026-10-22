@@ -1,4 +1,6 @@
-/** Monta o corpo enviado à função widget-rss (RSS/Atom ou API JSON). */
+import { normalizeGithubFeedUrl } from "./github-feed";
+
+/** Monta o corpo enviado à função widget-rss (RSS/Atom, API JSON ou GitHub). */
 export function feedRequestBody(
   config: Record<string, unknown>,
   url: string,
@@ -9,7 +11,7 @@ export function feedRequestBody(
     return typeof v === "string" ? v.trim() : "";
   };
   return {
-    url,
+    url: normalizeGithubFeedUrl(url),
     max,
     json_items_path: s("jsonItemsPath"),
     json_title_template: s("jsonTitleTemplate"),
