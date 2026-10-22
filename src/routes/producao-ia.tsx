@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import {
   Download,
@@ -115,10 +115,13 @@ function ProducaoIaPage() {
         <TabsContent value="imagem" className="mt-4">
           <CreateImageTab />
         </TabsContent>
+        <TabsContent value="ofertas" className="mt-4">
+          <OffersTab />
+        </TabsContent>
         <TabsContent value="config" className="mt-4">
           <ProvidersCard />
         </TabsContent>
-        {TABS.filter((t) => !["visao", "imagem", "config"].includes(t.id)).map((t) => (
+        {TABS.filter((t) => !["visao", "imagem", "ofertas", "config"].includes(t.id)).map((t) => (
           <TabsContent key={t.id} value={t.id} className="mt-4">
             <Card className="rounded-2xl border-dashed">
               <CardContent className="flex flex-col items-center gap-2 py-12 text-center">
@@ -240,11 +243,19 @@ const emptyBrief: ImageBrief = {
   aspect: "9:16",
 };
 
-function CreateImageTab() {
+type CreateImageProps = {
+  initial?: Partial<ImageBrief>;
+  extraPrompt?: string;
+  extraFields?: ReactNode;
+  title?: string;
+  validate?: () => string | null;
+};
+
+function CreateImageTab({ initial, extraPrompt = "", extraFields, title = "Briefing da imagem", validate }: CreateImageProps = {}) {
   const { membership, user } = useAuth();
   const providers = useProviders();
   const canCreate = membership?.role !== "viewer";
-  const [brief, setBrief] = useState<ImageBrief>(emptyBrief);
+  const [brief, setBrief] = useState<ImageBrief>({ ...emptyBrief, ...initial });
   const [provider, setProvider] = useState<AiProvider>("openai");
   const [quality, setQuality] = useState("medium");
   const [refs, setRefs] = useState<{ name: string; url: string }[]>([]);
@@ -254,7 +265,10 @@ function CreateImageTab() {
   const [result, setResult] = useState<{ image: string; model: string; prompt: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const autoPrompt = useMemo(() => buildImagePrompt(brief, refs.length > 0), [brief, refs.length]);
+  const autoPrompt = useMemo(
+    () => [buildImagePrompt(brief, refs.length > 0), extraPrompt].filter(Boolean).join("\n"),
+    [brief, refs.length, extraPrompt],
+  );
   const finalPrompt = prompt ?? autoPrompt;
   const set = (k: keyof ImageBrief) => (v: string) => setBrief((b) => ({ ...b, [k]: v }));
   const providerReady = providers.data ? providers.data[provider] : true;
@@ -274,7 +288,12 @@ function CreateImageTab() {
   };
 
   const run = async () => {
-    if (!brief.theme.trim() && !prompt) {
+    const v = validate?.();
+    if (v) {
+      toast.error(v);
+      return;
+    }
+    if (!brief.theme.trim() && !prompt && !extraPrompt) {
       toast.error("Descreva o tema da imagem.");
       return;
     }
@@ -326,9 +345,10 @@ function CreateImageTab() {
     <div className="grid gap-4 lg:grid-cols-[1fr_420px]">
       <Card className="rounded-2xl">
         <CardHeader>
-          <CardTitle className="text-base">Briefing da imagem</CardTitle>
+          <CardTitle className="text-base">{title}</CardTitle>
         </CardHeader>
         <CardContent className="grid gap-3 sm:grid-cols-2">
+          {extraFields}
           <Field label="Marca ou empresa" value={brief.brand} onChange={set("brand")} />
           <Field label="Nome do projeto" value={brief.project} onChange={set("project")} />
           <Pick label="Objetivo da campanha" value={brief.objective} options={OBJECTIVES} onChange={set("objective")} />
@@ -469,5 +489,45 @@ function Pick(props: { label: string; value: string; options: string[]; onChange
         </SelectContent>
       </Select>
     </div>
+  );
+}
+
+const OFFER_TYPES = ["Desconto", "Leve mais, pague menos", "Lançamento", "Liquidação", "Combo", "Frete grátis", "Oferta relâmpago"];
+
+function OffersTab() {
+  const [o, setO] = useState({ type: OFFER_TYPES[0], product: "", price: "", oldPrice: "", discount: "", validity: "", conditions: "" });
+  const set = (k: keyof typeof o) => (v: string) => setO((x) => ({ ...x, [k]: v }));
+  const extraPrompt = useMemo(() => {
+    const l = ["Peça publicitária de OFERTA para varejo, com destaque máximo para o preço, legível de longe em tela de mídia indoor."];
+    l.push(`Tipo de oferta: ${o.type}.`);
+    if (o.product) l.push(`Produto em oferta: ${o.product}.`);
+    if (o.price) l.push(`Preço promocional em destaque grande: "${o.price}".`);
+    if (o.oldPrice) l.push(`Preço anterior riscado, menor: "${o.oldPrice}".`);
+    if (o.discount) l.push(`Selo de desconto: "${o.discount}".`);
+    if (o.validity) l.push(`Validade em texto pequeno: "${o.validity}".`);
+    if (o.conditions) l.push(`Condições em texto pequeno: "${o.conditions}".`);
+    return l.join("\n");
+  }, [o]);
+  return (
+    <CreateImageTab
+      title="Briefing da oferta"
+      initial={{ objective: "Oferta", style: "Vibrante / varejo" }}
+      extraPrompt={extraPrompt}
+      validate={() => (!o.product.trim() ? "Informe o produto em oferta." : null)}
+      extraFields={
+        <>
+          <Pick label="Tipo de oferta" value={o.type} options={OFFER_TYPES} onChange={set("type")} />
+          <Field label="Produto em oferta *" value={o.product} onChange={set("product")} />
+          <Field label="Preço promocional" value={o.price} onChange={set("price")} placeholder="Ex.: R$ 9,90" />
+          <Field label="Preço anterior" value={o.oldPrice} onChange={set("oldPrice")} placeholder="Ex.: R$ 14,90" />
+          <Field label="Selo de desconto" value={o.discount} onChange={set("discount")} placeholder="Ex.: -30%" />
+          <Field label="Validade" value={o.validity} onChange={set("validity")} placeholder="Ex.: até 31/10" />
+          <div className="sm:col-span-2">
+            <Field label="Condições" value={o.conditions} onChange={set("conditions")} placeholder="Ex.: enquanto durarem os estoques" />
+          </div>
+          <div className="border-t sm:col-span-2" />
+        </>
+      }
+    />
   );
 }
