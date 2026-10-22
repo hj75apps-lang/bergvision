@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import {
   Download,
@@ -121,10 +121,13 @@ function ProducaoIaPage() {
         <TabsContent value="dicas" className="mt-4">
           <TipsTab />
         </TabsContent>
+        <TabsContent value="marca" className="mt-4">
+          <BrandTab />
+        </TabsContent>
         <TabsContent value="config" className="mt-4">
           <ProvidersCard />
         </TabsContent>
-        {TABS.filter((t) => !["visao", "imagem", "ofertas", "dicas", "config"].includes(t.id)).map((t) => (
+        {TABS.filter((t) => !["visao", "imagem", "ofertas", "dicas", "marca", "config"].includes(t.id)).map((t) => (
           <TabsContent key={t.id} value={t.id} className="mt-4">
             <Card className="rounded-2xl border-dashed">
               <CardContent className="flex flex-col items-center gap-2 py-12 text-center">
@@ -259,6 +262,18 @@ function CreateImageTab({ initial, extraPrompt = "", extraFields, title = "Brief
   const providers = useProviders();
   const canCreate = membership?.role !== "viewer";
   const [brief, setBrief] = useState<ImageBrief>({ ...emptyBrief, ...initial });
+  const kit = useBrandKit(membership?.organization_id);
+  const [useContacts, setUseContacts] = useState(false);
+  useEffect(() => {
+    if (!kit) return;
+    setBrief((b) => ({
+      ...b,
+      brand: b.brand || kit.name,
+      palette: b.palette || kit.colors,
+      typography: b.typography || kit.typography,
+    }));
+  }, [kit]);
+  const contactsPrompt = useContacts && kit ? brandContactsLine(kit) : "";
   const [provider, setProvider] = useState<AiProvider>("openai");
   const [quality, setQuality] = useState("medium");
   const [refs, setRefs] = useState<{ name: string; url: string }[]>([]);
@@ -269,8 +284,8 @@ function CreateImageTab({ initial, extraPrompt = "", extraFields, title = "Brief
   const [error, setError] = useState<string | null>(null);
 
   const autoPrompt = useMemo(
-    () => [buildImagePrompt(brief, refs.length > 0), extraPrompt].filter(Boolean).join("\n"),
-    [brief, refs.length, extraPrompt],
+    () => [buildImagePrompt(brief, refs.length > 0), extraPrompt, contactsPrompt].filter(Boolean).join("\n"),
+    [brief, refs.length, extraPrompt, contactsPrompt],
   );
   const finalPrompt = prompt ?? autoPrompt;
   const set = (k: keyof ImageBrief) => (v: string) => setBrief((b) => ({ ...b, [k]: v }));
@@ -412,6 +427,12 @@ function CreateImageTab({ initial, extraPrompt = "", extraFields, title = "Brief
               A IA usa a logomarca como referência, mas não garante reproduzir logos e textos com perfeição. Para a peça final, ajuste no Studio.
             </p>
           </div>
+          {kit && brandContactsLine(kit) && (
+            <label className="flex items-center gap-2 text-xs sm:col-span-2">
+              <input type="checkbox" checked={useContacts} onChange={(e) => setUseContacts(e.target.checked)} />
+              Incluir os contatos da marca no rodapé da peça
+            </label>
+          )}
           <div className="sm:col-span-2">
             <div className="flex items-center justify-between">
               <Label className="text-xs">Instruções enviadas à IA</Label>
@@ -574,5 +595,93 @@ function TipsTab() {
         </>
       }
     />
+  );
+}
+
+type BrandKit = {
+  name: string; slogan: string; colors: string; typography: string;
+  phone: string; whatsapp: string; instagram: string; site: string; address: string;
+};
+const emptyKit: BrandKit = { name: "", slogan: "", colors: "", typography: "", phone: "", whatsapp: "", instagram: "", site: "", address: "" };
+const kitKey = (org: string) => `bv:brand-kit:${org}`;
+const KIT_EVENT = "bv:brand-kit-changed";
+
+function readKit(org?: string): BrandKit | null {
+  if (!org || typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(kitKey(org));
+    return raw ? { ...emptyKit, ...(JSON.parse(raw) as Partial<BrandKit>) } : null;
+  } catch {
+    return null;
+  }
+}
+
+function useBrandKit(org?: string): BrandKit | null {
+  const [kit, setKit] = useState<BrandKit | null>(null);
+  useEffect(() => {
+    setKit(readKit(org));
+    const on = () => setKit(readKit(org));
+    window.addEventListener(KIT_EVENT, on);
+    return () => window.removeEventListener(KIT_EVENT, on);
+  }, [org]);
+  return kit;
+}
+
+function brandContactsLine(k: BrandKit): string {
+  const parts = [
+    k.whatsapp && `WhatsApp ${k.whatsapp}`,
+    k.phone && `Tel. ${k.phone}`,
+    k.instagram && `Instagram ${k.instagram}`,
+    k.site && k.site,
+    k.address && k.address,
+  ].filter(Boolean);
+  const l: string[] = [];
+  if (k.slogan) l.push(`Slogan da marca, discreto: "${k.slogan}".`);
+  if (parts.length) l.push(`Rodapé com contatos, legível: "${parts.join(" · ")}".`);
+  return l.join("\n");
+}
+
+function BrandTab() {
+  const { membership } = useAuth();
+  const org = membership?.organization_id;
+  const canEdit = membership?.role !== "viewer";
+  const [k, setK] = useState<BrandKit>(emptyKit);
+  useEffect(() => {
+    setK(readKit(org) ?? emptyKit);
+  }, [org]);
+  const set = (f: keyof BrandKit) => (v: string) => setK((x) => ({ ...x, [f]: v }));
+  const save = () => {
+    if (!org) return;
+    window.localStorage.setItem(kitKey(org), JSON.stringify(k));
+    window.dispatchEvent(new Event(KIT_EVENT));
+    toast.success("Dados da marca salvos.");
+  };
+  return (
+    <Card className="rounded-2xl">
+      <CardHeader>
+        <CardTitle className="text-base">Marca e contatos</CardTitle>
+        <CardDescription>
+          Preencha uma vez: o nome, as cores e a tipografia entram sozinhos nos briefings, e os contatos podem ir no rodapé das peças. Ficam salvos neste navegador.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="grid gap-3 sm:grid-cols-2">
+        <Field label="Nome da marca" value={k.name} onChange={set("name")} />
+        <Field label="Slogan" value={k.slogan} onChange={set("slogan")} />
+        <Field label="Cores da marca" value={k.colors} onChange={set("colors")} placeholder="Ex.: vermelho e branco" />
+        <Field label="Tipografia" value={k.typography} onChange={set("typography")} placeholder="Ex.: sem serifa, negrito" />
+        <Field label="WhatsApp" value={k.whatsapp} onChange={set("whatsapp")} placeholder="(66) 99999-9999" />
+        <Field label="Telefone" value={k.phone} onChange={set("phone")} />
+        <Field label="Instagram" value={k.instagram} onChange={set("instagram")} placeholder="@suamarca" />
+        <Field label="Site" value={k.site} onChange={set("site")} />
+        <div className="sm:col-span-2">
+          <Field label="Endereço" value={k.address} onChange={set("address")} />
+        </div>
+        <div className="sm:col-span-2">
+          <Button className="rounded-xl" onClick={save} disabled={!canEdit || !org}>
+            <Save className="h-4 w-4" /> Salvar dados da marca
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
