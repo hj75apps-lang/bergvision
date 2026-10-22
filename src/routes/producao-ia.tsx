@@ -29,6 +29,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { ExternalPromptCard } from "@/components/ai-studio/external-prompt-card";
+import { buildExternalImagePrompt, buildExternalVideoPrompt } from "@/lib/ai-studio/external-prompt";
 import { Badge } from "@/components/ui/badge";
 import {
   Select,
@@ -450,6 +452,9 @@ function CreateImageTab({ initial, extraPrompt = "", extraFields, title = "Brief
               )}
             </div>
             <Textarea className="mt-1 font-mono text-xs" rows={5} value={finalPrompt} onChange={(e) => setPrompt(e.target.value)} />
+          </div>
+          <div className="sm:col-span-2">
+            <ExternalPromptCard kind="imagem" prompt={buildExternalImagePrompt(finalPrompt, brief.aspect, refs.length > 0)} />
           </div>
         </CardContent>
       </Card>
@@ -930,6 +935,7 @@ function CreateVideoTab() {
             </div>
             <Textarea rows={5} value={finalPrompt} onChange={(e) => setPrompt(e.target.value)} />
           </div>
+          <ExternalPromptCard kind="vídeo" prompt={buildExternalVideoPrompt({ base: finalPrompt, aspect, duration: String(duration), resolution, negative, hasImage: !!image })} />
           <Button className="w-full rounded-xl" disabled={!canCreate || busy || !ready} onClick={generate}>
             {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
             {busy ? `Gerando… ${elapsed}s` : "Gerar vídeo"}
