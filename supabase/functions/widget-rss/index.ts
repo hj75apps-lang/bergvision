@@ -86,6 +86,95 @@ function pickImage(block: string): string | null {
   return null;
 }
 
+// ---------- Suporte a APIs JSON ----------
+
+function getPath(obj: any, path: string): any {
+  if (!path) return obj;
+  let cur = obj;
+  for (const k of path.split(".").filter(Boolean)) {
+    if (cur == null) return undefined;
+    cur = cur[k];
+  }
+  return cur;
+}
+
+function toText(v: any): string {
+  if (v == null) return "";
+  if (Array.isArray(v)) return v.map(toText).filter(Boolean).join(" - ");
+  if (typeof v === "object") return "";
+  return stripHtml(String(v));
+}
+
+function findArray(data: any, depth = 0): any[] | null {
+  if (Array.isArray(data)) return data;
+  if (!data || typeof data !== "object" || depth > 2) return null;
+  for (const v of Object.values(data)) {
+    if (Array.isArray(v) && v.length && typeof v[0] === "object") return v;
+  }
+  for (const v of Object.values(data)) {
+    const r = findArray(v, depth + 1);
+    if (r) return r;
+  }
+  return null;
+}
+
+const TITLE_KEYS = ["title", "titulo", "headline", "name", "nome", "text", "texto", "descricao", "description"];
+const IMAGE_KEYS = ["image", "imagem", "urlToImage", "thumbnail", "image_url", "img"];
+const DATE_KEYS = ["pubDate", "publishedAt", "date", "data", "dataApuracao", "published", "updated"];
+const LINK_KEYS = ["link", "url"];
+
+function firstKey(item: any, keys: string[]): string {
+  for (const k of keys) {
+    const t = toText(item?.[k]);
+    if (t) return t;
+  }
+  return "";
+}
+
+function autoTitle(item: any): string {
+  if (item == null || typeof item !== "object") return toText(item);
+  const t = firstKey(item, TITLE_KEYS);
+  if (t) return t;
+  // Sem campo de título: monta "campo: valor" com os primeiros valores simples.
+  return Object.entries(item)
+    .filter(([, v]) => v != null && (typeof v !== "object" || Array.isArray(v)))
+    .map(([k, v]) => [k, toText(v)] as const)
+    .filter(([, v]) => v && v.length <= 120)
+    .slice(0, 4)
+    .map(([k, v]) => `${k}: ${v}`)
+    .join(" | ");
+}
+
+function jsonItems(data: any, body: any, max: number) {
+  const itemsPath = String(body?.json_items_path ?? "").trim().slice(0, 200);
+  const template = String(body?.json_title_template ?? "").trim().slice(0, 300);
+  const imageField = String(body?.json_image_field ?? "").trim().slice(0, 200);
+  const dateField = String(body?.json_date_field ?? "").trim().slice(0, 200);
+
+  let list: any[];
+  const base = itemsPath ? getPath(data, itemsPath) : null;
+  if (Array.isArray(base)) list = base;
+  else if (base && typeof base === "object") list = [base];
+  else list = findArray(data) ?? (data && typeof data === "object" ? [data] : []);
+
+  return list.slice(0, max).map((item) => {
+    const title = template
+      ? template.replace(/\{([^}]+)\}/g, (_, p) => toText(getPath(item, p.trim()))).trim()
+      : autoTitle(item);
+    let image: string | null = imageField
+      ? toText(getPath(item, imageField))
+      : firstKey(item, IMAGE_KEYS);
+    if (image && !/^https:\/\//i.test(image)) image = null;
+    return {
+      title: (title || "—").slice(0, 500),
+      link: firstKey(item, LINK_KEYS),
+      pubDate: dateField ? toText(getPath(item, dateField)) : firstKey(item, DATE_KEYS),
+      image: image || null,
+      summary: "",
+    };
+  });
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS")
     return new Response(null, { status: 204, headers: CORS });
@@ -160,6 +249,23 @@ Deno.serve(async (req) => {
     }
     if (xml.includes("\uFFFD")) {
       try { xml = new TextDecoder("windows-1252").decode(buf); } catch { /* keep */ }
+    }
+
+    // API JSON (ex.: resultados de loterias, APIs REST de notícias)
+    const ctype = (res.headers.get("content-type") ?? "").toLowerCase();
+    const trimmed = xml.replace(/^\uFEFF/, "").trim();
+    if (ctype.includes("json") || trimmed.startsWith("{") || trimmed.startsWith("[")) {
+      let data: any;
+      try {
+        data = JSON.parse(trimmed);
+      } catch {
+        return json({ error: "invalid_json_feed" }, 502);
+      }
+      return json({
+        feedTitle: "",
+        fetchedAt: new Date().toISOString(),
+        items: jsonItems(data, body, max),
+      });
     }
 
     // Itens de RSS (<item>) ou Atom (<entry>)
