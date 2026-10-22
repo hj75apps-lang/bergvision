@@ -79,6 +79,7 @@ function DashboardPage() {
 
   const playersQ = useQuery({
     queryKey: ["dashboard-players", orgId],
+    refetchInterval: 30_000,
     enabled: !!orgId,
     queryFn: async (): Promise<Player[]> => {
       const { data, error } = await supabase
