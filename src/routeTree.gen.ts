@@ -17,6 +17,7 @@ import { Route as ConfiguracoesRouteImport } from './routes/configuracoes'
 import { Route as EquipeRouteImport } from './routes/equipe'
 import { Route as PlayersRouteImport } from './routes/players'
 import { Route as PlaylistsRouteImport } from './routes/playlists'
+import { Route as ProducaoIaRouteImport } from './routes/producao-ia'
 import { Route as RelatorioRouteImport } from './routes/relatorio'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as StudioRouteImport } from './routes/studio'
@@ -24,6 +25,7 @@ import { Route as TemplatesRouteImport } from './routes/templates'
 import { Route as InviteTokenRouteImport } from './routes/invite.$token'
 import { Route as StudioIndexRouteImport } from './routes/studio.index'
 import { Route as StudioTemplateIdRouteImport } from './routes/studio.$templateId'
+import { Route as ApiAiImageRouteImport } from './routes/api/ai/image'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -65,6 +67,11 @@ const PlaylistsRoute = PlaylistsRouteImport.update({
   path: '/playlists',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ProducaoIaRoute = ProducaoIaRouteImport.update({
+  id: '/producao-ia',
+  path: '/producao-ia',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const RelatorioRoute = RelatorioRouteImport.update({
   id: '/relatorio',
   path: '/relatorio',
@@ -100,6 +107,11 @@ const StudioTemplateIdRoute = StudioTemplateIdRouteImport.update({
   path: '/$templateId',
   getParentRoute: () => StudioRoute,
 } as any)
+const ApiAiImageRoute = ApiAiImageRouteImport.update({
+  id: '/api/ai/image',
+  path: '/api/ai/image',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -110,6 +122,7 @@ export interface FileRoutesByFullPath {
   '/equipe': typeof EquipeRoute
   '/players': typeof PlayersRoute
   '/playlists': typeof PlaylistsRoute
+  '/producao-ia': typeof ProducaoIaRoute
   '/relatorio': typeof RelatorioRoute
   '/reset-password': typeof ResetPasswordRoute
   '/studio': typeof StudioRouteWithChildren
@@ -117,6 +130,7 @@ export interface FileRoutesByFullPath {
   '/invite/$token': typeof InviteTokenRoute
   '/studio/$templateId': typeof StudioTemplateIdRoute
   '/studio/': typeof StudioIndexRoute
+  '/api/ai/image': typeof ApiAiImageRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -127,12 +141,14 @@ export interface FileRoutesByTo {
   '/equipe': typeof EquipeRoute
   '/players': typeof PlayersRoute
   '/playlists': typeof PlaylistsRoute
+  '/producao-ia': typeof ProducaoIaRoute
   '/relatorio': typeof RelatorioRoute
   '/reset-password': typeof ResetPasswordRoute
   '/templates': typeof TemplatesRoute
   '/invite/$token': typeof InviteTokenRoute
   '/studio/$templateId': typeof StudioTemplateIdRoute
   '/studio': typeof StudioIndexRoute
+  '/api/ai/image': typeof ApiAiImageRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -144,6 +160,7 @@ export interface FileRoutesById {
   '/equipe': typeof EquipeRoute
   '/players': typeof PlayersRoute
   '/playlists': typeof PlaylistsRoute
+  '/producao-ia': typeof ProducaoIaRoute
   '/relatorio': typeof RelatorioRoute
   '/reset-password': typeof ResetPasswordRoute
   '/studio': typeof StudioRouteWithChildren
@@ -151,6 +168,7 @@ export interface FileRoutesById {
   '/invite/$token': typeof InviteTokenRoute
   '/studio/$templateId': typeof StudioTemplateIdRoute
   '/studio/': typeof StudioIndexRoute
+  '/api/ai/image': typeof ApiAiImageRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -163,6 +181,7 @@ export interface FileRouteTypes {
     | '/equipe'
     | '/players'
     | '/playlists'
+    | '/producao-ia'
     | '/relatorio'
     | '/reset-password'
     | '/studio'
@@ -170,6 +189,7 @@ export interface FileRouteTypes {
     | '/invite/$token'
     | '/studio/$templateId'
     | '/studio/'
+    | '/api/ai/image'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -180,12 +200,14 @@ export interface FileRouteTypes {
     | '/equipe'
     | '/players'
     | '/playlists'
+    | '/producao-ia'
     | '/relatorio'
     | '/reset-password'
     | '/templates'
     | '/invite/$token'
     | '/studio/$templateId'
     | '/studio'
+    | '/api/ai/image'
   id:
     | '__root__'
     | '/'
@@ -196,6 +218,7 @@ export interface FileRouteTypes {
     | '/equipe'
     | '/players'
     | '/playlists'
+    | '/producao-ia'
     | '/relatorio'
     | '/reset-password'
     | '/studio'
@@ -203,6 +226,7 @@ export interface FileRouteTypes {
     | '/invite/$token'
     | '/studio/$templateId'
     | '/studio/'
+    | '/api/ai/image'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -214,11 +238,13 @@ export interface RootRouteChildren {
   EquipeRoute: typeof EquipeRoute
   PlayersRoute: typeof PlayersRoute
   PlaylistsRoute: typeof PlaylistsRoute
+  ProducaoIaRoute: typeof ProducaoIaRoute
   RelatorioRoute: typeof RelatorioRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
   StudioRoute: typeof StudioRouteWithChildren
   TemplatesRoute: typeof TemplatesRoute
   InviteTokenRoute: typeof InviteTokenRoute
+  ApiAiImageRoute: typeof ApiAiImageRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -279,6 +305,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PlaylistsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/producao-ia': {
+      id: '/producao-ia'
+      path: '/producao-ia'
+      fullPath: '/producao-ia'
+      preLoaderRoute: typeof ProducaoIaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/relatorio': {
       id: '/relatorio'
       path: '/relatorio'
@@ -328,6 +361,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof StudioTemplateIdRouteImport
       parentRoute: typeof StudioRoute
     }
+    '/api/ai/image': {
+      id: '/api/ai/image'
+      path: '/api/ai/image'
+      fullPath: '/api/ai/image'
+      preLoaderRoute: typeof ApiAiImageRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -353,11 +393,13 @@ const rootRouteChildren: RootRouteChildren = {
   EquipeRoute: EquipeRoute,
   PlayersRoute: PlayersRoute,
   PlaylistsRoute: PlaylistsRoute,
+  ProducaoIaRoute: ProducaoIaRoute,
   RelatorioRoute: RelatorioRoute,
   ResetPasswordRoute: ResetPasswordRoute,
   StudioRoute: StudioRouteWithChildren,
   TemplatesRoute: TemplatesRoute,
   InviteTokenRoute: InviteTokenRoute,
+  ApiAiImageRoute: ApiAiImageRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
