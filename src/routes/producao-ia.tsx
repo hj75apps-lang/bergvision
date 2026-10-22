@@ -124,10 +124,13 @@ function ProducaoIaPage() {
         <TabsContent value="marca" className="mt-4">
           <BrandTab />
         </TabsContent>
+        <TabsContent value="modelos" className="mt-4">
+          <ModelsTab />
+        </TabsContent>
         <TabsContent value="config" className="mt-4">
           <ProvidersCard />
         </TabsContent>
-        {TABS.filter((t) => !["visao", "imagem", "ofertas", "dicas", "marca", "config"].includes(t.id)).map((t) => (
+        {TABS.filter((t) => !["visao", "imagem", "ofertas", "dicas", "marca", "modelos", "config"].includes(t.id)).map((t) => (
           <TabsContent key={t.id} value={t.id} className="mt-4">
             <Card className="rounded-2xl border-dashed">
               <CardContent className="flex flex-col items-center gap-2 py-12 text-center">
@@ -683,5 +686,68 @@ function BrandTab() {
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+type ModelPreset = { id: string; category: string; name: string; brief: Partial<ImageBrief> };
+const MODEL_PRESETS: ModelPreset[] = [
+  { id: "farm-oferta", category: "Farmácia", name: "Oferta de vitaminas", brief: { objective: "Oferta", category: "farmácia", theme: "Frascos de vitaminas sobre bancada clara, folhas verdes, sensação de saúde e bem-estar", style: "Fotográfico realista", palette: "verde e branco", aspect: "9:16" } },
+  { id: "farm-dica", category: "Farmácia", name: "Dica de saúde", brief: { objective: "Conteúdo educativo", category: "farmácia", theme: "Copo de água e ícones de saúde, ambiente leve e limpo", style: "Minimalista", palette: "azul claro e branco", aspect: "16:9" } },
+  { id: "acad-matricula", category: "Academia", name: "Matrícula promocional", brief: { objective: "Oferta", category: "academia", theme: "Pessoa treinando com energia em academia moderna, iluminação dramática", style: "Vibrante / varejo", palette: "preto e amarelo", headline: "Matrícula grátis", aspect: "9:16" } },
+  { id: "acad-motiv", category: "Academia", name: "Frase motivacional", brief: { objective: "Campanha de marca", category: "academia", theme: "Halteres em close com fundo escuro e luz lateral", style: "3D moderno", palette: "preto e laranja", aspect: "16:9" } },
+  { id: "rest-prato", category: "Restaurante", name: "Prato do dia", brief: { objective: "Publicidade de produto", category: "restaurante", theme: "Prato executivo apetitoso visto de cima, mesa de madeira, luz natural", style: "Fotográfico realista", palette: "tons quentes", headline: "Prato do dia", aspect: "16:9" } },
+  { id: "rest-combo", category: "Restaurante", name: "Combo lanche", brief: { objective: "Oferta", category: "lanchonete", theme: "Hambúrguer, batata e refrigerante em composição dinâmica com respingos", style: "Vibrante / varejo", palette: "vermelho e amarelo", aspect: "9:16" } },
+  { id: "merc-hort", category: "Supermercado", name: "Feira de hortifrúti", brief: { objective: "Oferta", category: "supermercado", theme: "Frutas e verduras frescas em caixotes, gotas de água", style: "Fotográfico realista", palette: "verde e laranja", headline: "Quarta do hortifrúti", aspect: "16:9" } },
+  { id: "merc-acougue", category: "Supermercado", name: "Açougue", brief: { objective: "Oferta", category: "supermercado", theme: "Cortes de carne nobre em tábua com ervas e sal grosso", style: "Luxo / premium", palette: "vermelho escuro e preto", aspect: "9:16" } },
+  { id: "clin-inst", category: "Clínica", name: "Institucional da clínica", brief: { objective: "Institucional", category: "clínica", theme: "Recepção de clínica moderna, profissional sorridente, ambiente acolhedor", style: "Fotográfico realista", palette: "azul e branco", aspect: "16:9" } },
+  { id: "data-natal", category: "Datas comemorativas", name: "Natal", brief: { objective: "Data comemorativa", theme: "Decoração de Natal elegante com luzes desfocadas e presentes", style: "Luxo / premium", palette: "vermelho, verde e dourado", headline: "Feliz Natal", aspect: "16:9" } },
+  { id: "data-maes", category: "Datas comemorativas", name: "Dia das Mães", brief: { objective: "Data comemorativa", theme: "Flores delicadas e presente com laço, luz suave", style: "Minimalista", palette: "rosa e branco", headline: "Feliz Dia das Mães", aspect: "9:16" } },
+  { id: "serv-agend", category: "Serviços", name: "Agende seu horário", brief: { objective: "Serviço", category: "salão de beleza", theme: "Salão de beleza moderno, cadeira e espelho iluminado", style: "Luxo / premium", palette: "preto e dourado", cta: "Agende pelo WhatsApp", aspect: "9:16" } },
+];
+
+function ModelsTab() {
+  const cats = useMemo(() => ["Todas", ...Array.from(new Set(MODEL_PRESETS.map((m) => m.category)))], []);
+  const [cat, setCat] = useState("Todas");
+  const [sel, setSel] = useState<ModelPreset | null>(null);
+  if (sel) {
+    return (
+      <div className="space-y-3">
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" size="sm" className="rounded-xl" onClick={() => setSel(null)}>
+            ← Voltar aos modelos
+          </Button>
+          <Badge variant="outline" className="rounded-full">{sel.category} · {sel.name}</Badge>
+        </div>
+        <CreateImageTab key={sel.id} title={`Modelo: ${sel.name}`} initial={{ ...sel.brief, project: sel.name }} />
+      </div>
+    );
+  }
+  const list = cat === "Todas" ? MODEL_PRESETS : MODEL_PRESETS.filter((m) => m.category === cat);
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap gap-2">
+        {cats.map((c) => (
+          <Button key={c} size="sm" variant={c === cat ? "default" : "secondary"} className="rounded-full" onClick={() => setCat(c)}>
+            {c}
+          </Button>
+        ))}
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {list.map((m) => (
+          <button
+            key={m.id}
+            onClick={() => setSel(m)}
+            className="flex flex-col gap-2 rounded-2xl border bg-card/60 p-4 text-left transition hover:border-primary/50 hover:bg-card"
+          >
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-sm font-medium">{m.name}</span>
+              <Badge variant="outline" className="rounded-full text-[10px]">{m.brief.aspect}</Badge>
+            </div>
+            <span className="text-xs text-muted-foreground">{m.category} · {m.brief.objective}</span>
+            <span className="line-clamp-2 text-xs text-muted-foreground">{m.brief.theme}</span>
+          </button>
+        ))}
+      </div>
+    </div>
   );
 }
