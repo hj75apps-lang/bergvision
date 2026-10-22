@@ -1,3 +1,4 @@
+import { isPlayerOnline } from "@/lib/player-status";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -69,14 +70,8 @@ type TemplateOpt = {
   is_system: boolean | null;
 };
 
-const HEARTBEAT_OFFLINE_MS = 60_000;
-
 function isOnline(p: Player, nowMs: number): boolean {
-  if (!p.last_heartbeat) return false;
-  const last = new Date(p.last_heartbeat).getTime();
-  if (Number.isNaN(last)) return false;
-  if (nowMs - last > HEARTBEAT_OFFLINE_MS) return false;
-  return (p.status ?? "").toLowerCase() === "online";
+  return isPlayerOnline(p, nowMs);
 }
 
 function formatOrientation(o: string | null | undefined): string {
@@ -120,6 +115,7 @@ function PlayersPage() {
   const playersQ = useQuery({
     queryKey: ["players", orgId],
     enabled: !!orgId,
+    refetchInterval: 30_000,
     queryFn: async (): Promise<Player[]> => {
       const { data, error } = await supabase
         .from("players")

@@ -1,3 +1,4 @@
+import { isPlayerOnline } from "@/lib/player-status";
 import { useEffect, useMemo, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
@@ -62,14 +63,8 @@ type PlaylistRow = {
   created_at: string | null;
 };
 
-const HEARTBEAT_OFFLINE_MS = 60_000;
-
 function isOnline(p: Player, nowMs: number): boolean {
-  if (!p.last_heartbeat) return false;
-  const last = new Date(p.last_heartbeat).getTime();
-  if (Number.isNaN(last)) return false;
-  if (nowMs - last > HEARTBEAT_OFFLINE_MS) return false;
-  return (p.status ?? "").toLowerCase() === "online";
+  return isPlayerOnline(p, nowMs);
 }
 
 function DashboardPage() {
@@ -84,6 +79,7 @@ function DashboardPage() {
 
   const playersQ = useQuery({
     queryKey: ["dashboard-players", orgId],
+    refetchInterval: 30_000,
     enabled: !!orgId,
     queryFn: async (): Promise<Player[]> => {
       const { data, error } = await supabase
