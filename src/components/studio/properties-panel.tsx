@@ -880,6 +880,7 @@ function TickerConfig({
           className="h-8 text-xs"
         />
       </label>
+      <JsonFeedFields config={config} disabled={disabled} setCfg={setCfg} />
 
       <label className="flex flex-col gap-1">
         <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
@@ -1227,6 +1228,7 @@ function LowerThirdsConfig({
           className="h-8 text-xs"
         />
       </label>
+      <JsonFeedFields config={config} disabled={disabled} setCfg={setCfg} />
       <div className="grid grid-cols-2 gap-2">
         <label className="flex flex-col gap-1">
           <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
@@ -3170,6 +3172,7 @@ function WidgetContent({
               className="h-8 text-xs"
             />
           </label>
+          <JsonFeedFields config={config} disabled={disabled} setCfg={setCfg} />
           <NumberField
             label="Itens"
             value={(config.maxItems as number) ?? 5}
