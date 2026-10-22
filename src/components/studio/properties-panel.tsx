@@ -113,19 +113,19 @@ export function PropertiesPanel({
   onEditImage?: () => void;
 }) {
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full min-w-0 flex-col overflow-hidden">
       <div className="border-b border-border/60 px-3 py-2.5">
         <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
           Propriedades
         </h3>
       </div>
-      <ScrollArea className="flex-1">
+      <ScrollArea className="min-h-0 min-w-0 flex-1 [&_[data-radix-scroll-area-viewport]>div]:!block [&_[data-radix-scroll-area-viewport]>div]:!min-w-0 [&_[data-radix-scroll-area-viewport]>div]:w-full">
         {!element ? (
           <p className="p-4 text-xs text-muted-foreground">
             Selecione um elemento para editar suas propriedades.
           </p>
         ) : (
-          <div className="flex flex-col gap-4 p-3">
+          <div className="flex min-w-0 max-w-full flex-col gap-4 overflow-x-hidden p-3 [&_*]:min-w-0 [&_input]:max-w-full [&_button]:max-w-full">
             <div className="text-[11px] uppercase tracking-wider text-muted-foreground">
               {ELEMENT_LABELS[element.element_type]}
             </div>
