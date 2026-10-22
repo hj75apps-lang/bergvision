@@ -879,6 +879,10 @@ function TickerConfig({
           placeholder="https://g1.globo.com/rss/g1/"
           className="h-8 text-xs"
         />
+        <span className="text-[10px] text-muted-foreground">
+          Aceita RSS, API JSON ou GitHub: link do repositório (commits), de
+          /releases, /tags ou de um arquivo .json/.xml do repositório.
+        </span>
       </label>
       <JsonFeedFields config={config} disabled={disabled} setCfg={setCfg} />
 

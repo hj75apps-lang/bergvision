@@ -215,7 +215,23 @@ Deno.serve(async (req) => {
     if (userErr || !userData?.user) return json({ error: "invalid_token" }, 401);
   }
 
-  const url = String(body?.url ?? "").trim();
+  let url = String(body?.url ?? "").trim();
+  // Links do GitHub: arquivo → raw; repositório/releases/commits/tags → Atom.
+  const gh = url.match(/^https?:\/\/(?:www\.)?github\.com\/([^/]+)\/([^/?#]+)(?:\/([^?#]*))?/i);
+  if (gh) {
+    const owner = gh[1];
+    const repo = gh[2].replace(/\.git$/, "");
+    const rest = (gh[3] ?? "").split("/").filter(Boolean);
+    const base = `https://github.com/${owner}/${repo}`;
+    const kind = rest[0];
+    if ((kind === "blob" || kind === "raw") && rest.length >= 3)
+      url = `https://raw.githubusercontent.com/${owner}/${repo}/${rest.slice(1).join("/")}`;
+    else if (!kind) url = `${base}/commits.atom`;
+    else if (kind === "releases") url = `${base}/releases.atom`;
+    else if (kind === "tags") url = `${base}/tags.atom`;
+    else if (kind === "commits" && !rest.join("/").endsWith(".atom"))
+      url = rest.length > 1 ? `${base}/commits/${rest.slice(1).join("/")}.atom` : `${base}/commits.atom`;
+  }
   const max = Math.max(1, Math.min(30, Number(body?.max ?? body?.limit ?? 10) || 10));
 
   let parsed: URL;
