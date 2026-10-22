@@ -30,6 +30,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { ExternalPromptCard } from "@/components/ai-studio/external-prompt-card";
+import { imageDirection, videoInitial, type ModelMode } from "@/lib/ai-studio/model-direction";
 import { buildExternalImagePrompt, buildExternalVideoPrompt } from "@/lib/ai-studio/external-prompt";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -744,23 +745,42 @@ const MODEL_PRESETS: ModelPreset[] = [
 function ModelsTab() {
   const cats = useMemo(() => ["Todas", ...Array.from(new Set(MODEL_PRESETS.map((m) => m.category)))], []);
   const [cat, setCat] = useState("Todas");
+  const [mode, setMode] = useState<ModelMode>("imagem");
   const [sel, setSel] = useState<ModelPreset | null>(null);
+  const modeToggle = (
+    <div className="inline-flex rounded-full border bg-card/60 p-1">
+      {(["imagem", "video"] as const).map((m) => (
+        <Button key={m} size="sm" variant={mode === m ? "default" : "ghost"} className="rounded-full" onClick={() => setMode(m)}>
+          {m === "imagem" ? "Imagem" : "Vídeo"}
+        </Button>
+      ))}
+    </div>
+  );
   if (sel) {
     return (
       <div className="space-y-3">
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Button variant="ghost" size="sm" className="rounded-xl" onClick={() => setSel(null)}>
             ← Voltar aos modelos
           </Button>
           <Badge variant="outline" className="rounded-full">{sel.category} · {sel.name}</Badge>
+          <div className="ml-auto">{modeToggle}</div>
         </div>
-        <CreateImageTab key={sel.id} title={`Modelo: ${sel.name}`} initial={{ ...sel.brief, project: sel.name }} />
+        {mode === "imagem" ? (
+          <CreateImageTab key={`${sel.id}-img`} title={`Modelo: ${sel.name}`} initial={{ ...sel.brief, project: sel.name }} extraPrompt={imageDirection(sel.brief)} />
+        ) : (
+          <CreateVideoTab key={`${sel.id}-vid`} initial={videoInitial(sel.brief)} />
+        )}
       </div>
     );
   }
   const list = cat === "Todas" ? MODEL_PRESETS : MODEL_PRESETS.filter((m) => m.category === cat);
   return (
     <div className="space-y-4">
+      <div className="flex flex-wrap items-center gap-3">
+        <span className="text-sm text-muted-foreground">Gerar como:</span>
+        {modeToggle}
+      </div>
       <div className="flex flex-wrap gap-2">
         {cats.map((c) => (
           <Button key={c} size="sm" variant={c === cat ? "default" : "secondary"} className="rounded-full" onClick={() => setCat(c)}>
@@ -790,16 +810,18 @@ function ModelsTab() {
 
 const VIDEO_STYLES = ["Cinematográfico", "Comercial de produto", "Institucional", "Animação 3D", "Câmera lenta elegante", "Vibrante / varejo"];
 
-function CreateVideoTab() {
+type VideoInitial = { scene?: string; style?: string; camera?: string; aspect?: string };
+
+function CreateVideoTab({ initial }: { initial?: VideoInitial } = {}) {
   const { membership, user } = useAuth();
   const providers = useProviders();
   const canCreate = membership?.role !== "viewer";
   const kit = useBrandKit(membership?.organization_id);
   const [model, setModel] = useState<VeoModel>("veo-3.1");
-  const [scene, setScene] = useState("");
-  const [style, setStyle] = useState(VIDEO_STYLES[0]);
-  const [camera, setCamera] = useState("");
-  const [aspect, setAspect] = useState("16:9");
+  const [scene, setScene] = useState(initial?.scene ?? "");
+  const [style, setStyle] = useState(initial?.style ?? VIDEO_STYLES[0]);
+  const [camera, setCamera] = useState(initial?.camera ?? "");
+  const [aspect, setAspect] = useState(initial?.aspect ?? "16:9");
   const [duration, setDuration] = useState("8");
   const [resolution, setResolution] = useState("720p");
   const [negative, setNegative] = useState("texto ilegível, marcas d'água, distorções");
