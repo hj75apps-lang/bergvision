@@ -17,6 +17,7 @@ import { Route as ConfiguracoesRouteImport } from './routes/configuracoes'
 import { Route as EquipeRouteImport } from './routes/equipe'
 import { Route as PlayersRouteImport } from './routes/players'
 import { Route as PlaylistsRouteImport } from './routes/playlists'
+import { Route as ProducaoIaRouteImport } from './routes/producao-ia'
 import { Route as RelatorioRouteImport } from './routes/relatorio'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as StudioRouteImport } from './routes/studio'
@@ -64,6 +65,11 @@ const PlayersRoute = PlayersRouteImport.update({
 const PlaylistsRoute = PlaylistsRouteImport.update({
   id: '/playlists',
   path: '/playlists',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProducaoIaRoute = ProducaoIaRouteImport.update({
+  id: '/producao-ia',
+  path: '/producao-ia',
   getParentRoute: () => rootRouteImport,
 } as any)
 const RelatorioRoute = RelatorioRouteImport.update({
@@ -116,6 +122,7 @@ export interface FileRoutesByFullPath {
   '/equipe': typeof EquipeRoute
   '/players': typeof PlayersRoute
   '/playlists': typeof PlaylistsRoute
+  '/producao-ia': typeof ProducaoIaRoute
   '/relatorio': typeof RelatorioRoute
   '/reset-password': typeof ResetPasswordRoute
   '/studio': typeof StudioRouteWithChildren
@@ -134,6 +141,7 @@ export interface FileRoutesByTo {
   '/equipe': typeof EquipeRoute
   '/players': typeof PlayersRoute
   '/playlists': typeof PlaylistsRoute
+  '/producao-ia': typeof ProducaoIaRoute
   '/relatorio': typeof RelatorioRoute
   '/reset-password': typeof ResetPasswordRoute
   '/templates': typeof TemplatesRoute
@@ -152,6 +160,7 @@ export interface FileRoutesById {
   '/equipe': typeof EquipeRoute
   '/players': typeof PlayersRoute
   '/playlists': typeof PlaylistsRoute
+  '/producao-ia': typeof ProducaoIaRoute
   '/relatorio': typeof RelatorioRoute
   '/reset-password': typeof ResetPasswordRoute
   '/studio': typeof StudioRouteWithChildren
@@ -172,6 +181,7 @@ export interface FileRouteTypes {
     | '/equipe'
     | '/players'
     | '/playlists'
+    | '/producao-ia'
     | '/relatorio'
     | '/reset-password'
     | '/studio'
@@ -190,6 +200,7 @@ export interface FileRouteTypes {
     | '/equipe'
     | '/players'
     | '/playlists'
+    | '/producao-ia'
     | '/relatorio'
     | '/reset-password'
     | '/templates'
@@ -207,6 +218,7 @@ export interface FileRouteTypes {
     | '/equipe'
     | '/players'
     | '/playlists'
+    | '/producao-ia'
     | '/relatorio'
     | '/reset-password'
     | '/studio'
@@ -226,6 +238,7 @@ export interface RootRouteChildren {
   EquipeRoute: typeof EquipeRoute
   PlayersRoute: typeof PlayersRoute
   PlaylistsRoute: typeof PlaylistsRoute
+  ProducaoIaRoute: typeof ProducaoIaRoute
   RelatorioRoute: typeof RelatorioRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
   StudioRoute: typeof StudioRouteWithChildren
@@ -290,6 +303,13 @@ declare module '@tanstack/react-router' {
       path: '/playlists'
       fullPath: '/playlists'
       preLoaderRoute: typeof PlaylistsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/producao-ia': {
+      id: '/producao-ia'
+      path: '/producao-ia'
+      fullPath: '/producao-ia'
+      preLoaderRoute: typeof ProducaoIaRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/relatorio': {
@@ -373,6 +393,7 @@ const rootRouteChildren: RootRouteChildren = {
   EquipeRoute: EquipeRoute,
   PlayersRoute: PlayersRoute,
   PlaylistsRoute: PlaylistsRoute,
+  ProducaoIaRoute: ProducaoIaRoute,
   RelatorioRoute: RelatorioRoute,
   ResetPasswordRoute: ResetPasswordRoute,
   StudioRoute: StudioRouteWithChildren,
