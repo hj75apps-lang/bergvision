@@ -880,6 +880,7 @@ function TickerConfig({
           className="h-8 text-xs"
         />
       </label>
+      <JsonFeedFields config={config} disabled={disabled} setCfg={setCfg} />
 
       <label className="flex flex-col gap-1">
         <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
@@ -1227,6 +1228,7 @@ function LowerThirdsConfig({
           className="h-8 text-xs"
         />
       </label>
+      <JsonFeedFields config={config} disabled={disabled} setCfg={setCfg} />
       <div className="grid grid-cols-2 gap-2">
         <label className="flex flex-col gap-1">
           <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
@@ -3170,6 +3172,7 @@ function WidgetContent({
               className="h-8 text-xs"
             />
           </label>
+          <JsonFeedFields config={config} disabled={disabled} setCfg={setCfg} />
           <NumberField
             label="Itens"
             value={(config.maxItems as number) ?? 5}
@@ -3915,5 +3918,55 @@ function WeatherCitiesEditor({
         </label>
       )}
     </div>
+  );
+}
+
+/* ---------- Feed por API JSON (opcional) ---------- */
+
+function JsonFeedFields({
+  config,
+  disabled,
+  setCfg,
+}: {
+  config: Record<string, unknown>;
+  disabled?: boolean;
+  setCfg: (patch: Record<string, unknown>) => void;
+}) {
+  const field = (key: string, label: string, placeholder: string) => (
+    <label className="flex flex-col gap-1">
+      <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+        {label}
+      </span>
+      <Input
+        value={(config[key] as string) ?? ""}
+        disabled={disabled}
+        maxLength={300}
+        onChange={(e) => setCfg({ [key]: e.target.value })}
+        placeholder={placeholder}
+        className="h-8 text-xs"
+      />
+    </label>
+  );
+  return (
+    <details className="rounded-lg border border-border/60 bg-muted/20 p-2">
+      <summary className="cursor-pointer text-[11px] font-medium text-muted-foreground">
+        API JSON (opcional)
+      </summary>
+      <div className="mt-2 flex flex-col gap-2">
+        <p className="text-[10px] leading-snug text-muted-foreground">
+          O endereço acima também aceita APIs que devolvem JSON (ex.: resultados de
+          loterias). Sem preencher nada, os campos são detectados sozinhos. Use os
+          campos abaixo para escolher o que mostrar; use {"{campo}"} para montar o texto.
+        </p>
+        {field("jsonItemsPath", "Caminho da lista", "ex.: data.items (vazio = automático)")}
+        {field(
+          "jsonTitleTemplate",
+          "Texto de cada item",
+          "ex.: Concurso {numero}: {listaDezenas}",
+        )}
+        {field("jsonImageField", "Campo da imagem", "ex.: image.url")}
+        {field("jsonDateField", "Campo da data", "ex.: dataApuracao")}
+      </div>
+    </details>
   );
 }

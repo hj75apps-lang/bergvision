@@ -1,3 +1,4 @@
+import { feedRequestBody, feedKey } from "@/lib/studio/feed-request";
 import {
   isVideoEmbedHost,
   needsVimeoOEmbed,
@@ -1185,13 +1186,13 @@ function RssWidget({ config }: { config: Record<string, unknown> }) {
   const speed = Math.max(5, Math.min(180, (config.speed as number) ?? 40));
   const separator = (config.separator as string) ?? "  •  ";
   const q = useQuery({
-    queryKey: ["widget-rss", url, max],
+    queryKey: ["widget-rss", url, max, feedKey(config)],
     enabled: url.length > 0,
     staleTime: 5 * 60 * 1000,
     refetchInterval: 10 * 60 * 1000,
     queryFn: async () => {
       const { data, error } = await supabase.functions.invoke("widget-rss", {
-        body: { url, max },
+        body: feedRequestBody(config, url, max),
       });
       if (error) throw error;
       return data as {
@@ -1829,13 +1830,13 @@ function TickerWidget({ config }: { config: Record<string, unknown> }) {
     ((config.badgeText as string) || preset.badgeText || "BREAKING").slice(0, 24);
 
   const q = useQuery({
-    queryKey: ["widget-ticker", url, max],
+    queryKey: ["widget-ticker", url, max, feedKey(config)],
     enabled: url.length > 0,
     staleTime: 5 * 60 * 1000,
     refetchInterval: 10 * 60 * 1000,
     queryFn: async () => {
       const { data, error } = await supabase.functions.invoke("widget-rss", {
-        body: { url, max },
+        body: feedRequestBody(config, url, max),
       });
       if (error) throw error;
       return data as { items: { title: string }[] };
@@ -2375,13 +2376,13 @@ function LowerThirdsWidget({ config }: { config: Record<string, unknown> }) {
   const titlePrefix = ((config.titlePrefix as string) ?? "").slice(0, 40);
 
   const rssQ = useQuery({
-    queryKey: ["widget-lowerthirds-rss", feedUrl, maxItems],
+    queryKey: ["widget-lowerthirds-rss", feedUrl, maxItems, feedKey(config)],
     enabled: feedUrl.length > 0,
     staleTime: 5 * 60 * 1000,
     refetchInterval: 10 * 60 * 1000,
     queryFn: async () => {
       const { data, error } = await supabase.functions.invoke("widget-rss", {
-        body: { url: feedUrl, max: maxItems },
+        body: feedRequestBody(config, feedUrl, maxItems),
       });
       if (error) throw error;
       return data as { items: { title: string; pubDate?: string }[] };
