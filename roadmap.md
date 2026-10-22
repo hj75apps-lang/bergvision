@@ -1,6 +1,6 @@
 # Produção Visual com IA
 - [x] Etapa 1: página com 9 abas + Criar imagem (OpenAI/Gemini) + salvar na Biblioteca
-- [ ] Etapa 2: Criar vídeo (Runway, tarefa assíncrona) — aguarda chave RUNWAY_API_KEY
+- [x] Etapa 2: Criar vídeo (Google Veo via chave Gemini)
 - [x] Etapa 3: Ofertas e promoções
 - [x] Etapa 4: Dicas e conteúdo
 - [x] Etapa 5: Marca e contatos

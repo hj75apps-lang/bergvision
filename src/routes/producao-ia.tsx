@@ -41,7 +41,10 @@ import {
   fetchProviderStatus,
   fileToDataUrl,
   generateImage,
+  generateVideo,
   saveImageToLibrary,
+  saveVideoToLibrary,
+  type VeoModel,
   type AiProvider,
 } from "@/lib/ai-studio/api";
 import { buildImagePrompt, type ImageBrief } from "@/lib/ai-studio/prompt";
@@ -115,6 +118,9 @@ function ProducaoIaPage() {
         <TabsContent value="imagem" className="mt-4">
           <CreateImageTab />
         </TabsContent>
+        <TabsContent value="video" className="mt-4">
+          <CreateVideoTab />
+        </TabsContent>
         <TabsContent value="ofertas" className="mt-4">
           <OffersTab />
         </TabsContent>
@@ -130,7 +136,7 @@ function ProducaoIaPage() {
         <TabsContent value="config" className="mt-4">
           <ProvidersCard />
         </TabsContent>
-        {TABS.filter((t) => !["visao", "imagem", "ofertas", "dicas", "marca", "modelos", "config"].includes(t.id)).map((t) => (
+        {TABS.filter((t) => !["visao", "imagem", "video", "ofertas", "dicas", "marca", "modelos", "config"].includes(t.id)).map((t) => (
           <TabsContent key={t.id} value={t.id} className="mt-4">
             <Card className="rounded-2xl border-dashed">
               <CardContent className="flex flex-col items-center gap-2 py-12 text-center">
@@ -150,10 +156,10 @@ function ProducaoIaPage() {
 
 function ProvidersCard() {
   const q = useProviders();
-  const rows: { key: "openai" | "gemini" | "runway"; label: string; use: string }[] = [
+  const rows: { key: "openai" | "gemini"; label: string; use: string }[] = [
     { key: "openai", label: "OpenAI", use: "Imagens" },
-    { key: "gemini", label: "Google Gemini", use: "Imagens" },
-    { key: "runway", label: "Runway", use: "Vídeos" },
+    { key: "gemini", label: "Google Gemini", use: "Imagens e vídeos (Veo)" },
+
   ];
   return (
     <Card className="rounded-2xl">
@@ -773,6 +779,188 @@ function ModelsTab() {
           </button>
         ))}
       </div>
+    </div>
+  );
+}
+
+const VIDEO_STYLES = ["Cinematográfico", "Comercial de produto", "Institucional", "Animação 3D", "Câmera lenta elegante", "Vibrante / varejo"];
+
+function CreateVideoTab() {
+  const { membership, user } = useAuth();
+  const providers = useProviders();
+  const canCreate = membership?.role !== "viewer";
+  const kit = useBrandKit(membership?.organization_id);
+  const [model, setModel] = useState<VeoModel>("veo-3.1");
+  const [scene, setScene] = useState("");
+  const [style, setStyle] = useState(VIDEO_STYLES[0]);
+  const [camera, setCamera] = useState("");
+  const [aspect, setAspect] = useState("16:9");
+  const [duration, setDuration] = useState("8");
+  const [resolution, setResolution] = useState("720p");
+  const [negative, setNegative] = useState("texto ilegível, marcas d'água, distorções");
+  const [image, setImage] = useState<{ name: string; url: string } | null>(null);
+  const [prompt, setPrompt] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [elapsed, setElapsed] = useState(0);
+  const [saving, setSaving] = useState(false);
+  const [result, setResult] = useState<{ blob: Blob; url: string } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => () => { if (result) URL.revokeObjectURL(result.url); }, [result]);
+
+  const autoPrompt = [
+    scene.trim(),
+    `Estilo: ${style}.`,
+    camera.trim() ? `Movimento de câmera: ${camera.trim()}.` : "",
+    kit?.colors ? `Paleta de cores da marca: ${kit.colors}.` : "",
+    `Vídeo para tela de mídia indoor em formato ${aspect === "9:16" ? "vertical" : "horizontal"}, alta qualidade, iluminação profissional.`,
+  ].filter(Boolean).join(" ");
+  const finalPrompt = prompt ?? autoPrompt;
+  const ready = providers.data ? providers.data.gemini : true;
+
+  const generate = async () => {
+    if (!scene.trim() && prompt === null) { toast.error("Descreva a cena do vídeo."); return; }
+    setBusy(true); setError(null); setElapsed(0);
+    try {
+      const blob = await generateVideo(
+        { model, prompt: finalPrompt, negativePrompt: negative, aspect, duration: Number(duration), resolution, image: image?.url },
+        setElapsed,
+      );
+      setResult({ blob, url: URL.createObjectURL(blob) });
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const save = async () => {
+    if (!result || !membership?.organization_id) return;
+    setSaving(true);
+    try {
+      await saveVideoToLibrary({ blob: result.blob, name: scene.trim().slice(0, 40) || "Vídeo IA", orgId: membership.organization_id, userId: user?.id ?? null });
+      toast.success("Vídeo salvo na Biblioteca, pasta \"Criações IA\".");
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="grid gap-4 lg:grid-cols-2">
+      <Card className="rounded-2xl">
+        <CardHeader>
+          <CardTitle className="text-base">Briefing do vídeo</CardTitle>
+          <CardDescription>Gerado pelo Google Veo, com a sua chave do Gemini.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {!ready && <p className="rounded-xl border border-destructive/40 p-3 text-sm text-destructive">A chave do Google Gemini não está configurada.</p>}
+          <div className="space-y-1.5">
+            <Label>Modelo</Label>
+            <Select value={model} onValueChange={(v) => setModel(v as VeoModel)}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="veo-3.1">Veo 3.1 (melhor qualidade)</SelectItem>
+                <SelectItem value="veo-3.1-fast">Veo 3.1 Fast (mais rápido e barato)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1.5">
+            <Label>Cena</Label>
+            <Textarea rows={4} value={scene} onChange={(e) => setScene(e.target.value)} placeholder="Ex.: xícara de café fumegante sobre balcão de padaria, luz da manhã" />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label>Estilo</Label>
+              <Select value={style} onValueChange={setStyle}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>{VIDEO_STYLES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Formato</Label>
+              <Select value={aspect} onValueChange={setAspect}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="16:9">16:9 horizontal</SelectItem>
+                  <SelectItem value="9:16">9:16 vertical</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Duração</Label>
+              <Select value={duration} onValueChange={(v) => { setDuration(v); if (v !== "8") setResolution("720p"); }}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>{["4", "6", "8"].map((d) => <SelectItem key={d} value={d}>{d} segundos</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Resolução</Label>
+              <Select value={resolution} onValueChange={setResolution}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="720p">720p</SelectItem>
+                  <SelectItem value="1080p" disabled={duration !== "8"}>1080p (só 8 s)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <Field label="Movimento de câmera" value={camera} onChange={setCamera} placeholder="Ex.: aproximação lenta, giro suave" />
+          <Field label="Evitar no vídeo" value={negative} onChange={setNegative} />
+          <div className="space-y-1.5">
+            <Label>Imagem inicial (opcional)</Label>
+            {image ? (
+              <div className="flex items-center gap-2 rounded-xl border p-2">
+                <img src={image.url} alt="" className="h-12 w-12 rounded-lg object-cover" />
+                <span className="flex-1 truncate text-xs">{image.name}</span>
+                <Button size="icon" variant="ghost" onClick={() => setImage(null)}><X className="h-4 w-4" /></Button>
+              </div>
+            ) : (
+              <Input type="file" accept="image/png,image/jpeg,image/webp" onChange={async (e) => {
+                const f = e.target.files?.[0];
+                if (f) setImage({ name: f.name, url: await fileToDataUrl(f) });
+              }} />
+            )}
+          </div>
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between">
+              <Label>Instruções para a IA</Label>
+              {prompt !== null && <Button size="sm" variant="ghost" onClick={() => setPrompt(null)}>Restaurar automático</Button>}
+            </div>
+            <Textarea rows={5} value={finalPrompt} onChange={(e) => setPrompt(e.target.value)} />
+          </div>
+          <Button className="w-full rounded-xl" disabled={!canCreate || busy || !ready} onClick={generate}>
+            {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
+            {busy ? `Gerando… ${elapsed}s` : "Gerar vídeo"}
+          </Button>
+          {!canCreate && <p className="text-xs text-muted-foreground">Seu perfil é somente leitura.</p>}
+        </CardContent>
+      </Card>
+
+      <Card className="rounded-2xl">
+        <CardHeader>
+          <CardTitle className="text-base">Resultado</CardTitle>
+          <CardDescription>A geração costuma levar de 1 a 6 minutos. Mantenha esta página aberta.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {error && <p className="rounded-xl border border-destructive/40 p-3 text-sm text-destructive">{error}</p>}
+          {busy && <div className="flex aspect-video items-center justify-center rounded-xl border border-dashed"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>}
+          {!busy && result && (
+            <>
+              <video src={result.url} controls autoPlay loop muted playsInline className="w-full rounded-xl bg-background" />
+              <div className="flex flex-wrap gap-2">
+                <Button variant="outline" className="rounded-xl" onClick={generate}><RefreshCw className="mr-2 h-4 w-4" />Gerar de novo</Button>
+                <Button variant="outline" className="rounded-xl" asChild><a href={result.url} download="video-ia.mp4"><Download className="mr-2 h-4 w-4" />Baixar</a></Button>
+                <Button className="rounded-xl" disabled={saving || !canCreate} onClick={save}>
+                  {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}Salvar
+                </Button>
+              </div>
+            </>
+          )}
+          {!busy && !result && !error && <p className="text-sm text-muted-foreground">O vídeo aparece aqui.</p>}
+        </CardContent>
+      </Card>
     </div>
   );
 }
