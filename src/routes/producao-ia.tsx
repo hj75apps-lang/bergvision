@@ -118,10 +118,13 @@ function ProducaoIaPage() {
         <TabsContent value="ofertas" className="mt-4">
           <OffersTab />
         </TabsContent>
+        <TabsContent value="dicas" className="mt-4">
+          <TipsTab />
+        </TabsContent>
         <TabsContent value="config" className="mt-4">
           <ProvidersCard />
         </TabsContent>
-        {TABS.filter((t) => !["visao", "imagem", "ofertas", "config"].includes(t.id)).map((t) => (
+        {TABS.filter((t) => !["visao", "imagem", "ofertas", "dicas", "config"].includes(t.id)).map((t) => (
           <TabsContent key={t.id} value={t.id} className="mt-4">
             <Card className="rounded-2xl border-dashed">
               <CardContent className="flex flex-col items-center gap-2 py-12 text-center">
@@ -524,6 +527,48 @@ function OffersTab() {
           <Field label="Validade" value={o.validity} onChange={set("validity")} placeholder="Ex.: até 31/10" />
           <div className="sm:col-span-2">
             <Field label="Condições" value={o.conditions} onChange={set("conditions")} placeholder="Ex.: enquanto durarem os estoques" />
+          </div>
+          <div className="border-t sm:col-span-2" />
+        </>
+      }
+    />
+  );
+}
+
+const TIP_FORMATS = ["Dica rápida", "Passo a passo", "Você sabia?", "Curiosidade", "Lista de cuidados", "Data comemorativa", "Aviso ao público"];
+
+function TipsTab() {
+  const [t, setT] = useState({ format: TIP_FORMATS[0], subject: "", title: "", points: "", source: "" });
+  const set = (k: keyof typeof t) => (v: string) => setT((x) => ({ ...x, [k]: v }));
+  const extraPrompt = useMemo(() => {
+    const l = ["Peça de CONTEÚDO EDUCATIVO para mídia indoor: visual limpo, informativo, poucos textos, grandes e legíveis de longe. Sem aparência de anúncio de preço."];
+    l.push(`Formato: ${t.format}.`);
+    if (t.subject) l.push(`Assunto: ${t.subject}.`);
+    if (t.title) l.push(`Título em destaque: "${t.title}".`);
+    const pts = t.points.split("\n").map((x) => x.trim()).filter(Boolean).slice(0, 5);
+    if (pts.length) l.push(`Tópicos curtos, com ícones simples, nesta ordem: ${pts.map((x, i) => `${i + 1}) "${x}"`).join("; ")}.`);
+    if (t.source) l.push(`Rodapé discreto: "${t.source}".`);
+    return l.join("\n");
+  }, [t]);
+  return (
+    <CreateImageTab
+      title="Briefing do conteúdo"
+      initial={{ objective: "Conteúdo educativo", style: "Minimalista" }}
+      extraPrompt={extraPrompt}
+      validate={() => (!t.subject.trim() ? "Informe o assunto da dica." : null)}
+      extraFields={
+        <>
+          <Pick label="Formato" value={t.format} options={TIP_FORMATS} onChange={set("format")} />
+          <Field label="Assunto *" value={t.subject} onChange={set("subject")} placeholder="Ex.: hidratação no calor" />
+          <div className="sm:col-span-2">
+            <Field label="Título" value={t.title} onChange={set("title")} placeholder="Ex.: Beba água a cada hora" />
+          </div>
+          <div className="sm:col-span-2">
+            <Label className="text-xs">Tópicos (um por linha, até 5)</Label>
+            <Textarea className="mt-1" rows={3} value={t.points} onChange={(e) => set("points")(e.target.value)} />
+          </div>
+          <div className="sm:col-span-2">
+            <Field label="Fonte ou rodapé" value={t.source} onChange={set("source")} placeholder="Ex.: Fonte: Ministério da Saúde" />
           </div>
           <div className="border-t sm:col-span-2" />
         </>
