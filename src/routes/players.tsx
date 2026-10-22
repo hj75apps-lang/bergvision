@@ -2,7 +2,8 @@ import { isPlayerOnline } from "@/lib/player-status";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { ChevronRight, Loader2, MonitorPlay, Plus } from "lucide-react";
+import { ChevronRight, KeyRound, Loader2, MonitorPlay, Pause, Play, Plus } from "lucide-react";
+import { getPausedLinks, pausePlayer, resetPairing, resumePlayer } from "@/lib/player-remote";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -290,6 +291,45 @@ function PlayerCard({
   const [detailOpen, setDetailOpen] = useState(false);
   const currentTpl = templates.find((t) => t.id === player.current_template_id);
   const lastLabel = formatRelative(player.last_heartbeat);
+  const [paused, setPaused] = useState(false);
+  const [busy, setBusy] = useState<null | "pause" | "code">(null);
+
+  useEffect(() => {
+    setPaused(getPausedLinks(player.id) !== null);
+  }, [player.id]);
+
+  const togglePause = async () => {
+    setBusy("pause");
+    try {
+      if (paused) {
+        await resumePlayer(player.id, player.organization_id);
+        setPaused(false);
+        toast.success(`${player.name} voltou a exibir as playlists.`);
+      } else {
+        await pausePlayer(player.id);
+        setPaused(true);
+        toast.success(`${player.name} foi pausado.`);
+      }
+      onChanged();
+    } catch (err) {
+      toast.error("Não foi possível: " + (err instanceof Error ? err.message : String(err)));
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const newCode = async () => {
+    if (!window.confirm(`Gerar novo código para "${player.name}"? A tela será desconectada e mostrará um novo PIN para parear de novo.`)) return;
+    setBusy("code");
+    try {
+      await resetPairing(player.id);
+      toast.success("Tela desconectada. Digite o novo PIN em \"Novo Player\".");
+      onChanged();
+    } catch (err) {
+      toast.error("Não foi possível: " + (err instanceof Error ? err.message : String(err)));
+      setBusy(null);
+    }
+  };
 
   return (
     <>
@@ -352,6 +392,49 @@ function PlayerCard({
             </div>
             <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
           </div>
+          {canManage && (
+            <div
+              className="col-span-2 grid grid-cols-2 gap-2"
+              onClick={(e) => e.stopPropagation()}
+              onKeyDown={(e) => e.stopPropagation()}
+            >
+              <Button
+                size="sm"
+                variant={paused ? "default" : "secondary"}
+                className="rounded-xl"
+                disabled={busy !== null}
+                onClick={togglePause}
+              >
+                {busy === "pause" ? (
+                  <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                ) : paused ? (
+                  <Play className="mr-1.5 h-3.5 w-3.5" />
+                ) : (
+                  <Pause className="mr-1.5 h-3.5 w-3.5" />
+                )}
+                {paused ? "Iniciar" : "Pausar"}
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="rounded-xl"
+                disabled={busy !== null}
+                onClick={newCode}
+              >
+                {busy === "code" ? (
+                  <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <KeyRound className="mr-1.5 h-3.5 w-3.5" />
+                )}
+                Novo código
+              </Button>
+            </div>
+          )}
+          {paused && (
+            <div className="col-span-2 rounded-lg bg-warning/15 px-2 py-1 text-center text-[11px] text-warning">
+              Pausado — a tela mostra o aviso de pausa
+            </div>
+          )}
         </CardContent>
       </Card>
       <PlayerDetailSheet
