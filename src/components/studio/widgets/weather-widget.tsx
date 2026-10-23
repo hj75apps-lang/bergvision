@@ -18,6 +18,7 @@ type WeatherData = {
   description: string;
   city: string;
   country: string;
+  state: string;
   forecast: { date: string; max: number; min: number; code: number }[];
 };
 
@@ -332,6 +333,7 @@ export function WeatherWidget({ config }: { config: Record<string, unknown> }) {
     description: typeof raw.description === "string" ? raw.description : "—",
     city: typeof raw.city === "string" ? raw.city : cities[Math.min(index, cities.length - 1)] ?? "",
     country: typeof raw.country === "string" ? raw.country : "",
+    state: typeof raw.state === "string" ? raw.state : "",
     forecast: Array.isArray(raw.forecast) ? (raw.forecast as WeatherData["forecast"]) : [],
   };
   const t = themeStyle(theme, d.code, d.isDay, accentColor);
@@ -455,7 +457,7 @@ function PresetComplete({
             className="truncate"
           >
             {d.city}
-            {d.country ? `, ${d.country}` : ""}
+            {d.state ? ` - ${d.state}` : d.country ? `, ${d.country}` : ""}
           </span>
           <span
             style={{ fontSize: "6cqh", opacity: 0.7, marginTop: "0.5cqh", color: tc.description }}

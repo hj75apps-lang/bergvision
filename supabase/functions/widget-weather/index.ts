@@ -56,6 +56,27 @@ const WMO: Record<number, string> = {
   99: "Trovoadas com granizo forte",
 };
 
+// Nome do estado brasileiro → sigla (UF)
+const UF: Record<string, string> = {
+  "acre": "AC", "alagoas": "AL", "amapa": "AP", "amazonas": "AM", "bahia": "BA",
+  "ceara": "CE", "distrito federal": "DF", "espirito santo": "ES", "goias": "GO",
+  "maranhao": "MA", "mato grosso": "MT", "mato grosso do sul": "MS",
+  "minas gerais": "MG", "para": "PA", "paraiba": "PB", "parana": "PR",
+  "pernambuco": "PE", "piaui": "PI", "rio de janeiro": "RJ",
+  "rio grande do norte": "RN", "rio grande do sul": "RS", "rondonia": "RO",
+  "roraima": "RR", "santa catarina": "SC", "sao paulo": "SP", "sergipe": "SE",
+  "tocantins": "TO",
+};
+const norm = (s: string) =>
+  s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+function stateAbbr(name: unknown, isoCode?: unknown): string {
+  const m = String(isoCode ?? "").trim().match(/^[A-Z]{2}-([A-Z0-9]{1,3})$/);
+  if (m) return m[1];
+  const n = String(name ?? "").trim();
+  if (!n) return "";
+  return UF[norm(n.replace(/^estado d[eoa]s?\s+/i, ""))] ?? n;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS")
     return new Response(null, { status: 204, headers: CORS });
@@ -96,7 +117,11 @@ Deno.serve(async (req) => {
     if (userErr || !userData?.user) return json({ error: "invalid_token" }, 401);
   }
 
-  const city = String(body?.city ?? "").trim().slice(0, 120);
+  const rawCity = String(body?.city ?? "").trim().slice(0, 120);
+  // Aceita "Cidade - UF" ou "Cidade, UF": separa a sigla para desambiguar.
+  const ufMatch = rawCity.match(/^(.*?)\s*[-,/]\s*([A-Za-z]{2})$/);
+  const city = ufMatch ? ufMatch[1].trim() : rawCity;
+  const wantUf = ufMatch ? ufMatch[2].toUpperCase() : "";
   const units = body?.units === "imperial" ? "imperial" : "metric";
   const latIn = body?.latitude == null ? NaN : Number(body.latitude);
   const lonIn = body?.longitude == null ? NaN : Number(body.longitude);
@@ -142,7 +167,11 @@ Deno.serve(async (req) => {
       if (r.ok) {
         const j = await r.json();
         const name = String(j?.city || j?.locality || "").trim();
-        if (name) return { name, country: String(j?.countryCode ?? "") };
+        if (name) return {
+          name,
+          country: String(j?.countryCode ?? ""),
+          state: stateAbbr(j?.principalSubdivision, j?.principalSubdivisionCode),
+        };
       }
     } catch { /* fallback */ }
     try {
@@ -159,29 +188,39 @@ Deno.serve(async (req) => {
         const j = await r.json();
         const a = j?.address ?? {};
         const name = String(a.city || a.town || a.village || a.municipality || a.county || "").trim();
-        if (name) return { name, country: String(a.country_code ?? "").toUpperCase() };
+        if (name) return {
+          name,
+          country: String(a.country_code ?? "").toUpperCase(),
+          state: stateAbbr(a.state, a["ISO3166-2-lvl4"]),
+        };
       }
     } catch { /* fallback */ }
-    return { name: `${lat.toFixed(3)}, ${lon.toFixed(3)}`, country: "" };
+    return { name: `${lat.toFixed(3)}, ${lon.toFixed(3)}`, country: "", state: "" };
   }
 
   try {
-    let place: any = { latitude: latIn, longitude: lonIn, name: city, country_code: "" };
+    let place: any = { latitude: latIn, longitude: lonIn, name: city, country_code: "", state: "" };
     if (!hasCoords) {
       const geoUrl = new URL("https://geocoding-api.open-meteo.com/v1/search");
       geoUrl.searchParams.set("name", city);
-      geoUrl.searchParams.set("count", "1");
+      geoUrl.searchParams.set("count", "10");
       geoUrl.searchParams.set("language", "pt");
       geoUrl.searchParams.set("format", "json");
       const geoRes = await timed(geoUrl, 8000);
       if (!geoRes.ok) return json({ error: "geocoding_failed" }, 502);
       const geo = await geoRes.json();
-      place = geo?.results?.[0];
+      const results: any[] = Array.isArray(geo?.results) ? geo.results : [];
+      place =
+        (wantUf && results.find((r) => stateAbbr(r?.admin1) === wantUf)) ||
+        results.find((r) => r?.country_code === "BR") ||
+        results[0];
       if (!place) return json({ error: "city_not_found" }, 404);
+      place.state = stateAbbr(place.admin1);
     } else if (!city) {
       const rg = await reverseGeocode(latIn, lonIn);
       place.name = rg.name;
       place.country_code = rg.country;
+      place.state = rg.state;
     }
 
     const unit = units === "imperial" ? "fahrenheit" : "celsius";
@@ -267,6 +306,7 @@ Deno.serve(async (req) => {
         description: WMO[code] ?? "—",
         city: place.name,
         country: place.country_code ?? place.country ?? "",
+        state: place.state ?? "",
         forecast: days,
         hourly: hours,
       },
