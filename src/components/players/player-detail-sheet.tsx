@@ -36,6 +36,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { PreviewPanel } from "@/components/preview/preview-panel";
+import { PlayerDiagnostics } from "@/components/players/player-diagnostics";
 
 type Player = {
   id: string;
@@ -495,6 +496,13 @@ export function PlayerDetailSheet({
               </div>
             )}
           </section>
+
+          <PlayerDiagnostics
+            playerId={player.id}
+            organizationId={player.organization_id}
+            canCommand={canManage}
+            open={open}
+          />
         </div>
 
         <SheetFooter className="flex-row items-center justify-between gap-2 border-t border-border/60 px-6 py-4">
