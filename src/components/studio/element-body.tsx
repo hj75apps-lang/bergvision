@@ -9,6 +9,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
 
+import { embedProvider, prepareEmbedUrl, useEmbedWatchdog } from "@/lib/studio/embed-watchdog";
 import { useSignedUrl } from "@/lib/studio/use-signed-url";
 import { supabase } from "@/integrations/supabase/client";
 import { ELEMENT_LABELS, type TemplateElement } from "@/lib/studio/types";
@@ -385,17 +386,35 @@ function IframeWidget({ config }: { config: Record<string, unknown> }) {
       : 30;
   const [idx, setIdx] = useState(0);
   const count = urls.length;
+  // Timer reinicia a cada troca: se o vídeo terminar antes (aviso do player),
+  // o próximo link entra na hora e ganha o tempo completo.
   useEffect(() => {
     if (count < 2) return;
-    const id = window.setInterval(() => setIdx((i) => (i + 1) % count), rotation * 1000);
-    return () => window.clearInterval(id);
-  }, [count, rotation]);
+    const id = window.setTimeout(() => setIdx((i) => (i + 1) % count), rotation * 1000);
+    return () => window.clearTimeout(id);
+  }, [count, rotation, idx]);
   if (count < 2) return <SingleIframe config={config} />;
   const cur = urls[idx % count];
-  return <SingleIframe key={`${idx % count}:${cur}`} config={{ ...config, url: cur }} />;
+  return (
+    <SingleIframe
+      key={`${idx % count}:${cur}`}
+      config={{ ...config, url: cur }}
+      multi
+      onEnded={() => setIdx((i) => (i + 1) % count)}
+    />
+  );
 }
 
-function SingleIframe({ config }: { config: Record<string, unknown> }) {
+function SingleIframe({
+  config,
+  multi = false,
+  onEnded,
+}: {
+  config: Record<string, unknown>;
+  multi?: boolean;
+  onEnded?: () => void;
+}) {
+  const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const rawUrl = typeof config.url === "string" ? config.url : "";
   // Converte links de página (vimeo.com/..., youtube.com/watch...) que recusam
   // incorporação em URLs de player — corrige também elementos já salvos.
@@ -442,6 +461,15 @@ function SingleIframe({ config }: { config: Record<string, unknown> }) {
     const id = window.setInterval(() => setNonce((n) => n + 1), refresh * 1000);
     return () => window.clearInterval(id);
   }, [refresh]);
+  const provider = embedProvider(url);
+  const playerUrl = prepareEmbedUrl(url, provider, !multi);
+  useEmbedWatchdog({
+    iframeRef,
+    provider,
+    src: playerUrl + "|" + nonce,
+    onEnded,
+    onReload: () => setNonce((n) => n + 1),
+  });
   const isValid = /^https:\/\//i.test(url);
   const isYouTube = /^https:\/\/(www\.)?youtube(-nocookie)?\.com\/embed/i.test(url);
   if (vimeoState === "loading" || vimeoState === "failed") {
@@ -470,11 +498,12 @@ function SingleIframe({ config }: { config: Record<string, unknown> }) {
     .join(" ");
   const scale = zoom / 100;
   const inverse = `${(100 / scale).toFixed(4)}%`;
-  const src = refresh > 0 ? `${url}${url.includes("#") ? "&" : "#"}_r=${nonce}` : url;
+  const src = refresh > 0 ? `${playerUrl}${playerUrl.includes("#") ? "&" : "#"}_r=${nonce}` : playerUrl;
   return (
     <div className="relative h-full w-full overflow-hidden bg-black">
       <iframe
         key={nonce}
+        ref={iframeRef}
         src={src}
         title="Iframe widget"
         loading={isVideo ? "eager" : "lazy"}
