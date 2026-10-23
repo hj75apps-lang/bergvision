@@ -38,6 +38,11 @@ import {
   Undo2,
   Video as VideoIcon,
   ChevronDown,
+  ArrowUp,
+  ArrowDown,
+  ArrowUpToLine,
+  ArrowDownToLine,
+  Layers,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -69,6 +74,7 @@ import {
   ContextMenu,
   ContextMenuContent,
   ContextMenuItem,
+  ContextMenuSeparator,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
 import {
@@ -761,6 +767,7 @@ function EditorPage() {
     duplicateElements,
     nudge,
     selectedIds,
+    arrangeLayers,
   ]);
 
   // ---- Moveable helpers ----
@@ -1429,7 +1436,7 @@ function EditorPage() {
 
       <p className="text-center text-xs text-muted-foreground">
         Ctrl+Z / Ctrl+Shift+Z desfazer/refazer · Delete/Backspace excluir ·
-        Ctrl+D duplicar · setas para mover (Shift = 5%)
+        Ctrl+D duplicar · Ctrl+] / Ctrl+[ camadas · Alt+1 painel de camadas · setas para mover (Shift = 5%)
       </p>
 
       <PreviewPanel
@@ -1520,6 +1527,8 @@ function EditorPage() {
     </div>
   );
 }
+
+type ArrangeAction = "front" | "forward" | "backward" | "back";
 
 function ElementView({
   el,
