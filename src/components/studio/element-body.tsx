@@ -9,6 +9,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
 
+import { embedProvider, prepareEmbedUrl, useEmbedWatchdog } from "@/lib/studio/embed-watchdog";
 import { useSignedUrl } from "@/lib/studio/use-signed-url";
 import { supabase } from "@/integrations/supabase/client";
 import { ELEMENT_LABELS, type TemplateElement } from "@/lib/studio/types";
@@ -460,6 +461,15 @@ function SingleIframe({
     const id = window.setInterval(() => setNonce((n) => n + 1), refresh * 1000);
     return () => window.clearInterval(id);
   }, [refresh]);
+  const provider = embedProvider(url);
+  const playerUrl = prepareEmbedUrl(url, provider, !multi);
+  useEmbedWatchdog({
+    iframeRef,
+    provider,
+    src: playerUrl + "|" + nonce,
+    onEnded,
+    onReload: () => setNonce((n) => n + 1),
+  });
   const isValid = /^https:\/\//i.test(url);
   const isYouTube = /^https:\/\/(www\.)?youtube(-nocookie)?\.com\/embed/i.test(url);
   if (vimeoState === "loading" || vimeoState === "failed") {
@@ -488,11 +498,12 @@ function SingleIframe({
     .join(" ");
   const scale = zoom / 100;
   const inverse = `${(100 / scale).toFixed(4)}%`;
-  const src = refresh > 0 ? `${url}${url.includes("#") ? "&" : "#"}_r=${nonce}` : url;
+  const src = refresh > 0 ? `${playerUrl}${playerUrl.includes("#") ? "&" : "#"}_r=${nonce}` : playerUrl;
   return (
     <div className="relative h-full w-full overflow-hidden bg-black">
       <iframe
         key={nonce}
+        ref={iframeRef}
         src={src}
         title="Iframe widget"
         loading={isVideo ? "eager" : "lazy"}
