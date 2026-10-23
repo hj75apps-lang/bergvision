@@ -6,7 +6,7 @@ import {
   toVideoEmbedUrl,
 } from "@/lib/studio/video-embed";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueries } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
 
 import { embedProvider, prepareEmbedUrl, useEmbedWatchdog } from "@/lib/studio/embed-watchdog";
@@ -1261,9 +1261,33 @@ function RssWidget({ config }: { config: Record<string, unknown> }) {
     | "vertical-down";
   const speed = Math.max(5, Math.min(180, (config.speed as number) ?? 40));
   const separator = (config.separator as string) ?? "  •  ";
+  const manual = config.source === "manual";
+  const manualRaw = Array.isArray(config.manualItems)
+    ? (config.manualItems as Record<string, unknown>[])
+    : [];
+  const manualList = manualRaw
+    .filter((m) => m && m.active !== false && typeof m.title === "string" && (m.title as string).trim())
+    .slice(0, 30);
+  const manualImgQs = useQueries({
+    queries: manualList.map((m) => {
+      const path = typeof m.imagePath === "string" ? m.imagePath : "";
+      return {
+        queryKey: ["signed-url", "media", path, 3600],
+        enabled: manual && path.length > 0,
+        staleTime: 50 * 60 * 1000,
+        queryFn: async () => {
+          const { data, error } = await supabase.storage
+            .from("media")
+            .createSignedUrl(path, 3600);
+          if (error) throw error;
+          return data?.signedUrl ?? null;
+        },
+      };
+    }),
+  });
   const q = useQuery({
     queryKey: ["widget-rss", url, max, feedKey(config)],
-    enabled: url.length > 0,
+    enabled: !manual && url.length > 0,
     staleTime: 5 * 60 * 1000,
     refetchInterval: 10 * 60 * 1000,
     queryFn: async () => {
@@ -1278,7 +1302,13 @@ function RssWidget({ config }: { config: Record<string, unknown> }) {
   });
   const [idx, setIdx] = useState(0);
   const [imgFailed, setImgFailed] = useState<Record<number, boolean>>({});
-  const items = q.data?.items ?? [];
+  const items: { title: string; pubDate: string; image?: string | null }[] = manual
+    ? manualList.map((m, i) => ({
+        title: String(m.title).trim().slice(0, 500),
+        pubDate: "",
+        image: (manualImgQs[i]?.data as string | null | undefined) ?? null,
+      }))
+    : (q.data?.items ?? []);
   useEffect(() => {
     if (items.length <= 1) return;
     if (motion !== "fade" && motion !== "none") return;
@@ -1327,7 +1357,7 @@ function RssWidget({ config }: { config: Record<string, unknown> }) {
     color: textColor,
   };
 
-  if (!url) {
+  if (!url && !manual) {
     return (
       <div
         className="flex h-full w-full flex-col justify-center gap-1 overflow-hidden p-2 text-white"
@@ -1337,7 +1367,7 @@ function RssWidget({ config }: { config: Record<string, unknown> }) {
       </div>
     );
   }
-  if (q.isLoading) {
+  if (!manual && q.isLoading) {
     return (
       <div
         className="flex h-full w-full items-center justify-center overflow-hidden p-2 text-white"
@@ -1347,13 +1377,15 @@ function RssWidget({ config }: { config: Record<string, unknown> }) {
       </div>
     );
   }
-  if (q.isError || items.length === 0) {
+  if ((!manual && q.isError) || items.length === 0) {
     return (
       <div
         className="flex h-full w-full items-center justify-center overflow-hidden p-2 text-white"
         style={wrapperStyle}
       >
-        <span className="text-[10cqh] opacity-70">Feed indisponível</span>
+        <span className="text-[10cqh] opacity-70">
+          {manual ? "Adicione notícias" : "Feed indisponível"}
+        </span>
       </div>
     );
   }

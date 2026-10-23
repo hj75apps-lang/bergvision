@@ -3170,6 +3170,31 @@ function WidgetContent({
 
       {(widgetType === "rss" || widgetType === "news") && (
         <>
+          <div className="grid grid-cols-2 gap-1 rounded-md border border-border/50 bg-muted/30 p-1">
+            {(["feed", "manual"] as const).map((src) => {
+              const active = (config.source === "manual" ? "manual" : "feed") === src;
+              return (
+                <button
+                  key={src}
+                  type="button"
+                  disabled={disabled}
+                  onClick={() => setCfg({ source: src })}
+                  className={cn(
+                    "rounded px-2 py-1 text-[11px] font-medium transition-colors",
+                    active
+                      ? "bg-primary text-primary-foreground"
+                      : "text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  {src === "feed" ? "Feed (link)" : "Minhas notícias"}
+                </button>
+              );
+            })}
+          </div>
+          {config.source === "manual" ? (
+            <ManualNewsEditor config={config} setCfg={setCfg} disabled={disabled} />
+          ) : (
+            <>
           <label className="flex flex-col gap-1">
             <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
               URL do feed
@@ -3184,6 +3209,8 @@ function WidgetContent({
             />
           </label>
           <JsonFeedFields config={config} disabled={disabled} setCfg={setCfg} />
+            </>
+          )}
           <NumberField
             label="Itens"
             value={(config.maxItems as number) ?? 5}
@@ -4071,5 +4098,155 @@ function JsonFeedFields({
         {field("jsonDateField", "Campo da data", "ex.: dataApuracao")}
       </div>
     </details>
+  );
+}
+
+
+// ---------- Notícias próprias (widget Notícias, fonte manual) ----------
+
+type ManualNewsItem = {
+  id: string;
+  title: string;
+  imagePath?: string | null;
+  active?: boolean;
+};
+
+function ManualNewsThumb({ path }: { path: string }) {
+  const { data } = useQuery({
+    queryKey: ["signed-url", "media", path, 3600],
+    staleTime: 50 * 60 * 1000,
+    queryFn: async () => {
+      const { data: d, error } = await supabase.storage
+        .from("media")
+        .createSignedUrl(path, 3600);
+      if (error) throw error;
+      return d?.signedUrl ?? null;
+    },
+  });
+  if (!data) return <div className="h-full w-full animate-pulse bg-muted" />;
+  return <img src={data} alt="" className="h-full w-full object-cover" />;
+}
+
+function ManualNewsEditor({
+  config,
+  setCfg,
+  disabled,
+}: {
+  config: Record<string, unknown>;
+  setCfg: (p: Record<string, unknown>) => void;
+  disabled: boolean;
+}) {
+  const items: ManualNewsItem[] = Array.isArray(config.manualItems)
+    ? (config.manualItems as ManualNewsItem[])
+    : [];
+  const [pickFor, setPickFor] = useState<string | null>(null);
+  const save = (next: ManualNewsItem[]) => setCfg({ manualItems: next });
+  const update = (id: string, p: Partial<ManualNewsItem>) =>
+    save(items.map((it) => (it.id === id ? { ...it, ...p } : it)));
+  const move = (i: number, d: -1 | 1) => {
+    const j = i + d;
+    if (j < 0 || j >= items.length) return;
+    const next = [...items];
+    [next[i], next[j]] = [next[j], next[i]];
+    save(next);
+  };
+  const add = () => {
+    if (items.length >= 30) {
+      toast.error("Limite de 30 notícias por widget.");
+      return;
+    }
+    const id =
+      typeof crypto !== "undefined" && "randomUUID" in crypto
+        ? crypto.randomUUID()
+        : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    save([{ id, title: "", imagePath: null, active: true }, ...items]);
+  };
+
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex items-center justify-between">
+        <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+          Notícias ({items.length})
+        </span>
+        <Button size="sm" variant="secondary" className="h-7 gap-1 text-[11px]" disabled={disabled} onClick={add}>
+          <Plus className="h-3.5 w-3.5" /> Nova notícia
+        </Button>
+      </div>
+      {items.length === 0 && (
+        <p className="rounded-md border border-dashed border-border/60 p-3 text-center text-[11px] text-muted-foreground">
+          Escreva suas notícias e avisos. Elas aparecem com os mesmos efeitos do feed:
+          rolagem, troca de títulos e fotos.
+        </p>
+      )}
+      {items.map((it, i) => (
+        <div
+          key={it.id}
+          className={cn(
+            "flex flex-col gap-1.5 rounded-lg border border-border/50 bg-muted/20 p-2",
+            it.active === false && "opacity-60",
+          )}
+        >
+          <Textarea
+            value={it.title}
+            disabled={disabled}
+            maxLength={500}
+            rows={2}
+            placeholder="Título da notícia"
+            onChange={(e) => update(it.id, { title: e.target.value })}
+            className="min-h-[52px] text-xs"
+          />
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              disabled={disabled}
+              onClick={() => setPickFor(it.id)}
+              className="flex h-10 w-14 shrink-0 items-center justify-center overflow-hidden rounded-md border border-border/60 bg-muted/40"
+              title="Escolher foto"
+            >
+              {it.imagePath ? (
+                <ManualNewsThumb path={it.imagePath} />
+              ) : (
+                <ImagePlus className="h-4 w-4 text-muted-foreground" />
+              )}
+            </button>
+            {it.imagePath && (
+              <Button size="sm" variant="ghost" className="h-7 px-1.5 text-[10px]" disabled={disabled} onClick={() => update(it.id, { imagePath: null })}>
+                Sem foto
+              </Button>
+            )}
+            <div className="ml-auto flex items-center gap-0.5">
+              <Switch
+                checked={it.active !== false}
+                disabled={disabled}
+                onCheckedChange={(v) => update(it.id, { active: v })}
+                title="Exibir"
+              />
+              <Button size="icon" variant="ghost" className="h-7 w-7" disabled={disabled || i === 0} onClick={() => move(i, -1)}>
+                <ArrowUp className="h-3.5 w-3.5" />
+              </Button>
+              <Button size="icon" variant="ghost" className="h-7 w-7" disabled={disabled || i === items.length - 1} onClick={() => move(i, 1)}>
+                <ArrowDown className="h-3.5 w-3.5" />
+              </Button>
+              <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" disabled={disabled} onClick={() => save(items.filter((x) => x.id !== it.id))}>
+                <Trash2 className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+          </div>
+        </div>
+      ))}
+      <p className="text-[10px] text-muted-foreground">
+        Para ver as fotos, ligue "Mostrar imagem" abaixo. Salve o modelo para as telas
+        receberem as notícias novas.
+      </p>
+      <MediaPickerDialog
+        open={pickFor !== null}
+        onOpenChange={(v) => !v && setPickFor(null)}
+        filter="image"
+        onPick={(f: PickerMediaFile) => {
+          if (pickFor) update(pickFor, { imagePath: f.storage_path });
+          setPickFor(null);
+        }}
+      />
+    </div>
   );
 }
