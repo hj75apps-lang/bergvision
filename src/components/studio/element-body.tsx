@@ -625,6 +625,7 @@ function ClockWidget({ config }: { config: Record<string, unknown> }) {
   const layout = ((config.layout as string) ?? "stack") as "stack" | "inline";
   const color = (config.color as string) ?? "#FFFFFF";
   const accent = (config.accentColor as string) ?? color;
+  const dateColor = (config.dateColor as string) || color;
   const [now, setNow] = useState(() => new Date());
   useEffect(() => {
     const tick = kind === "analog" ? 1000 : showSeconds ? 1000 : 15000;
@@ -709,7 +710,7 @@ function ClockWidget({ config }: { config: Record<string, unknown> }) {
                 fontWeight: 500,
                 lineHeight: 1.1,
                 textTransform: "capitalize",
-                color,
+                color: dateColor,
               }}
               className="truncate"
             >
@@ -760,6 +761,7 @@ function ClockWidget({ config }: { config: Record<string, unknown> }) {
             lineHeight: 1.1,
             marginTop: layout === "stack" ? "0.4em" : 0,
             textTransform: "capitalize",
+            color: dateColor,
           }}
           className="truncate"
         >

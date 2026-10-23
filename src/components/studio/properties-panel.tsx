@@ -3018,6 +3018,12 @@ function WidgetContent({
             onChange={(v) => setCfg({ color: v })}
           />
           <ColorField
+            label="Cor da data / dia da semana"
+            value={(config.dateColor as string) ?? ((config.color as string) ?? "#FFFFFF")}
+            disabled={disabled}
+            onChange={(v) => setCfg({ dateColor: v })}
+          />
+          <ColorField
             label="Cor de destaque (ponteiro dos segundos / efeitos)"
             value={(config.accentColor as string) ?? ((config.color as string) ?? "#FFFFFF")}
             disabled={disabled}
@@ -3153,6 +3159,7 @@ function WidgetContent({
           <p className="text-[10px] text-muted-foreground">
             Dados via Open-Meteo (gratuito, sem chave de API). Atualiza a cada 15 min.
           </p>
+          <WeatherTextColors config={config} setCfg={setCfg} disabled={disabled} />
           <WeatherBackgroundControls
             config={config}
             setCfg={setCfg}
@@ -3388,6 +3395,98 @@ function WidgetContent({
       )}
 
       <AppearanceFields c={c} patch={patch} disabled={disabled} />
+    </div>
+  );
+}
+
+const WEATHER_TEXT_FIELDS: { key: string; label: string; presets: string[] }[] = [
+  { key: "city", label: "Cidade", presets: ["complete", "forecast", "vertical"] },
+  { key: "temp", label: "Temperatura", presets: ["minimal", "complete", "forecast", "vertical"] },
+  { key: "unit", label: "Unidade (°C)", presets: ["minimal", "complete", "forecast", "vertical"] },
+  { key: "description", label: "Condição / previsão", presets: ["minimal", "complete", "forecast", "vertical"] },
+  { key: "labels", label: "Rótulos (Sensação, Umidade…)", presets: ["complete", "forecast"] },
+  { key: "feelsLike", label: "Sensação térmica", presets: ["complete", "forecast"] },
+  { key: "humidity", label: "Umidade", presets: ["complete", "forecast"] },
+  { key: "wind", label: "Vento", presets: ["complete", "forecast"] },
+  { key: "minMax", label: "Máx./Mín. de hoje", presets: ["forecast"] },
+  { key: "forecastTitle", label: "Título “Próximos dias”", presets: ["forecast"] },
+  { key: "dayName", label: "Próximos dias — dia", presets: ["forecast", "vertical"] },
+  { key: "dayDate", label: "Próximos dias — data", presets: ["forecast"] },
+  { key: "dayCondition", label: "Próximos dias — condição", presets: ["forecast"] },
+  { key: "dayMax", label: "Próximos dias — máxima", presets: ["forecast", "vertical"] },
+  { key: "dayMin", label: "Próximos dias — mínima", presets: ["forecast", "vertical"] },
+  { key: "dayRain", label: "Próximos dias — chuva", presets: ["forecast"] },
+];
+
+function WeatherTextColors({
+  config,
+  setCfg,
+  disabled,
+}: {
+  config: Record<string, unknown>;
+  setCfg: (patch: Record<string, unknown>) => void;
+  disabled: boolean;
+}) {
+  const preset = (config.preset as string) ?? "complete";
+  const raw = config.textColors;
+  const colors: Record<string, string> =
+    raw && typeof raw === "object" ? { ...(raw as Record<string, string>) } : {};
+  const fields = WEATHER_TEXT_FIELDS.filter((f) => f.presets.includes(preset));
+  const setOne = (key: string, value: string | null) => {
+    const next = { ...colors };
+    if (value) next[key] = value;
+    else delete next[key];
+    setCfg({ textColors: next });
+  };
+  return (
+    <div className="flex flex-col gap-1.5 rounded-md border border-border/50 bg-muted/30 p-2">
+      <div className="flex items-center justify-between">
+        <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+          Cores dos textos
+        </span>
+        {Object.keys(colors).length > 0 && (
+          <button
+            type="button"
+            disabled={disabled}
+            onClick={() => setCfg({ textColors: {} })}
+            className="text-[10px] text-primary hover:underline disabled:opacity-50"
+          >
+            Restaurar todas
+          </button>
+        )}
+      </div>
+      {fields.map((f) => {
+        const value = colors[f.key];
+        return (
+          <div key={f.key} className="flex min-w-0 items-center justify-between gap-2">
+            <span className="min-w-0 truncate text-[11px]">{f.label}</span>
+            <div className="flex shrink-0 items-center gap-1">
+              {value && (
+                <button
+                  type="button"
+                  disabled={disabled}
+                  onClick={() => setOne(f.key, null)}
+                  className="text-[10px] text-muted-foreground hover:text-foreground"
+                  title="Voltar à cor do tema"
+                >
+                  Tema
+                </button>
+              )}
+              <input
+                type="color"
+                aria-label={`Cor de ${f.label}`}
+                value={value ?? "#FFFFFF"}
+                disabled={disabled}
+                onChange={(e) => setOne(f.key, e.target.value)}
+                className={`h-7 w-10 cursor-pointer rounded border bg-transparent ${value ? "border-primary" : "border-border opacity-60"}`}
+              />
+            </div>
+          </div>
+        );
+      })}
+      <span className="text-[10px] text-muted-foreground">
+        Campos sem cor escolhida seguem a cor do tema.
+      </span>
     </div>
   );
 }

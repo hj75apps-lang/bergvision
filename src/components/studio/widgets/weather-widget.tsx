@@ -107,6 +107,20 @@ function themeStyle(
   }
 }
 
+export type WeatherTextKey =
+  | "city" | "description" | "temp" | "unit" | "labels" | "feelsLike" | "humidity" | "wind"
+  | "minMax" | "forecastTitle" | "dayName" | "dayDate" | "dayCondition" | "dayMax" | "dayMin" | "dayRain";
+type TC = Partial<Record<WeatherTextKey, string>>;
+function readTextColors(config: Record<string, unknown>): TC {
+  const raw = config.textColors;
+  if (!raw || typeof raw !== "object") return {};
+  const out: TC = {};
+  for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+    if (typeof v === "string" && /^#[0-9a-fA-F]{3,8}$/.test(v)) out[k as WeatherTextKey] = v;
+  }
+  return out;
+}
+
 export function WeatherWidget({ config }: { config: Record<string, unknown> }) {
   const normalize = (raw: string) =>
     raw
@@ -139,6 +153,7 @@ export function WeatherWidget({ config }: { config: Record<string, unknown> }) {
   const theme = ((config.theme as Theme) ?? "gradient") as Theme;
   const accentColor = config.accentColor as string | undefined;
   const animated = (config.showAnimatedIcons as boolean | undefined) ?? true;
+  const tc = readTextColors(config);
 
   const bgPath = (config.backgroundImagePath as string | undefined) || null;
   const bgUrl = useSignedUrl(bgPath, 3600);
@@ -332,13 +347,13 @@ export function WeatherWidget({ config }: { config: Record<string, unknown> }) {
     current.dataUpdatedAt > 0 && Date.now() - current.dataUpdatedAt > STALE_AFTER_MS;
   const body =
     preset === "minimal" ? (
-      <PresetMinimal d={d} shell={shell} accent={t.accent} animated={animated} />
+      <PresetMinimal d={d} shell={shell} accent={t.accent} animated={animated} tc={tc} />
     ) : preset === "forecast" ? (
-      <PresetForecast d={d} shell={shell} accent={t.accent} animated={animated} />
+      <PresetForecast d={d} shell={shell} accent={t.accent} animated={animated} tc={tc} />
     ) : preset === "vertical" ? (
-      <PresetVertical d={d} shell={shell} accent={t.accent} animated={animated} />
+      <PresetVertical d={d} shell={shell} accent={t.accent} animated={animated} tc={tc} />
     ) : (
-      <PresetComplete d={d} shell={shell} accent={t.accent} animated={animated} />
+      <PresetComplete d={d} shell={shell} accent={t.accent} animated={animated} tc={tc} />
     );
   if (!isStale) return withBg(body);
   return withBg(
@@ -380,11 +395,13 @@ function PresetMinimal({
   shell,
   accent,
   animated,
+  tc,
 }: {
   d: WeatherData;
   shell: React.CSSProperties;
   accent: string;
   animated: boolean;
+  tc: TC;
 }) {
   return (
     <div
@@ -395,13 +412,13 @@ function PresetMinimal({
         <WeatherIcon code={d.code} isDay={d.isDay} accent={accent} animated={animated} />
       </div>
       <div className="flex flex-col leading-none">
-        <span style={{ fontSize: "40cqmin", fontWeight: 700, letterSpacing: "-0.03em" }}>
+        <span style={{ fontSize: "40cqmin", fontWeight: 700, letterSpacing: "-0.03em", color: tc.temp }}>
           {d.temp}
-          <span style={{ fontSize: "18cqmin", fontWeight: 500, opacity: 0.8 }}>
+          <span style={{ fontSize: "18cqmin", fontWeight: 500, opacity: 0.8, color: tc.unit }}>
             {d.unit}
           </span>
         </span>
-        <span style={{ fontSize: "8cqmin", opacity: 0.9, marginTop: "2cqmin" }}>
+        <span style={{ fontSize: "8cqmin", opacity: 0.9, marginTop: "2cqmin", color: tc.description }}>
           {d.description}
         </span>
       </div>
@@ -414,11 +431,13 @@ function PresetComplete({
   shell,
   accent,
   animated,
+  tc,
 }: {
   d: WeatherData;
   shell: React.CSSProperties;
   accent: string;
   animated: boolean;
+  tc: TC;
 }) {
   return (
     <div className="flex h-full w-full flex-col p-[5cqmin]" style={shell}>
@@ -431,6 +450,7 @@ function PresetComplete({
               letterSpacing: "0.02em",
               textTransform: "uppercase",
               opacity: 0.85,
+              color: tc.city,
             }}
             className="truncate"
           >
@@ -438,7 +458,7 @@ function PresetComplete({
             {d.country ? `, ${d.country}` : ""}
           </span>
           <span
-            style={{ fontSize: "6cqh", opacity: 0.7, marginTop: "0.5cqh" }}
+            style={{ fontSize: "6cqh", opacity: 0.7, marginTop: "0.5cqh", color: tc.description }}
             className="truncate"
           >
             {d.description}
@@ -451,26 +471,26 @@ function PresetComplete({
       <div className="mt-auto flex items-end justify-between gap-[3cqmin]">
         <div className="leading-none">
           <span
-            style={{ fontSize: "48cqh", fontWeight: 700, letterSpacing: "-0.04em" }}
+            style={{ fontSize: "48cqh", fontWeight: 700, letterSpacing: "-0.04em", color: tc.temp }}
           >
             {d.temp}
-            <span style={{ fontSize: "18cqh", fontWeight: 500, opacity: 0.75 }}>
+            <span style={{ fontSize: "18cqh", fontWeight: 500, opacity: 0.75, color: tc.unit }}>
               {d.unit}
             </span>
           </span>
         </div>
         <div
           className="flex flex-col items-end gap-[0.8cqh] text-right"
-          style={{ fontSize: "5.5cqh", opacity: 0.9 }}
+          style={{ fontSize: "5.5cqh", opacity: 0.9, color: tc.labels }}
         >
           <span>
-            Sensação <b>{d.feelsLike}{d.unit}</b>
+            Sensação <b style={{ color: tc.feelsLike }}>{d.feelsLike}{d.unit}</b>
           </span>
           <span>
-            Umidade <b>{d.humidity}%</b>
+            Umidade <b style={{ color: tc.humidity }}>{d.humidity}%</b>
           </span>
           <span>
-            Vento <b>{d.wind} {d.windUnit}</b>
+            Vento <b style={{ color: tc.wind }}>{d.wind} {d.windUnit}</b>
           </span>
         </div>
       </div>
@@ -515,11 +535,13 @@ function PresetForecast({
   shell,
   accent,
   animated,
+  tc,
 }: {
   d: WeatherData;
   shell: React.CSSProperties;
   accent: string;
   animated: boolean;
+  tc: TC;
 }) {
   const all = (d.forecast ?? []) as ForecastDay[];
   const today = all[0];
@@ -544,18 +566,18 @@ function PresetForecast({
           <div style={{ width: "13cqh", height: "13cqh", flexShrink: 0 }}>
             <WeatherIcon code={d.code} isDay={d.isDay} accent={accent} animated={animated} />
           </div>
-          <span className="leading-none" style={{ fontSize: "13cqh", fontWeight: 700, letterSpacing: "-0.03em" }}>
+          <span className="leading-none" style={{ fontSize: "13cqh", fontWeight: 700, letterSpacing: "-0.03em", color: tc.temp }}>
             {d.temp}
-            <span style={{ fontSize: "6cqh", fontWeight: 500, verticalAlign: "top" }}>{d.unit}</span>
+            <span style={{ fontSize: "6cqh", fontWeight: 500, verticalAlign: "top", color: tc.unit }}>{d.unit}</span>
           </span>
           <div className="flex min-w-0 flex-col" style={{ gap: "0.6cqh" }}>
-            <span className="truncate" style={{ fontSize: "4.2cqh", fontWeight: 600 }}>
+            <span className="truncate" style={{ fontSize: "4.2cqh", fontWeight: 600, color: tc.description }}>
               {d.description}
-              {d.city ? <span style={{ ...muted, fontWeight: 400 }}> · {d.city}</span> : null}
+              {d.city ? <span style={{ ...muted, fontWeight: 400, color: tc.city }}> · {d.city}</span> : null}
             </span>
-            <span style={{ fontSize: "3.4cqh", ...muted }}>Sensação de {d.feelsLike}°</span>
+            <span style={{ fontSize: "3.4cqh", ...muted, color: tc.feelsLike }}>Sensação de {d.feelsLike}°</span>
             {today ? (
-              <span style={{ fontSize: "3.4cqh", ...muted }}>
+              <span style={{ fontSize: "3.4cqh", ...muted, color: tc.minMax }}>
                 Máx. {today.max}° · Mín. {today.min}°
               </span>
             ) : null}
@@ -563,16 +585,16 @@ function PresetForecast({
         </div>
         <div className="flex shrink-0 gap-[3cqw]">
           <div className="flex flex-col" style={{ gap: "1cqh" }}>
-            <span className="flex items-center gap-[0.6cqw]" style={{ fontSize: "3.4cqh", ...muted }}>
+            <span className="flex items-center gap-[0.6cqw]" style={{ fontSize: "3.4cqh", ...muted, color: tc.labels }}>
               <span style={{ width: "4cqh", height: "4cqh", display: "inline-block" }}>
                 <WeatherIcon code={61} accent={accent} animated={animated} />
               </span>
               Umidade
             </span>
-            <span style={{ fontSize: "5.5cqh", fontWeight: 700 }}>{d.humidity}%</span>
+            <span style={{ fontSize: "5.5cqh", fontWeight: 700, color: tc.humidity }}>{d.humidity}%</span>
           </div>
           <div className="flex flex-col" style={{ gap: "1cqh" }}>
-            <span className="flex items-center gap-[0.6cqw]" style={{ fontSize: "3.4cqh", ...muted }}>
+            <span className="flex items-center gap-[0.6cqw]" style={{ fontSize: "3.4cqh", ...muted, color: tc.labels }}>
               <span
                 aria-hidden
                 style={{
@@ -584,7 +606,7 @@ function PresetForecast({
               </span>
               Vento atual
             </span>
-            <span style={{ fontSize: "5.5cqh", fontWeight: 700 }}>
+            <span style={{ fontSize: "5.5cqh", fontWeight: 700, color: tc.wind }}>
               {d.wind} <span style={{ fontSize: "3.4cqh", fontWeight: 500 }}>{d.windUnit}</span>
             </span>
           </div>
@@ -593,7 +615,7 @@ function PresetForecast({
       <style>{`@keyframes bv-wind-sway{0%,100%{transform:translateX(0)}50%{transform:translateX(18%)}}`}</style>
 
       {/* Próximos 5 dias */}
-      <span style={{ fontSize: "4.4cqh", fontWeight: 700, margin: "2.4cqh 0 1.8cqh" }}>
+      <span style={{ fontSize: "4.4cqh", fontWeight: 700, margin: "2.4cqh 0 1.8cqh", color: tc.forecastTitle }}>
         Próximos {days.length} dias
       </span>
       <div
@@ -609,10 +631,10 @@ function PresetForecast({
               style={{ ...card, padding: "2.4cqh 1cqw" }}
             >
               <div className="flex flex-col" style={{ gap: "0.6cqh" }}>
-                <span className="truncate" style={{ fontSize: "3.8cqh", fontWeight: 700 }}>
+                <span className="truncate" style={{ fontSize: "3.8cqh", fontWeight: 700, color: tc.dayName }}>
                   {dt ? WEEKDAYS_FULL_PT[dt.getUTCDay()] : day.date}
                 </span>
-                <span style={{ fontSize: "3cqh", ...muted }}>
+                <span style={{ fontSize: "3cqh", ...muted, color: tc.dayDate }}>
                   {dt ? `${dt.getUTCDate()} de ${MONTHS_PT[dt.getUTCMonth()]}` : ""}
                 </span>
               </div>
@@ -620,33 +642,33 @@ function PresetForecast({
                 <div style={{ width: "13cqh", height: "13cqh" }}>
                   <WeatherIcon code={day.code} accent={accent} animated={animated} />
                 </div>
-                <span style={{ fontSize: "3.4cqh" }}>{wmoLabel(day.code)}</span>
+                <span style={{ fontSize: "3.4cqh", color: tc.dayCondition }}>{wmoLabel(day.code)}</span>
               </div>
               <div className="flex items-end justify-center gap-[1.2cqw]">
                 <div className="flex flex-col items-center">
-                  <span style={{ fontSize: "6cqh", fontWeight: 700, lineHeight: 1 }}>
+                  <span style={{ fontSize: "6cqh", fontWeight: 700, lineHeight: 1, color: tc.dayMax }}>
                     {day.max}
                     <span style={{ fontSize: "2.8cqh" }}>{d.unit}</span>
                   </span>
-                  <span style={{ fontSize: "2.8cqh", ...muted }}>Máxima</span>
+                  <span style={{ fontSize: "2.8cqh", ...muted, color: tc.labels }}>Máxima</span>
                 </div>
                 <div className="flex flex-col items-center">
-                  <span style={{ fontSize: "5cqh", fontWeight: 400, lineHeight: 1 }}>
+                  <span style={{ fontSize: "5cqh", fontWeight: 400, lineHeight: 1, color: tc.dayMin }}>
                     {day.min}
                     <span style={{ fontSize: "2.8cqh" }}>{d.unit}</span>
                   </span>
-                  <span style={{ fontSize: "2.8cqh", ...muted }}>Mínima</span>
+                  <span style={{ fontSize: "2.8cqh", ...muted, color: tc.labels }}>Mínima</span>
                 </div>
               </div>
               <div
                 className="flex w-full flex-col items-center"
                 style={{ borderTop: "1px solid rgba(255,255,255,0.12)", paddingTop: "1.6cqh" }}
               >
-                <span style={{ fontSize: "4.4cqh", fontWeight: 700 }}>
+                <span style={{ fontSize: "4.4cqh", fontWeight: 700, color: tc.dayRain }}>
                   ☂ {typeof day.precipitationMax === "number" ? day.precipitationMax : 0}
                   <span style={{ fontSize: "2.8cqh" }}> %</span>
                 </span>
-                <span style={{ fontSize: "2.8cqh", ...muted }}>Chance de chuva</span>
+                <span style={{ fontSize: "2.8cqh", ...muted, color: tc.labels }}>Chance de chuva</span>
               </div>
             </div>
           );
@@ -661,11 +683,13 @@ function PresetVertical({
   shell,
   accent,
   animated,
+  tc,
 }: {
   d: WeatherData;
   shell: React.CSSProperties;
   accent: string;
   animated: boolean;
+  tc: TC;
 }) {
   const days = (d.forecast ?? []).slice(0, 4);
   return (
@@ -674,7 +698,7 @@ function PresetVertical({
       style={shell}
     >
       <span
-        style={{ fontSize: "5cqh", fontWeight: 600, letterSpacing: "0.1em" }}
+        style={{ fontSize: "5cqh", fontWeight: 600, letterSpacing: "0.1em", color: tc.city }}
         className="uppercase opacity-80"
       >
         {d.city}
@@ -684,14 +708,14 @@ function PresetVertical({
       </div>
       <span
         className="leading-none"
-        style={{ fontSize: "22cqh", fontWeight: 700, letterSpacing: "-0.03em" }}
+        style={{ fontSize: "22cqh", fontWeight: 700, letterSpacing: "-0.03em", color: tc.temp }}
       >
         {d.temp}
-        <span style={{ fontSize: "9cqh", fontWeight: 500, opacity: 0.75 }}>
+        <span style={{ fontSize: "9cqh", fontWeight: 500, opacity: 0.75, color: tc.unit }}>
           {d.unit}
         </span>
       </span>
-      <span style={{ fontSize: "4.5cqh", opacity: 0.9 }}>{d.description}</span>
+      <span style={{ fontSize: "4.5cqh", opacity: 0.9, color: tc.description }}>{d.description}</span>
       <div
         className="mt-auto flex w-full flex-col gap-[1.2cqh] pt-[2cqh]"
         style={{ borderTop: "1px solid rgba(255,255,255,0.18)" }}
@@ -702,14 +726,14 @@ function PresetVertical({
             className="flex items-center justify-between gap-[2cqmin] px-[1cqh]"
             style={{ fontSize: "4.5cqh" }}
           >
-            <span style={{ opacity: 0.85, minWidth: "10cqh", textAlign: "left" }}>
+            <span style={{ opacity: 0.85, minWidth: "10cqh", textAlign: "left", color: tc.dayName }}>
               {i === 0 ? "Hoje" : fmtDate(day.date)}
             </span>
             <div style={{ width: "8cqh", height: "8cqh" }}>
               <WeatherIcon code={day.code} accent={accent} animated={animated} />
             </div>
-            <span style={{ fontWeight: 600, minWidth: "12cqh", textAlign: "right" }}>
-              {day.max}° <span style={{ opacity: 0.6 }}>{day.min}°</span>
+            <span style={{ fontWeight: 600, minWidth: "12cqh", textAlign: "right", color: tc.dayMax }}>
+              {day.max}° <span style={{ opacity: 0.6, color: tc.dayMin }}>{day.min}°</span>
             </span>
           </div>
         ))}
