@@ -31,6 +31,16 @@ import {
   InputOTPSlot,
   InputOTPSeparator,
 } from "@/components/ui/input-otp";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { GridSkeleton } from "@/components/layout/grid-skeleton";
@@ -318,8 +328,10 @@ function PlayerCard({
     }
   };
 
+  const [confirmOpen, setConfirmOpen] = useState(false);
+
   const newCode = async () => {
-    if (!window.confirm(`Gerar novo código para "${player.name}"? A tela será desconectada e mostrará um novo PIN para parear de novo.`)) return;
+    setConfirmOpen(false);
     setBusy("code");
     try {
       await resetPairing(player.id);
@@ -419,7 +431,7 @@ function PlayerCard({
                 variant="outline"
                 className="rounded-xl"
                 disabled={busy !== null}
-                onClick={newCode}
+                onClick={() => setConfirmOpen(true)}
               >
                 {busy === "code" ? (
                   <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
@@ -437,6 +449,23 @@ function PlayerCard({
           )}
         </CardContent>
       </Card>
+      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <AlertDialogContent className="rounded-2xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Gerar novo código?</AlertDialogTitle>
+            <AlertDialogDescription>
+              A tela &ldquo;{player.name}&rdquo; será desconectada e mostrará um novo PIN
+              para parear de novo.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="rounded-xl">Cancelar</AlertDialogCancel>
+            <AlertDialogAction className="rounded-xl" onClick={newCode}>
+              Gerar novo código
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       <PlayerDetailSheet
         open={detailOpen}
         onOpenChange={setDetailOpen}
