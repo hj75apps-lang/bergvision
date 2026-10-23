@@ -470,6 +470,18 @@ function SingleIframe({
     onEnded,
     onReload: () => setNonce((n) => n + 1),
   });
+  const isDrive = /^https:\/\/drive\.google\.com\/file\/d\//i.test(url);
+  const [frameState, setFrameState] = useState<"loading" | "ready" | "timeout">("loading");
+  useEffect(() => {
+    if (!isVideo || !url) return;
+    setFrameState("loading");
+    if (import.meta.env.DEV) console.log("[VideoPlayer:load]", { host: isDrive ? "drive" : provider || "embed" });
+    const t = window.setTimeout(() => {
+      setFrameState((st) => (st === "loading" ? "timeout" : st));
+      if (import.meta.env.DEV) console.log("[VideoPlayer:timeout]", { host: isDrive ? "drive" : provider || "embed" });
+    }, 20_000);
+    return () => window.clearTimeout(t);
+  }, [isVideo, url, nonce, isDrive, provider]);
   const isValid = /^https:\/\//i.test(url);
   const isYouTube = /^https:\/\/(www\.)?youtube(-nocookie)?\.com\/embed/i.test(url);
   if (vimeoState === "loading" || vimeoState === "failed") {
@@ -505,6 +517,10 @@ function SingleIframe({
         key={nonce}
         ref={iframeRef}
         src={src}
+        onLoad={() => {
+          setFrameState("ready");
+          if (import.meta.env.DEV) console.log("[VideoPlayer:ready]", { host: isDrive ? "drive" : provider || "embed" });
+        }}
         title="Iframe widget"
         loading={isVideo ? "eager" : "lazy"}
         referrerPolicy={isVideo ? "strict-origin-when-cross-origin" : "no-referrer"}
@@ -538,6 +554,35 @@ function SingleIframe({
               }
         }
       />
+      {isVideo && frameState !== "ready" && (
+        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 bg-black/80 p-3 text-center text-[11px] text-white/80">
+          {frameState === "loading" ? (
+            <>
+              <Loader2 className="h-5 w-5 animate-spin" aria-hidden />
+              <span>Carregando vídeo…</span>
+            </>
+          ) : (
+            <>
+              <span>
+                {isDrive
+                  ? "O Google Drive não respondeu. Confira se o arquivo está compartilhado como \"Qualquer pessoa com o link\" e se ainda existe."
+                  : "O vídeo demorou demais para carregar. Verifique a internet e o link."}
+              </span>
+              <button
+                type="button"
+                aria-label="Tentar carregar o vídeo novamente"
+                className="pointer-events-auto rounded-md border border-white/30 px-2 py-1 transition-all duration-200 hover:bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setNonce((n) => n + 1);
+                }}
+              >
+                Tentar novamente
+              </button>
+            </>
+          )}
+        </div>
+      )}
       {/* Camada transparente: impede que o iframe "engula" cliques, permitindo
           selecionar, mover, redimensionar, excluir e substituir o widget no editor. */}
       <div className="absolute inset-0" aria-hidden />
