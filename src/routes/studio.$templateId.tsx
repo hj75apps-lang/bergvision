@@ -648,6 +648,41 @@ function EditorPage() {
     [qc, snapshot, templateId],
   );
 
+  const [leftTab, setLeftTab] = useState<string>("components");
+
+  const arrangeLayers = useCallback(
+    async (ids: string[], action: ArrangeAction) => {
+      if (ids.length === 0) return;
+      const order = elements
+        .slice()
+        .sort((a, b) => (b.z_index ?? 0) - (a.z_index ?? 0))
+        .map((e) => e.id);
+      const sel = new Set(ids);
+      let next = order.slice();
+      if (action === "front") {
+        next = [...order.filter((i) => sel.has(i)), ...order.filter((i) => !sel.has(i))];
+      } else if (action === "back") {
+        next = [...order.filter((i) => !sel.has(i)), ...order.filter((i) => sel.has(i))];
+      } else if (action === "forward") {
+        for (let i = 1; i < next.length; i++) {
+          if (sel.has(next[i]) && !sel.has(next[i - 1])) {
+            const t = next[i - 1]; next[i - 1] = next[i]; next[i] = t;
+          }
+        }
+      } else {
+        for (let i = next.length - 2; i >= 0; i--) {
+          if (sel.has(next[i]) && !sel.has(next[i + 1])) {
+            const t = next[i + 1]; next[i + 1] = next[i]; next[i] = t;
+          }
+        }
+      }
+      if (next.every((id, i) => id === order[i])) return;
+      await reorderLayers(next);
+    },
+    [elements, reorderLayers],
+  );
+
+
   // ---- Keyboard shortcuts ----
   useEffect(() => {
     if (!canEdit) return;
@@ -658,6 +693,22 @@ function EditorPage() {
         return;
 
       const mod = e.ctrlKey || e.metaKey;
+      if (e.altKey && !mod && (e.key === "1" || e.code === "Digit1")) {
+        e.preventDefault();
+        setLeftTab("layers");
+        return;
+      }
+      if (mod && (e.code === "BracketRight" || e.code === "BracketLeft")) {
+        if (selectedIds.length > 0) {
+          e.preventDefault();
+          const up = e.code === "BracketRight";
+          const action: ArrangeAction = e.altKey
+            ? up ? "front" : "back"
+            : up ? "forward" : "backward";
+          void arrangeLayers(selectedIds, action);
+        }
+        return;
+      }
       if (mod && (e.key === "z" || e.key === "Z")) {
         e.preventDefault();
         if (e.shiftKey) void doRedo();
@@ -958,7 +1009,7 @@ function EditorPage() {
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-[240px_1fr_280px]">
         {/* Layers */}
         <aside className="hidden overflow-hidden rounded-2xl border border-border/60 bg-card/40 backdrop-blur lg:flex lg:flex-col lg:h-[72vh]">
-          <Tabs defaultValue="components" className="flex h-full flex-col">
+          <Tabs value={leftTab} onValueChange={setLeftTab} className="flex h-full flex-col">
             <TabsList className="mx-2 mt-2 grid w-auto grid-cols-2">
               <TabsTrigger value="components" className="text-xs">Componentes</TabsTrigger>
               <TabsTrigger value="layers" className="text-xs">Camadas</TabsTrigger>
@@ -1211,6 +1262,16 @@ function EditorPage() {
                     onToggleFullscreen={() => void toggleFullscreen(el.id)}
                     imageEditable={isImageEditable(el)}
                     onEditImage={() => openImageEditor(el.id)}
+                    onArrange={(a) =>
+                      void arrangeLayers(
+                        selectedIds.includes(el.id) ? selectedIds : [el.id],
+                        a,
+                      )
+                    }
+                    onShowLayers={() => setLeftTab("layers")}
+                    onContextOpen={() => {
+                      if (!selectedIds.includes(el.id)) setSelectedIds([el.id]);
+                    }}
                   />
                 ))}
 
@@ -1469,6 +1530,9 @@ function ElementView({
   onToggleFullscreen,
   imageEditable,
   onEditImage,
+  onArrange,
+  onShowLayers,
+  onContextOpen,
 }: {
   el: TemplateElement;
   selected: boolean;
@@ -1478,6 +1542,9 @@ function ElementView({
   onToggleFullscreen: () => void;
   imageEditable: boolean;
   onEditImage: () => void;
+  onArrange: (action: ArrangeAction) => void;
+  onShowLayers: () => void;
+  onContextOpen: () => void;
 }) {
   const visible = el.visible ?? true;
   const style: React.CSSProperties = {
@@ -1507,19 +1574,42 @@ function ElementView({
     </div>
   );
 
-  if (!canEdit || (!fullscreenable && !imageEditable)) return body;
+  if (!canEdit) return body;
+
+  const Kbd = ({ children }: { children: React.ReactNode }) => (
+    <span className="ml-auto rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+      {children}
+    </span>
+  );
 
   return (
-    <ContextMenu>
+    <ContextMenu onOpenChange={(o) => { if (o) onContextOpen(); }}>
       <ContextMenuTrigger asChild>{body}</ContextMenuTrigger>
-      <ContextMenuContent className="w-56">
+      <ContextMenuContent className="w-64 rounded-xl p-1.5">
+        <ContextMenuItem className="gap-3 py-2" onSelect={() => onArrange("front")}>
+          <ArrowUpToLine className="h-4 w-4" /> Trazer à frente <Kbd>Ctrl+Alt+]</Kbd>
+        </ContextMenuItem>
+        <ContextMenuItem className="gap-3 py-2" onSelect={() => onArrange("forward")}>
+          <ArrowUp className="h-4 w-4" /> Para frente <Kbd>Ctrl+]</Kbd>
+        </ContextMenuItem>
+        <ContextMenuItem className="gap-3 py-2" onSelect={() => onArrange("backward")}>
+          <ArrowDown className="h-4 w-4" /> Mover para trás <Kbd>Ctrl+[</Kbd>
+        </ContextMenuItem>
+        <ContextMenuItem className="gap-3 py-2" onSelect={() => onArrange("back")}>
+          <ArrowDownToLine className="h-4 w-4" /> Enviar para trás <Kbd>Ctrl+Alt+[</Kbd>
+        </ContextMenuItem>
+        <ContextMenuSeparator />
+        <ContextMenuItem className="gap-3 py-2" onSelect={() => onShowLayers()}>
+          <Layers className="h-4 w-4" /> Mostrar camadas <Kbd>Alt+1</Kbd>
+        </ContextMenuItem>
+        {(fullscreenable || imageEditable) && <ContextMenuSeparator />}
         {fullscreenable && (
-          <ContextMenuItem onSelect={() => onToggleFullscreen()}>
+          <ContextMenuItem className="py-2" onSelect={() => onToggleFullscreen()}>
             {isFullscreen ? "Restaurar tamanho original" : "Ocupar tela toda"}
           </ContextMenuItem>
         )}
         {imageEditable && (
-          <ContextMenuItem onSelect={() => onEditImage()}>
+          <ContextMenuItem className="py-2" onSelect={() => onEditImage()}>
             Editar imagem…
           </ContextMenuItem>
         )}
