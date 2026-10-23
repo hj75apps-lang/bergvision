@@ -1357,7 +1357,7 @@ function RssWidget({ config }: { config: Record<string, unknown> }) {
     color: textColor,
   };
 
-  if (!url) {
+  if (!url && !manual) {
     return (
       <div
         className="flex h-full w-full flex-col justify-center gap-1 overflow-hidden p-2 text-white"
