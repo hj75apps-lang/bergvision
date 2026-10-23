@@ -51,11 +51,15 @@ export function toVideoEmbedUrl(raw: string): string | null {
     return `https://player.vimeo.com/video/${m[1]}?autoplay=1&muted=1&loop=1&autopause=0&playsinline=1&title=0&byline=0&portrait=0&dnt=1${h ? `&h=${h}` : ""}`;
   }
 
-  if (host === "drive.google.com") {
-    const m = u.pathname.match(/\/file\/d\/([\w-]+)/);
-    const id = m?.[1] ?? u.searchParams.get("id");
-    if (!id) return null;
-    return `https://drive.google.com/file/d/${id}/preview`;
+  if (host === "drive.google.com" || host === "docs.google.com") {
+    // Aceita /file/d/ID/view, /file/u/0/d/ID, open?id=ID e uc?id=ID.
+    // Sempre usa o player oficial (/preview): respeita as permissões do arquivo
+    // e faz streaming progressivo, sem baixar o vídeo inteiro.
+    const m = u.pathname.match(/\/file\/(?:u\/\d+\/)?d\/([\w-]{10,})/);
+    const id = m ? m[1] : u.searchParams.get("id");
+    if (!id || !/^[\w-]{10,}$/.test(id)) return null;
+    const rk = u.searchParams.get("resourcekey");
+    return `https://drive.google.com/file/d/${id}/preview${rk ? `?resourcekey=${encodeURIComponent(rk)}` : ""}`;
   }
 
   if (host === "dailymotion.com" || host === "dai.ly") {
