@@ -3,7 +3,8 @@
 // POST { url: string, max?: number }
 // Requer JWT do Supabase Auth (Authorization: Bearer ...).
 //
-// Faz proxy do feed RSS/Atom, parseia XML e devolve JSON:
+// Faz proxy do feed RSS/Atom, API JSON ou página HTML de notícias (raspagem
+// automática de título + foto) e devolve JSON:
 //   { items: [{ title, link, pubDate }] }
 // Texto é sempre normalizado (sem HTML) para o Player renderizar seguro.
 //
@@ -175,6 +176,132 @@ function jsonItems(data: any, body: any, max: number) {
   });
 }
 
+// ---------- Raspagem de páginas HTML de notícias ----------
+// Ex.: https://www3.seduc.mt.gov.br/noticias. Agrupa links por endereço e
+// extrai título (texto do link, alt ou title da imagem) e foto (img no link).
+
+function decodeHtml(s: string): string {
+  return s
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;|&apos;/g, "'")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(Number(n)))
+    .replace(/&amp;/g, "&")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function htmlAttr(tag: string, name: string): string {
+  const m = tag.match(new RegExp(`\\s${name}\\s*=\\s*("([^"]*)"|'([^']*)')`, "i"));
+  return m ? decodeHtml(m[2] ?? m[3] ?? "") : "";
+}
+
+function absUrl(u: string, base: string): string | null {
+  if (!u || /^(javascript:|mailto:|tel:|data:|#)/i.test(u)) return null;
+  try {
+    const r = new URL(u, base);
+    return r.protocol === "https:" || r.protocol === "http:" ? r.toString() : null;
+  } catch {
+    return null;
+  }
+}
+
+function cleanHeadline(t: string): string {
+  return t
+    .replace(/^(navegar para a notícia|ir à notícia|ir para a notícia|leia mais:?|saiba mais:?)\s*/i, "")
+    .trim();
+}
+
+function isHeadline(t: string): boolean {
+  return t.length >= 20 && t.length <= 300 && t.split(" ").length >= 4;
+}
+
+function htmlImgSrc(tag: string, base: string): string | null {
+  const srcset = htmlAttr(tag, "data-srcset") || htmlAttr(tag, "srcset");
+  const candidates = [
+    htmlAttr(tag, "data-src"),
+    htmlAttr(tag, "data-lazy-src"),
+    htmlAttr(tag, "data-original"),
+    srcset ? srcset.split(",")[0].trim().split(/\s+/)[0] : "",
+    htmlAttr(tag, "src"),
+  ];
+  for (const c of candidates) {
+    const u = absUrl(c, base);
+    if (!u || /logo|icon|sprite|avatar|pixel|blank|spacer/i.test(u)) continue;
+    // Só HTTPS para evitar mixed content no Player.
+    return u.replace(/^http:\/\//i, "https://");
+  }
+  return null;
+}
+
+function scrapeHtml(html: string, pageUrl: string, max: number) {
+  const body = html
+    .replace(/<script[\s\S]*?<\/script>/gi, "")
+    .replace(/<style[\s\S]*?<\/style>/gi, "")
+    .replace(/<noscript[\s\S]*?<\/noscript>/gi, "")
+    .replace(/<(nav|header|footer)\b[\s\S]*?<\/\1>/gi, "");
+  const page = pageUrl.split("#")[0];
+  const byLink = new Map<string, { order: number; title: string; image: string | null }>();
+  let order = 0;
+
+  for (const m of body.matchAll(/<a\b([^>]*)>([\s\S]*?)<\/a>/gi)) {
+    const open = `<a ${m[1]}>`;
+    const href = absUrl(htmlAttr(open, "href"), page);
+    if (!href) continue;
+    const link = href.split("#")[0];
+    if (link === page) continue;
+    const inner = m[2];
+    const imgTag = inner.match(/<img\b[^>]*>/i)?.[0] ?? "";
+    const title =
+      [
+        cleanHeadline(decodeHtml(inner)),
+        imgTag ? cleanHeadline(htmlAttr(imgTag, "alt")) : "",
+        cleanHeadline(htmlAttr(open, "title")),
+      ].find(isHeadline) ?? "";
+    const image = imgTag ? htmlImgSrc(imgTag, page) : null;
+    const cur = byLink.get(link);
+    if (!cur) {
+      if (title || image) byLink.set(link, { order: order++, title, image });
+    } else {
+      if (!cur.title && title) cur.title = title;
+      if (!cur.image && image) cur.image = image;
+    }
+  }
+
+  let list = [...byLink.entries()]
+    .filter(([, v]) => v.title)
+    .sort((a, b) => a[1].order - b[1].order);
+  const withImg = list.filter(([, v]) => v.image);
+  if (withImg.length >= 3) list = withImg;
+  // Mantém o grupo de links com o mesmo começo de caminho (ex.: /w/, /noticias/),
+  // descartando atalhos de menu e banners isolados.
+  const seg = (u: string) => {
+    try {
+      return new URL(u).pathname.split("/").filter(Boolean)[0] ?? "";
+    } catch {
+      return "";
+    }
+  };
+  const counts = new Map<string, number>();
+  for (const [l] of list) counts.set(seg(l), (counts.get(seg(l)) ?? 0) + 1);
+  const top = [...counts.entries()].sort((a, b) => b[1] - a[1])[0];
+  if (top && top[1] >= 3) list = list.filter(([l]) => seg(l) === top[0]);
+
+  const seen = new Set<string>();
+  const out: { title: string; link: string; pubDate: string; image: string | null; summary: string }[] = [];
+  for (const [link, v] of list) {
+    const key = v.title.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({ title: v.title.slice(0, 500), link, pubDate: "", image: v.image, summary: "" });
+    if (out.length >= max) break;
+  }
+  return out;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS")
     return new Response(null, { status: 204, headers: CORS });
@@ -247,7 +374,7 @@ Deno.serve(async (req) => {
     const res = await fetch(url, {
       headers: {
         "User-Agent": "BergVision-Widget/1.0 (+https://bergvision.lovable.app)",
-        Accept: "application/rss+xml, application/atom+xml, application/xml, text/xml;q=0.9, */*;q=0.5",
+        Accept: "application/rss+xml, application/atom+xml, application/xml, text/xml;q=0.9, text/html;q=0.8, */*;q=0.5",
       },
     });
     if (!res.ok) return json({ error: "fetch_failed", status: res.status }, 502);
@@ -303,6 +430,16 @@ Deno.serve(async (req) => {
       image: pickImage(block),
       summary: (pick(block, "description") || pick(block, "summary") || pick(block, "content")).slice(0, 280),
     }));
+    // Página HTML comum (sem RSS): raspa título + foto das notícias.
+    if (!blocks.length && /<html|<body|<a\s/i.test(xml)) {
+      const pageTitle = xml.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1] ?? "";
+      return json({
+        feedTitle: stripHtml(pageTitle),
+        fetchedAt: new Date().toISOString(),
+        items: scrapeHtml(xml, res.url || url, max),
+      });
+    }
+
     const head = xml.split(/<item|<entry/i)[0];
     const feedTitle = pick(head, "title");
 
