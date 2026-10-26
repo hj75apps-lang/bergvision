@@ -3,7 +3,8 @@
 // POST { url: string, max?: number }
 // Requer JWT do Supabase Auth (Authorization: Bearer ...).
 //
-// Faz proxy do feed RSS/Atom, parseia XML e devolve JSON:
+// Faz proxy do feed RSS/Atom, API JSON ou página HTML de notícias (raspagem
+// automática de título + foto) e devolve JSON:
 //   { items: [{ title, link, pubDate }] }
 // Texto é sempre normalizado (sem HTML) para o Player renderizar seguro.
 //
