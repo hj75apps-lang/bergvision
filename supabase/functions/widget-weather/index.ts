@@ -233,7 +233,7 @@ Deno.serve(async (req) => {
     );
     wUrl.searchParams.set(
       "hourly",
-      "temperature_2m,apparent_temperature,relative_humidity_2m,wind_speed_10m,weather_code,precipitation_probability",
+      "temperature_2m,apparent_temperature,relative_humidity_2m,wind_speed_10m,weather_code,precipitation_probability,is_day",
     );
     wUrl.searchParams.set(
       "daily",
@@ -271,6 +271,7 @@ Deno.serve(async (req) => {
     if (start < 0) start = 0;
     const hours = hTimes.slice(start, start + 24).map((time, k) => {
       const i = start + k;
+      const hIsDay = hourly.is_day?.[i];
       return {
         time,
         temp: round(hourly.temperature_2m?.[i]),
@@ -279,6 +280,7 @@ Deno.serve(async (req) => {
         wind: round(hourly.wind_speed_10m?.[i]),
         code: round(hourly.weather_code?.[i], 0) as number,
         precipitation: round(hourly.precipitation_probability?.[i]),
+        isDay: hIsDay != null ? Number(hIsDay) !== 0 : true,
       };
     });
 

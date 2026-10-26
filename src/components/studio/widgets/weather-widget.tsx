@@ -19,7 +19,8 @@ type WeatherData = {
   city: string;
   country: string;
   state: string;
-  forecast: { date: string; max: number; min: number; code: number }[];
+  forecast: { date: string; max: number; min: number; code: number; isDay?: boolean }[];
+  hourly?: { time: string; temp: number; feelsLike: number; humidity: number; wind: number; code: number; precipitation: number; isDay: boolean }[];
 };
 
 type Preset = "minimal" | "complete" | "forecast" | "vertical";
@@ -335,6 +336,7 @@ export function WeatherWidget({ config }: { config: Record<string, unknown> }) {
     country: typeof raw.country === "string" ? raw.country : "",
     state: typeof raw.state === "string" ? raw.state : "",
     forecast: Array.isArray(raw.forecast) ? (raw.forecast as WeatherData["forecast"]) : [],
+    hourly: Array.isArray(raw.hourly) ? (raw.hourly as WeatherData["hourly"]) : [],
   };
   const t = themeStyle(theme, d.code, d.isDay, accentColor);
   // Quando há imagem de fundo personalizada, o fundo do tema fica transparente
@@ -642,7 +644,7 @@ function PresetForecast({
               </div>
               <div className="flex flex-col items-center" style={{ gap: "1cqh" }}>
                 <div style={{ width: "13cqh", height: "13cqh" }}>
-                  <WeatherIcon code={day.code} accent={accent} animated={animated} />
+                  <WeatherIcon code={day.code} isDay={day.isDay ?? true} accent={accent} animated={animated} />
                 </div>
                 <span style={{ fontSize: "3.4cqh", color: tc.dayCondition }}>{wmoLabel(day.code)}</span>
               </div>
@@ -732,7 +734,7 @@ function PresetVertical({
               {i === 0 ? "Hoje" : fmtDate(day.date)}
             </span>
             <div style={{ width: "8cqh", height: "8cqh" }}>
-              <WeatherIcon code={day.code} accent={accent} animated={animated} />
+              <WeatherIcon code={day.code} isDay={day.isDay ?? true} accent={accent} animated={animated} />
             </div>
             <span style={{ fontWeight: 600, minWidth: "12cqh", textAlign: "right", color: tc.dayMax }}>
               {day.max}° <span style={{ opacity: 0.6, color: tc.dayMin }}>{day.min}°</span>
