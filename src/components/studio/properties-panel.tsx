@@ -3946,15 +3946,52 @@ function ShapeContent({
           0% = totalmente transparente. 100% = opaco.
         </span>
       </div>
-      <NumberField
-        label="Cantos arredondados"
-        value={(c.borderRadius as number) ?? 0}
-        min={0}
-        max={100}
-        step={1}
-        disabled={disabled}
-        onCommit={(v) => patch({ borderRadius: v })}
-      />
+      {((c.shapeType as string) ?? "rectangle") !== "circle" && (
+        <>
+          <NumberField
+            label="Cantos arredondados (todos)"
+            value={(c.borderRadius as number) ?? 0}
+            min={0}
+            max={500}
+            step={1}
+            disabled={disabled}
+            onCommit={(v) =>
+              patch({
+                borderRadius: v,
+                radiusTopLeft: undefined,
+                radiusTopRight: undefined,
+                radiusBottomRight: undefined,
+                radiusBottomLeft: undefined,
+              })
+            }
+          />
+          <div className="grid grid-cols-2 gap-2">
+            {(
+              [
+                ["radiusTopLeft", "Sup. esquerdo"],
+                ["radiusTopRight", "Sup. direito"],
+                ["radiusBottomLeft", "Inf. esquerdo"],
+                ["radiusBottomRight", "Inf. direito"],
+              ] as const
+            ).map(([key, label]) => (
+              <NumberField
+                key={key}
+                label={label}
+                value={
+                  typeof c[key] === "number"
+                    ? (c[key] as number)
+                    : ((c.borderRadius as number) ?? 0)
+                }
+                min={0}
+                max={500}
+                step={1}
+                disabled={disabled}
+                onCommit={(v) => patch({ [key]: v })}
+              />
+            ))}
+          </div>
+        </>
+      )}
       <NumberField
         label="Espessura da borda"
         value={(c.borderWidth as number) ?? 0}
