@@ -292,7 +292,7 @@ function StudioPage() {
   const submitFolderDialog = () => {
     if (!folderDialog) return;
     if (folderDialog.mode === "create") {
-      const created = tf.createFolder(folderName);
+      const created = tf.createFolder(folderName, folderDialog.moveId);
       if (!created) return toast.error("Nome vazio ou pasta já existe.");
       toast.success("Pasta criada.");
     } else {
@@ -602,10 +602,7 @@ function StudioPage() {
             autoFocus
             onKeyDown={(e) => {
               if (e.key === "Enter") {
-                const moveId = folderDialog?.mode === "create" ? folderDialog.moveId : undefined;
-                const name = folderName.replace(/\s+/g, " ").trim();
                 submitFolderDialog();
-                if (moveId && name) tf.moveTemplate(moveId, name);
               }
             }}
           />
@@ -616,10 +613,7 @@ function StudioPage() {
             <Button
               disabled={folderName.trim().length === 0}
               onClick={() => {
-                const moveId = folderDialog?.mode === "create" ? folderDialog.moveId : undefined;
-                const name = folderName.replace(/\s+/g, " ").trim();
                 submitFolderDialog();
-                if (moveId && name) tf.moveTemplate(moveId, name);
               }}
             >
               Salvar
