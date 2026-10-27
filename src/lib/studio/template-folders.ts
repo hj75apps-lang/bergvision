@@ -53,10 +53,11 @@ export function useTemplateFolders(orgId: string | null) {
     [key],
   );
 
-  const createFolder = (raw: string): string | null => {
+  const createFolder = (raw: string, moveTemplateId?: string): string | null => {
     const name = normalizeFolderName(raw);
     if (!name || state.folders.includes(name)) return null;
-    save({ ...state, folders: [...state.folders, name].sort((a, b) => a.localeCompare(b, "pt-BR")) });
+    const assign = moveTemplateId ? { ...state.assign, [moveTemplateId]: name } : state.assign;
+    save({ assign, folders: [...state.folders, name].sort((a, b) => a.localeCompare(b, "pt-BR")) });
     return name;
   };
 
