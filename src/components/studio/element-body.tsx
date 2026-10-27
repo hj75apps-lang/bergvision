@@ -262,7 +262,12 @@ function ElementBodyInner({ el }: { el: TemplateElement }) {
               borderRadius:
                 shape === "circle"
                   ? "50%"
-                  : `${(c.borderRadius as number) ?? 0}px`,
+                  : (() => {
+                      const base = (c.borderRadius as number) ?? 0;
+                      const k = (n: unknown) =>
+                        `${typeof n === "number" ? n : base}px`;
+                      return `${k(c.radiusTopLeft)} ${k(c.radiusTopRight)} ${k(c.radiusBottomRight)} ${k(c.radiusBottomLeft)}`;
+                    })(),
               border:
                 (c.borderWidth as number) && c.borderColor
                   ? `${c.borderWidth}px solid ${c.borderColor}`
