@@ -41,7 +41,74 @@ function widgetBgStyle(
   return { backgroundColor: `${color}${hex}` };
 }
 
+const BV_EL_KEYFRAMES = `
+@keyframes bv-el-in-fade{from{opacity:0}to{opacity:1}}
+@keyframes bv-el-in-up{from{opacity:0;transform:translateY(30%)}to{opacity:1;transform:none}}
+@keyframes bv-el-in-down{from{opacity:0;transform:translateY(-30%)}to{opacity:1;transform:none}}
+@keyframes bv-el-in-left{from{opacity:0;transform:translateX(30%)}to{opacity:1;transform:none}}
+@keyframes bv-el-in-right{from{opacity:0;transform:translateX(-30%)}to{opacity:1;transform:none}}
+@keyframes bv-el-in-zoom{from{opacity:0;transform:scale(.6)}to{opacity:1;transform:none}}
+@keyframes bv-el-in-flip{from{opacity:0;transform:perspective(600px) rotateY(90deg)}to{opacity:1;transform:none}}
+@keyframes bv-el-in-spin{from{opacity:0;transform:rotate(-180deg) scale(.5)}to{opacity:1;transform:none}}
+@keyframes bv-el-loop-pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.06)}}
+@keyframes bv-el-loop-float{0%,100%{transform:translateY(0)}50%{transform:translateY(-4%)}}
+@keyframes bv-el-loop-shake{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-2%)}40%,80%{transform:translateX(2%)}}
+@keyframes bv-el-loop-swing{0%,100%{transform:rotate(0)}25%{transform:rotate(4deg)}75%{transform:rotate(-4deg)}}
+@keyframes bv-el-loop-spin{from{transform:rotate(0)}to{transform:rotate(360deg)}}
+@keyframes bv-el-loop-blink{0%,100%{opacity:1}50%{opacity:.3}}
+@keyframes bv-el-loop-zoom{0%,100%{transform:scale(1)}50%{transform:scale(1.15)}}
+`;
+
+/** Animação individual do componente (entrada + repetição), salva em content.elementAnimation. */
 export function ElementBody({ el }: { el: TemplateElement }) {
+  const c = (el.content ?? {}) as Record<string, unknown>;
+  const a = (c.elementAnimation ?? {}) as Record<string, unknown>;
+  const entrance = typeof a.entrance === "string" ? a.entrance : "none";
+  const loop = typeof a.loop === "string" ? a.loop : "none";
+  const clamp = (v: unknown, d: number, min: number, max: number) =>
+    Math.max(min, Math.min(max, typeof v === "number" ? v : d));
+  const inDur = clamp(a.entranceDuration, 0.8, 0.2, 10);
+  const delay = clamp(a.delay, 0, 0, 30);
+  const loopDur = clamp(a.loopDuration, 2, 0.3, 30);
+  const body = <ElementBodyInner el={el} />;
+  if (entrance === "none" && loop === "none") return body;
+  const full = { width: "100%", height: "100%" };
+  const loopTiming =
+    loop === "spin" ? "linear" : loop === "blink" ? "steps(2,start)" : "ease-in-out";
+  let node = body;
+  if (loop !== "none") {
+    node = (
+      <div
+        style={{
+          ...full,
+          animation: `bv-el-loop-${loop} ${loopDur}s ${loopTiming} ${entrance !== "none" ? inDur + delay : delay}s infinite`,
+        }}
+      >
+        {node}
+      </div>
+    );
+  }
+  if (entrance !== "none") {
+    node = (
+      <div
+        style={{
+          ...full,
+          animation: `bv-el-in-${entrance} ${inDur}s cubic-bezier(0.22,1,0.36,1) ${delay}s both`,
+        }}
+      >
+        {node}
+      </div>
+    );
+  }
+  return (
+    <>
+      <style>{BV_EL_KEYFRAMES}</style>
+      {node}
+    </>
+  );
+}
+
+function ElementBodyInner({ el }: { el: TemplateElement }) {
   const c = (el.content ?? {}) as Record<string, unknown>;
   switch (el.element_type) {
     case "text": {

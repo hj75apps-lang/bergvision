@@ -175,6 +175,14 @@ export function PropertiesPanel({
 
             <Separator />
 
+            <ElementAnimationBlock
+              element={element}
+              disabled={disabled}
+              onChange={onContentChange}
+            />
+
+            <Separator />
+
             <ContentBlock
               element={element}
               disabled={disabled}
@@ -311,6 +319,94 @@ function TransformBlock({
           className="mt-2"
         />
       </div>
+    </div>
+  );
+}
+
+const ENTRANCE_OPTIONS: Array<[string, string]> = [
+  ["none", "Nenhuma"],
+  ["fade", "Aparecer (fade)"],
+  ["up", "Subir"],
+  ["down", "Descer"],
+  ["left", "Entrar pela direita"],
+  ["right", "Entrar pela esquerda"],
+  ["zoom", "Zoom"],
+  ["flip", "Virar"],
+  ["spin", "Girar"],
+];
+const LOOP_OPTIONS: Array<[string, string]> = [
+  ["none", "Nenhuma"],
+  ["pulse", "Pulsar"],
+  ["float", "Flutuar"],
+  ["shake", "Tremer"],
+  ["swing", "Balançar"],
+  ["spin", "Girar sem parar"],
+  ["blink", "Piscar"],
+  ["zoom", "Zoom contínuo"],
+];
+
+function ElementAnimationBlock({
+  element,
+  disabled,
+  onChange,
+}: {
+  element: TemplateElement;
+  disabled: boolean;
+  onChange: (content: Record<string, unknown>) => void;
+}) {
+  const c = (element.content ?? {}) as Record<string, unknown>;
+  const a = (c.elementAnimation ?? {}) as Record<string, unknown>;
+  const entrance = typeof a.entrance === "string" ? a.entrance : "none";
+  const loop = typeof a.loop === "string" ? a.loop : "none";
+  const num = (v: unknown, d: number) => (typeof v === "number" ? v : d);
+  const set = (p: Record<string, unknown>) =>
+    onChange({ ...c, elementAnimation: { ...a, ...p } });
+  return (
+    <div className="flex min-w-0 flex-col gap-2">
+      <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+        Animação do componente
+      </span>
+      <Label className="text-xs">Entrada</Label>
+      <Select value={entrance} onValueChange={(v) => set({ entrance: v })} disabled={disabled}>
+        <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+        <SelectContent>
+          {ENTRANCE_OPTIONS.map(([v, l]) => (
+            <SelectItem key={v} value={v}>{l}</SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      {entrance !== "none" && (
+        <>
+          <span className="text-[10px] text-muted-foreground">
+            Duração da entrada ({num(a.entranceDuration, 0.8).toFixed(1)}s)
+          </span>
+          <Slider value={[Math.round(num(a.entranceDuration, 0.8) * 10)]} min={2} max={100} step={1}
+            disabled={disabled} onValueChange={([v]) => set({ entranceDuration: v / 10 })} />
+        </>
+      )}
+      <span className="text-[10px] text-muted-foreground">
+        Atraso ({num(a.delay, 0).toFixed(1)}s)
+      </span>
+      <Slider value={[Math.round(num(a.delay, 0) * 10)]} min={0} max={300} step={1}
+        disabled={disabled} onValueChange={([v]) => set({ delay: v / 10 })} />
+      <Label className="mt-1 text-xs">Repetição</Label>
+      <Select value={loop} onValueChange={(v) => set({ loop: v })} disabled={disabled}>
+        <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+        <SelectContent>
+          {LOOP_OPTIONS.map(([v, l]) => (
+            <SelectItem key={v} value={v}>{l}</SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      {loop !== "none" && (
+        <>
+          <span className="text-[10px] text-muted-foreground">
+            Velocidade ({num(a.loopDuration, 2).toFixed(1)}s por ciclo)
+          </span>
+          <Slider value={[Math.round(num(a.loopDuration, 2) * 10)]} min={3} max={300} step={1}
+            disabled={disabled} onValueChange={([v]) => set({ loopDuration: v / 10 })} />
+        </>
+      )}
     </div>
   );
 }
@@ -690,7 +786,7 @@ function TextContent({
 
       <div className="flex flex-col gap-2">
         <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-          Animação
+          Animação do texto (fonte)
         </span>
         <Select
           value={(c.animation as string) ?? "none"}
