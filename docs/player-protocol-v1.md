@@ -26,7 +26,7 @@ Documento canônico. Deve ser idêntico nos projetos Admin e Player. Implementa�
 - `schedule.validUntil`: após esse instante o item não é exibido, mesmo offline.
 
 ## 4. Comandos e ACK
-Comando: `{ commandId, action, expiresAt, expectedRevision|null, args }`. Ações: PAUSE, RESUME, SKIP, RELOAD_MANIFEST, IDENTIFY, RESTART_APP, CLEAR_CACHE.
+Comando: `{ commandId, action, expiresAt, expectedRevision|null, args }`. Ações: PAUSE, RESUME, SKIP, RELOAD_MANIFEST, IDENTIFY, RESTART_APP, CLEAR_CACHE, CHECK_UPDATE (verifica e instala nova versão do APK; ACK detail com versão atual/nova).
 - Dedup por `commandId` persistida entre reinícios. Repetido → reenvia o ACK salvo, não reexecuta (SKIP repetido não pula outro item).
 - Vencido → ACK `expired`. `expectedRevision` diferente da ativa → `failed` (revision_mismatch).
 - ACK `{ commandId, status, at, detail }`: received (persistido) | executed (concluído e verificado) | failed | expired. ACK não é confirmação de transporte.
