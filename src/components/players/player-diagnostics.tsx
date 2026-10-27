@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { supabase } from "@/integrations/supabase/client";
 
-type Action = "PAUSE" | "RESUME" | "SKIP" | "RELOAD_MANIFEST" | "RESTART_APP" | "CLEAR_CACHE";
+type Action = "PAUSE" | "RESUME" | "SKIP" | "RELOAD_MANIFEST" | "RESTART_APP" | "CLEAR_CACHE" | "CHECK_UPDATE";
 
 const ACTIONS: { action: Action; label: string; confirm: string }[] = [
   { action: "PAUSE", label: "Pausar", confirm: "A tela vai pausar a reprodução." },
@@ -25,6 +25,7 @@ const ACTIONS: { action: Action; label: string; confirm: string }[] = [
   { action: "RELOAD_MANIFEST", label: "Recarregar programação", confirm: "A tela vai buscar a programação de novo." },
   { action: "RESTART_APP", label: "Reiniciar app", confirm: "O app da tela será reiniciado. A tela fica preta por alguns segundos." },
   { action: "CLEAR_CACHE", label: "Limpar arquivos salvos", confirm: "A tela apaga os vídeos e imagens salvos e baixa tudo de novo." },
+  { action: "CHECK_UPDATE", label: "Buscar atualização", confirm: "A tela verifica se existe uma versão nova do app e, se houver, baixa e instala. Pode ficar preta por alguns instantes." },
 ];
 
 const STATUS_LABEL: Record<string, string> = {
