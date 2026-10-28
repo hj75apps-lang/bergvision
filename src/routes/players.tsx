@@ -126,7 +126,7 @@ function PlayersPage() {
   const playersQ = useQuery({
     queryKey: ["players", orgId],
     enabled: !!orgId,
-    refetchInterval: 30_000,
+    refetchInterval: 15_000,
     queryFn: async (): Promise<Player[]> => {
       const { data, error } = await supabase
         .from("players")
@@ -136,7 +136,41 @@ function PlayersPage() {
         .eq("organization_id", orgId!)
         .order("created_at", { ascending: false });
       if (error) throw error;
-      return (data ?? []) as Player[];
+      const rawPlayers = (data ?? []) as Player[];
+
+      // Otimização: buscar também device_status recente para atualizar o last_heartbeat se houver reporte mais recente
+      const playerIds = rawPlayers.map((p) => p.id);
+      if (playerIds.length === 0) return rawPlayers;
+
+      const { data: statuses } = await supabase
+        .from("device_status" as never)
+        .select("player_id, reported_at")
+        .in("player_id", playerIds);
+
+      if (statuses && Array.isArray(statuses)) {
+        const map = new Map<string, string>();
+        for (const st of statuses as Array<{ player_id: string; reported_at: string }>) {
+          if (st.reported_at) {
+            const existing = map.get(st.player_id);
+            if (!existing || new Date(st.reported_at).getTime() > new Date(existing).getTime()) {
+              map.set(st.player_id, st.reported_at);
+            }
+          }
+        }
+        return rawPlayers.map((p) => {
+          const diagReported = map.get(p.id);
+          if (diagReported) {
+            const pTime = p.last_heartbeat ? new Date(p.last_heartbeat).getTime() : 0;
+            const dTime = new Date(diagReported).getTime();
+            if (dTime > pTime) {
+              return { ...p, last_heartbeat: diagReported };
+            }
+          }
+          return p;
+        });
+      }
+
+      return rawPlayers;
     },
   });
 
