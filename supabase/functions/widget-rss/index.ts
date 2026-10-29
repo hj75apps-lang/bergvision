@@ -50,7 +50,7 @@ function stripHtml(s: string) {
 }
 
 function pick(block: string, tag: string): string {
-  const re = new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`, "i");
+  const re = new RegExp(`<${tag}[^>]*>([\s\S]*?)<\/${tag}>`, "i");
   const m = block.match(re);
   return m ? stripHtml(m[1]) : "";
 }
@@ -67,20 +67,25 @@ function pickLink(block: string): string {
 // description/content:encoded). Retorna null se nada for encontrado.
 function pickImage(block: string): string | null {
   const patterns: RegExp[] = [
-    /<media:content[^>]*url="([^"]+)"[^>]*(?:medium="image"|type="image\/[^"]+")/i,
-    /<media:content[^>]*(?:medium="image"|type="image\/[^"]+")[^>]*url="([^"]+)"/i,
+    /<media:content[^>]*url="([^"]+)"[^>]*(?:medium="image"|type="image\/[^"]+")?/i,
+    /<media:content[^>]*(?:medium="image"|type="image\/[^"]+")?[^>]*url="([^"]+)"/i,
     /<media:thumbnail[^>]*url="([^"]+)"/i,
     /<enclosure[^>]*url="([^"]+)"[^>]*type="image\/[^"]+"/i,
     /<enclosure[^>]*type="image\/[^"]+"[^>]*url="([^"]+)"/i,
     /<itunes:image[^>]*href="([^"]+)"/i,
-    // <img src="..."> dentro de <description> ou <content:encoded> (CDATA ou não)
     /<img[^>]+src=["']([^"']+)["']/i,
+    /<content:encoded>[\s\S]*?<img[^>]+src=["']([^"']+)["']/i,
+    /<description>[\s\S]*?<img[^>]+src=["']([^"']+)["']/i,
   ];
   for (const re of patterns) {
     const m = block.match(re);
     if (m && m[1]) {
-      const url = m[1].trim();
-      // Só HTTPS para evitar mixed content no Player.
+      let url = m[1].trim();
+      if (url.startsWith("//")) {
+        url = "https:" + url;
+      } else if (url.startsWith("http://")) {
+        url = url.replace("http://", "https://");
+      }
       if (/^https:\/\//i.test(url)) return url;
     }
   }
@@ -165,7 +170,11 @@ function jsonItems(data: any, body: any, max: number) {
     let image: string | null = imageField
       ? toText(getPath(item, imageField))
       : firstKey(item, IMAGE_KEYS);
-    if (image && !/^https:\/\//i.test(image)) image = null;
+    if (image) {
+      if (image.startsWith("//")) image = "https:" + image;
+      else if (image.startsWith("http://")) image = image.replace("http://", "https://");
+      if (!/^https:\/\//i.test(image)) image = null;
+    }
     return {
       title: (title || "—").slice(0, 500),
       link: firstKey(item, LINK_KEYS),
@@ -344,7 +353,7 @@ Deno.serve(async (req) => {
 
   let url = String(body?.url ?? "").trim();
   // Links do GitHub: arquivo → raw; repositório/releases/commits/tags → Atom.
-  const gh = url.match(/^https?:\/\/(?:www\.)?github\.com\/([^/]+)\/([^/?#]+)(?:\/([^?#]*))?/i);
+  const gh = url.match(/^https?:\/\/(?:www\.)?github\.com\/([^\/]+)\/([^\/?#]+)(?:\/([^\/?#]*))?/i);
   if (gh) {
     const owner = gh[1];
     const repo = gh[2].replace(/\.git$/, "");
