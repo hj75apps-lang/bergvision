@@ -549,7 +549,6 @@ function PairDialog({
     try {
       const { data, error } = await supabase.functions.invoke("confirm-pairing", {
         body: {
-          // Enviamos aliases porque a Edge Function pode aceitar qualquer um destes nomes.
           pin_code: pin,
           pairing_code: pin,
           code: pin,
@@ -558,21 +557,24 @@ function PairDialog({
         },
       });
       if (error) {
-        // Tenta extrair mensagem detalhada da resposta
         let detail = "";
         let status: number | undefined;
         try {
           const ctx = (error as any).context;
           status = ctx?.status;
-          if (ctx?.json) detail = (await ctx.json())?.error ?? "";
-          else if (ctx?.text) detail = await ctx.text();
+          if (ctx?.json && typeof ctx.json === "function") {
+            const j = await ctx.json();
+            detail = j?.error ?? j?.message ?? "";
+          } else if (ctx?.text && typeof ctx.text === "function") {
+            detail = await ctx.text();
+          }
         } catch {
-          /* noop */
+          /* ignore parse failures */
         }
         const msg = (detail || error.message || "").toString().toLowerCase();
-        if (status === 404 || msg.includes("not_found") && msg.includes("function")) {
+        if (status === 404 || (msg.includes("not_found") && msg.includes("function"))) {
           throw new Error(
-            "Edge Function 'confirm-pairing' não está publicada no Supabase. Faça o deploy com `supabase functions deploy confirm-pairing` (ou peça ao administrador do backend).",
+            "Edge Function 'confirm-pairing' não está disponível. Verifique o deploy no Supabase.",
           );
         }
         if (msg.includes("expired")) {
