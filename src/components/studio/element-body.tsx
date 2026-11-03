@@ -1393,7 +1393,8 @@ function RssWidget({ config }: { config: Record<string, unknown> }) {
 
   // Ajustes de texto controlados pelo usuário
   const textColor = (config.textColor as string) || "#FFFFFF";
-  const maxLines = Math.max(1, Math.min(8, (config.maxLines as number) ?? 3));
+  const maxLinesRaw = Math.round(Number(config.maxLines ?? 3));
+  const maxLines = Math.max(1, Math.min(8, Number.isFinite(maxLinesRaw) ? maxLinesRaw : 3));
   const fontWeight = (config.fontWeight as number) ?? 600;
   const textAlign = ((config.textAlign as string) ?? "left") as
     | "left"
@@ -1414,9 +1415,8 @@ function RssWidget({ config }: { config: Record<string, unknown> }) {
     const box = fitBoxRef.current;
     const txt = fitTextRef.current;
     if (!box || !txt) return;
-    const overflowing =
-      txt.scrollHeight > txt.clientHeight + 1 ||
-      txt.offsetHeight > box.clientHeight + 1;
+    // Só reduz a fonte se o bloco (já limitado a maxLines) não couber na caixa.
+    const overflowing = txt.offsetHeight > box.clientHeight + 1;
     if (overflowing && fitScale > 0.35) {
       setFitScale((s) => Math.max(0.35, s - 0.07));
     }
@@ -1478,7 +1478,7 @@ function RssWidget({ config }: { config: Record<string, unknown> }) {
             animation: `bv-marquee-x ${speed}s linear infinite`,
             animationDirection: dir,
             fontSize: `${sizeCqh}cqh`,
-            fontWeight: 600,
+            fontWeight,
             paddingLeft: "2rem",
           }}
         >
@@ -1510,8 +1510,14 @@ function RssWidget({ config }: { config: Record<string, unknown> }) {
               key={i}
               style={{
                 fontSize: `${sizeCqh}cqh`,
-                fontWeight: 600,
+                fontWeight,
                 lineHeight: 1.3,
+                textAlign,
+                display: "-webkit-box",
+                WebkitBoxOrient: "vertical",
+                WebkitLineClamp: maxLines,
+                overflow: "hidden",
+                overflowWrap: "break-word",
               }}
             >
               • {it.title}
@@ -1536,8 +1542,10 @@ function RssWidget({ config }: { config: Record<string, unknown> }) {
     display: "-webkit-box",
     WebkitBoxOrient: "vertical",
     WebkitLineClamp: maxLines,
+    maxHeight: `${maxLines * 1.2}em`,
     overflow: "hidden",
     overflowWrap: "break-word",
+    textOverflow: "ellipsis",
     textAlign,
   };
 
