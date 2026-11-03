@@ -117,7 +117,6 @@ function PlayersPage() {
   const [nowMs, setNowMs] = useState(() => Date.now());
   const [pairOpen, setPairOpen] = useState(false);
 
-  // Tick para re-avaliar status offline (last_heartbeat > 60s).
   useEffect(() => {
     const t = setInterval(() => setNowMs(Date.now()), 15_000);
     return () => clearInterval(t);
@@ -138,7 +137,6 @@ function PlayersPage() {
       if (error) throw error;
       const rawPlayers = (data ?? []) as Player[];
 
-      // Otimização: buscar também device_status recente para atualizar o last_heartbeat se houver reporte mais recente
       const playerIds = rawPlayers.map((p) => p.id);
       if (playerIds.length === 0) return rawPlayers;
 
@@ -187,7 +185,6 @@ function PlayersPage() {
     },
   });
 
-  // Realtime: quando players da org mudam (heartbeat, status), revalida.
   useEffect(() => {
     if (!orgId) return;
     const channel = supabase
@@ -625,7 +622,7 @@ function PairDialog({
                   <InputOTPSlot index={3} />
                   <InputOTPSlot index={4} />
                   <InputOTPSlot index={5} />
-                </InputOTPGroup>
+                </InputOTPGroup> 
               </InputOTP>
             </div>
           </div>
