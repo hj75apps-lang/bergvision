@@ -152,8 +152,6 @@ Deno.serve(async (req) => {
   // ---- Novo código para player existente (sem apagar o player) ----
   const repairId = typeof body?.player_id === "string" ? body.player_id : null;
   if (repairId) {
-    if (pairing.device_id !== repairId)
-      return json({ error: "code_other_device" }, 409);
     const { data: own } = await admin
       .from("players")
       .select("id")
@@ -161,6 +159,21 @@ Deno.serve(async (req) => {
       .eq("organization_id", profile.organization_id)
       .maybeSingle();
     if (!own) return json({ error: "player_not_found" }, 404);
+    if (pairing.device_id !== repairId) {
+      // O app pode ter gerado o código com outro device_id. Aceita se o
+      // Admin pediu "Novo código" para este player nos últimos 15 minutos.
+      const since = new Date(Date.now() - 15 * 60_000).toISOString();
+      const { data: req } = await admin
+        .from("device_commands")
+        .select("id")
+        .eq("player_id", repairId)
+        .eq("organization_id", profile.organization_id)
+        .eq("action", "REPAIR")
+        .gte("created_at", since)
+        .limit(1)
+        .maybeSingle();
+      if (!req) return json({ error: "code_other_device" }, 409);
+    }
     const { error: repErr } = await admin
       .from("pairing_codes")
       .update({ status: "confirmed", confirmed_at: new Date().toISOString(), device_id: repairId })
