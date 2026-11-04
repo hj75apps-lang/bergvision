@@ -180,6 +180,23 @@ Deno.serve(async (req) => {
       .eq("id", pairing.id);
     if (repErr)
       return json({ error: "pairing_update_failed", detail: repErr.message }, 500);
+    // Encerra o pedido de "Novo código" para a tela não gerar outro código
+    // ao buscar comandos de novo depois de parear.
+    const nowIso = new Date().toISOString();
+    const { error: doneErr } = await admin
+      .from("device_commands")
+      .update({ status: "executed", expires_at: nowIso })
+      .eq("player_id", repairId)
+      .eq("action", "REPAIR")
+      .in("status", ["pending", "received"]);
+    if (doneErr) {
+      await admin
+        .from("device_commands")
+        .update({ expires_at: nowIso })
+        .eq("player_id", repairId)
+        .eq("action", "REPAIR")
+        .in("status", ["pending", "received"]);
+    }
     return json({ ok: true, player_id: repairId, organization_id: profile.organization_id, repaired: true });
   }
 
