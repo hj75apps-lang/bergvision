@@ -66,3 +66,46 @@ export async function resetPairing(playerId: string): Promise<void> {
   if (error) throw error;
   window.localStorage.removeItem(key(playerId));
 }
+
+/** Pede à tela (online) que mostre um novo PIN, sem apagar o player. */
+export async function requestNewPairingCode(playerId: string, organizationId: string): Promise<void> {
+  const { data: u } = await supabase.auth.getUser();
+  const { error } = await supabase.from("device_commands" as never).insert({
+    organization_id: organizationId,
+    player_id: playerId,
+    action: "REPAIR",
+    args: {},
+    expected_revision: null,
+    expires_at: new Date(Date.now() + 10 * 60_000).toISOString(),
+    status: "pending",
+    created_by: u.user ? u.user.id : null,
+  } as never);
+  if (error) throw error;
+}
+
+/** Confere o PIN mostrado na tela e refaz o pareamento do MESMO player. */
+export async function confirmRepair(playerId: string, name: string, code: string): Promise<void> {
+  const { data, error } = await supabase.functions.invoke("confirm-pairing", {
+    body: { code: code.trim().toUpperCase(), name, player_id: playerId },
+  });
+  if (error) {
+    let detail = error.message;
+    try {
+      const ctx = (error as { context?: Response }).context;
+      if (ctx) {
+        const j = (await ctx.json()) as { error?: string };
+        if (j.error) detail = j.error;
+      }
+    } catch {
+      /* ignora */
+    }
+    const map: Record<string, string> = {
+      invalid_code: "Código inválido.",
+      code_expired: "Código expirado. Gere outro.",
+      code_already_used: "Esse código já foi usado.",
+      code_other_device: "Esse código é de outra tela, não deste player.",
+    };
+    throw new Error(map[detail] ?? detail);
+  }
+  if (!data || (data as { ok?: boolean }).ok !== true) throw new Error("Resposta inesperada do servidor.");
+}

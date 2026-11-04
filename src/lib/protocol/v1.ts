@@ -113,6 +113,7 @@ export const CommandActionSchema = z.enum([
   "RESTART_APP",
   "CLEAR_CACHE",
   "CHECK_UPDATE",
+  "REPAIR",
 ]);
 
 export const CommandSchema = z.object({
