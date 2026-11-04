@@ -70,6 +70,13 @@ export async function resetPairing(playerId: string): Promise<void> {
 /** Pede à tela (online) que mostre um novo PIN, sem apagar o player. */
 export async function requestNewPairingCode(playerId: string, organizationId: string): Promise<void> {
   const { data: u } = await supabase.auth.getUser();
+  // Encerra pedidos antigos ainda abertos, para a tela não gerar códigos repetidos.
+  await supabase
+    .from("device_commands" as never)
+    .update({ expires_at: new Date().toISOString() } as never)
+    .eq("player_id" as never, playerId as never)
+    .eq("action" as never, "REPAIR" as never)
+    .eq("status" as never, "pending" as never);
   const { error } = await supabase.from("device_commands" as never).insert({
     organization_id: organizationId,
     player_id: playerId,
