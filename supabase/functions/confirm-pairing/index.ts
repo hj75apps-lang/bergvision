@@ -149,6 +149,27 @@ Deno.serve(async (req) => {
     return json({ error: "code_already_used" }, 409);
   if (status && status !== "pending")
     return json({ error: "code_not_pending", detail: status }, 409);
+  // ---- Novo código para player existente (sem apagar o player) ----
+  const repairId = typeof body?.player_id === "string" ? body.player_id : null;
+  if (repairId) {
+    if (pairing.device_id !== repairId)
+      return json({ error: "code_other_device" }, 409);
+    const { data: own } = await admin
+      .from("players")
+      .select("id")
+      .eq("id", repairId)
+      .eq("organization_id", profile.organization_id)
+      .maybeSingle();
+    if (!own) return json({ error: "player_not_found" }, 404);
+    const { error: repErr } = await admin
+      .from("pairing_codes")
+      .update({ status: "confirmed", confirmed_at: new Date().toISOString(), device_id: repairId })
+      .eq("id", pairing.id);
+    if (repErr)
+      return json({ error: "pairing_update_failed", detail: repErr.message }, 500);
+    return json({ ok: true, player_id: repairId, organization_id: profile.organization_id, repaired: true });
+  }
+
   // ---- Cria o device (o Player recebe id + token no poll-pairing-status) ----
   let deviceId: string | null = pairing.device_id ?? null;
   let deviceToken: string | null = null;

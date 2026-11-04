@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ChevronRight, KeyRound, Loader2, MonitorPlay, Pause, Play, Plus } from "lucide-react";
-import { getPausedLinks, pausePlayer, resetPairing, resumePlayer } from "@/lib/player-remote";
+import { confirmRepair, getPausedLinks, pausePlayer, requestNewPairingCode, resumePlayer } from "@/lib/player-remote";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -361,16 +361,40 @@ function PlayerCard({
 
   const [confirmOpen, setConfirmOpen] = useState(false);
 
+  const [codeOpen, setCodeOpen] = useState(false);
+  const [pin, setPin] = useState("");
+  const [pairing, setPairing] = useState(false);
+
   const newCode = async () => {
     setConfirmOpen(false);
     setBusy("code");
     try {
-      await resetPairing(player.id);
-      toast.success("Tela desconectada. Digite o novo PIN em \"Novo Player\".");
-      onChanged();
+      await requestNewPairingCode(player.id, player.organization_id);
+      setPin("");
+      setCodeOpen(true);
     } catch (err) {
       toast.error("Não foi possível: " + (err instanceof Error ? err.message : String(err)));
+    } finally {
       setBusy(null);
+    }
+  };
+
+  const submitPin = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!/^[A-Za-z0-9]{6}$/.test(pin.trim())) {
+      toast.error("Digite os 6 caracteres mostrados na tela.");
+      return;
+    }
+    setPairing(true);
+    try {
+      await confirmRepair(player.id, player.name, pin);
+      toast.success(`${player.name} pareado de novo.`);
+      setCodeOpen(false);
+      onChanged();
+    } catch (err) {
+      toast.error("Não foi possível parear: " + (err instanceof Error ? err.message : String(err)));
+    } finally {
+      setPairing(false);
     }
   };
 
@@ -485,8 +509,8 @@ function PlayerCard({
           <AlertDialogHeader>
             <AlertDialogTitle>Gerar novo código?</AlertDialogTitle>
             <AlertDialogDescription>
-              A tela &ldquo;{player.name}&rdquo; será desconectada e mostrará um novo PIN
-              para parear de novo.
+              A tela &ldquo;{player.name}&rdquo; vai mostrar um novo código. O player, as
+              playlists e o nome continuam os mesmos.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -497,6 +521,36 @@ function PlayerCard({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      <Dialog open={codeOpen} onOpenChange={setCodeOpen}>
+        <DialogContent className="rounded-2xl sm:max-w-sm" onClick={(e) => e.stopPropagation()}>
+          <DialogHeader>
+            <DialogTitle>Digite o novo código</DialogTitle>
+            <DialogDescription>
+              Em alguns segundos a tela &ldquo;{player.name}&rdquo; mostra um código de 6
+              caracteres. Digite-o abaixo para confirmar.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={submitPin} className="space-y-4">
+            <Input
+              autoFocus
+              value={pin}
+              maxLength={6}
+              onChange={(e) => setPin(e.target.value.toUpperCase())}
+              placeholder="ABC123"
+              className="h-12 rounded-xl text-center font-mono text-xl tracking-[0.4em]"
+            />
+            <DialogFooter>
+              <Button type="button" variant="ghost" className="rounded-xl" onClick={() => setCodeOpen(false)}>
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={pairing} className="rounded-xl">
+                {pairing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Parear
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
       <PlayerDetailSheet
         open={detailOpen}
         onOpenChange={setDetailOpen}
