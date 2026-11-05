@@ -356,9 +356,9 @@ function EditorPage() {
           y: p.y,
           width: p.width,
           height: p.height,
-          rotation: 0,
+          rotation: p.rotation ?? 0,
           z_index: maxZ + 1 + i,
-          opacity: 1,
+          opacity: p.opacity ?? 1,
           locked: false,
           visible: true,
           content: { ...p.defaultContent, groupPath: [{ id: groupId, name: (tool as LibraryItem).label }] },
@@ -1294,6 +1294,7 @@ function EditorPage() {
                 disabled={!canEdit || addElement.isPending}
                 onAdd={(item: LibraryItem) => addElement.mutate(item)}
                 onImport={() => setImportOpen(true)}
+                selectedElements={selectedElements}
               />
             </TabsContent>
           </Tabs>
