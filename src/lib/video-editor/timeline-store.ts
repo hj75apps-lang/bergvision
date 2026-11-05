@@ -51,6 +51,8 @@ type State = {
   setZoom: (z: number) => void;
   setPlayhead: (ms: number) => void;
   setPlaying: (p: boolean) => void;
+  /** Carrega uma sequência (zera seleção e histórico). */
+  load: (tracks: Track[], clips: Clip[]) => void;
 };
 
 const clampZoom = (z: number) => Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, z));
@@ -201,5 +203,8 @@ export const useVideoTimeline = create<State>((set, get) => {
     setZoom: (z) => set({ zoom: clampZoom(z) }),
     setPlayhead: (ms) => set({ playhead: Math.max(0, ms) }),
     setPlaying: (p) => set((s) => ({ playing: p, playhead: p && s.playhead >= sequenceEnd(s.clips) ? 0 : s.playhead })),
+    load: (tracks, clips) => set({
+      tracks, clips, selected: [], past: [], future: [], playhead: 0, playing: false,
+    }),
   };
 });
