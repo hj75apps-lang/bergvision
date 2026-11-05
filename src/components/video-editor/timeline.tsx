@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import { useEditorAssets } from "@/lib/video-editor/use-editor-media";
-import { ASSET_DRAG_MIME, type EditorAsset } from "@/lib/video-editor/media";
+import { ASSET_DRAG_MIME } from "@/lib/video-editor/media";
 import { useVideoTimeline } from "@/lib/video-editor/timeline-store";
 import {
   canPlace, fitZoom, formatTimecode, moveClip, rulerStep, sequenceEnd, TRACK_LABEL, tracksCompatible, trimEnd, trimStart,
@@ -285,4 +285,3 @@ export function VideoTimeline() {
   );
 }
 
-export type { EditorAsset };
