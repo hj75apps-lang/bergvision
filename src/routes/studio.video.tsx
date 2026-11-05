@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
 import { MediaLibrary } from "@/components/video-editor/media-library";
 import { MediaPreview } from "@/components/video-editor/media-preview";
+import { VideoTimeline } from "@/components/video-editor/timeline";
 import type { EditorAsset } from "@/lib/video-editor/media";
 
 export const Route = createFileRoute("/studio/video")({
@@ -45,9 +46,7 @@ function VideoEditorPage() {
         <section className="flex flex-col gap-3">
           <MediaPreview asset={selected} />
           {selected && <p className="truncate text-sm text-muted-foreground">{selected.name}</p>}
-          <div className="rounded-2xl border border-dashed border-border/60 p-6 text-center text-sm text-muted-foreground">
-            A linha do tempo chega na próxima fase.
-          </div>
+          <VideoTimeline />
         </section>
       </div>
     </div>
