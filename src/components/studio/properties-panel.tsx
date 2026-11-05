@@ -1,4 +1,9 @@
 import {
+  extractPlaceholders,
+  missingFields,
+  type DataField,
+} from "@/lib/studio/data-binding";
+import {
   parseElementAnimation,
   validateAnimation,
   type Keyframe,
@@ -104,7 +109,11 @@ export function PropertiesPanel({
   onToggleFullscreen,
   imageEditable,
   onEditImage,
+  dataFields = [],
+  onOpenData,
 }: {
+  dataFields?: DataField[];
+  onOpenData?: () => void;
   element: TemplateElement | null;
   disabled: boolean;
   onGeomChange: (patch: Partial<Pick<TemplateElement, NumericKey>>) => void;
@@ -180,6 +189,14 @@ export function PropertiesPanel({
             )}
 
             <Separator />
+
+            {element.element_type === "text" && (
+              <>
+                <DataBindingBlock element={element} disabled={disabled} fields={dataFields}
+                  onChange={onContentChange} onOpenData={onOpenData} />
+                <Separator />
+              </>
+            )}
 
             <ElementAnimationBlock
               element={element}
@@ -559,6 +576,76 @@ function ElementAnimationBlock({
             <Label className="text-[11px]">Repetir keyframes</Label>
             <Switch checked={a.keyframesLoop} disabled={disabled} onCheckedChange={(v) => set({ keyframesLoop: v })} />
           </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function DataBindingBlock({
+  element,
+  disabled,
+  fields,
+  onChange,
+  onOpenData,
+}: {
+  element: TemplateElement;
+  disabled: boolean;
+  fields: DataField[];
+  onChange: (content: Record<string, unknown>) => void;
+  onOpenData?: () => void;
+}) {
+  const c = (element.content ?? {}) as Record<string, unknown>;
+  const bound = c.dataBound === true;
+  const text = typeof c.content === "string" ? c.content : "";
+  const missing = bound ? missingFields(text, fields) : [];
+  const used = extractPlaceholders(text);
+  const insert = (key: string) => {
+    const sep = text && !text.endsWith(" ") && !text.endsWith("\n") ? " " : "";
+    console.log("[DadosDinamicos:vincular]", { el: element.id, key });
+    onChange({ ...c, dataBound: true, content: `${text}${sep}{{${key}}}` });
+  };
+  return (
+    <div className="flex min-w-0 flex-col gap-2">
+      <div className="flex items-center justify-between gap-2">
+        <Label className="text-xs">Converter em objeto controlado por dados</Label>
+        <Switch checked={bound} disabled={disabled}
+          aria-label="Converter em objeto controlado por dados"
+          onCheckedChange={(v) => {
+            console.log("[DadosDinamicos:converter]", { el: element.id, v });
+            onChange({ ...c, dataBound: v });
+          }} />
+      </div>
+      {bound && (
+        <>
+          <p className="text-[10px] text-muted-foreground">
+            Use {"{{campo}}"} no texto. A fonte, as cores, a posição e as animações continuam as mesmas; só o conteúdo muda.
+          </p>
+          {fields.length === 0 ? (
+            <Button size="sm" variant="outline" className="h-7 text-[11px]" onClick={onOpenData}>
+              Criar campos na aba Dados
+            </Button>
+          ) : (
+            <div className="flex flex-wrap gap-1">
+              {fields.map((f) => (
+                <button key={f.key} type="button" disabled={disabled} onClick={() => insert(f.key)}
+                  className={cn(
+                    "rounded-full border px-2 py-0.5 font-mono text-[10px] transition-all duration-200 focus-visible:ring-1 focus-visible:ring-primary disabled:opacity-40",
+                    used.includes(f.key) ? "border-primary/60 bg-primary/10 text-foreground" : "border-border/60 text-muted-foreground hover:text-foreground",
+                  )}>
+                  + {`{{${f.key}}}`}
+                </button>
+              ))}
+            </div>
+          )}
+          {missing.length > 0 && (
+            <p role="alert" className="rounded-md bg-destructive/10 p-1.5 text-[10px] text-destructive">
+              Campo(s) inexistente(s): {missing.map((m) => `{{${m}}}`).join(", ")}. Crie na aba Dados ou corrija o texto.
+            </p>
+          )}
+          {used.length === 0 && (
+            <p className="text-[10px] text-muted-foreground">Este texto ainda não usa nenhum campo.</p>
+          )}
         </>
       )}
     </div>

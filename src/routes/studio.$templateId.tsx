@@ -1,3 +1,11 @@
+import { DataPanel } from "@/components/studio/data-panel";
+import {
+  DATA_SOURCE_NAME,
+  currentValues,
+  findDataSourceElement,
+  parseDataSource,
+  type DataSource,
+} from "@/lib/studio/data-binding";
 import { ImportGraphicDialog } from "@/components/studio/import-graphic-dialog";
 import { persistImportedLayers } from "@/lib/studio/graphic-import-upload";
 import { TimelinePanel } from "@/components/studio/timeline-panel";
@@ -680,6 +688,45 @@ function EditorPage() {
 
   const [leftTab, setLeftTab] = useState<string>("components");
   const [importOpen, setImportOpen] = useState(false);
+  const dataSourceEl = useMemo(() => findDataSourceElement(elements), [elements]);
+  const dataSource = useMemo(
+    () => parseDataSource((dataSourceEl?.content as Record<string, unknown> | null)?.dataSource),
+    [dataSourceEl],
+  );
+  const dataValues = useMemo(() => currentValues(dataSource), [dataSource]);
+  const visualElements = useMemo(() => elements.filter((e) => e !== dataSourceEl), [elements, dataSourceEl]);
+  const creatingDataSource = useRef(false);
+  const saveDataSource = useCallback(
+    async (next: DataSource) => {
+      if (dataSourceEl) {
+        const c = (dataSourceEl.content ?? {}) as Record<string, unknown>;
+        await commitElementUpdate(dataSourceEl.id, { content: { ...c, dataSource: next } });
+        return;
+      }
+      if (creatingDataSource.current) return;
+      creatingDataSource.current = true;
+      try {
+        const { error } = await supabase.from("template_elements").insert({
+          template_id: templateId,
+          element_type: "shape",
+          x: 0, y: 0, width: 0, height: 0, rotation: 0, z_index: 0,
+          opacity: 0, locked: true, visible: false,
+          content: {
+            element_type: "shape", shapeType: "rectangle", fill: "transparent", borderWidth: 0,
+            name: DATA_SOURCE_NAME, isDataSource: true, dataSource: next,
+          },
+        });
+        if (error) throw error;
+        await qc.invalidateQueries({ queryKey: ["studio_elements", templateId] });
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : "Falha ao salvar os dados.");
+      } finally {
+        creatingDataSource.current = false;
+      }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [dataSourceEl, templateId],
+  );
 
   const arrangeLayers = useCallback(
     async (ids: string[], action: ArrangeAction) => {
@@ -1042,13 +1089,22 @@ function EditorPage() {
         {/* Layers */}
         <aside className="hidden overflow-hidden rounded-2xl border border-border/60 bg-card/40 backdrop-blur lg:flex lg:flex-col lg:h-[72vh]">
           <Tabs value={leftTab} onValueChange={setLeftTab} className="flex h-full flex-col">
-            <TabsList className="mx-2 mt-2 grid w-auto grid-cols-2">
+            <TabsList className="mx-2 mt-2 grid w-auto grid-cols-3">
               <TabsTrigger value="components" className="text-xs">Componentes</TabsTrigger>
               <TabsTrigger value="layers" className="text-xs">Camadas</TabsTrigger>
+              <TabsTrigger value="data" className="text-xs">Dados</TabsTrigger>
             </TabsList>
+            <TabsContent value="data" className="mt-0 flex-1 overflow-hidden data-[state=inactive]:hidden">
+              <DataPanel
+                source={dataSource}
+                elements={visualElements}
+                disabled={!canEdit}
+                onChange={(next) => void saveDataSource(next)}
+              />
+            </TabsContent>
             <TabsContent value="layers" className="mt-0 flex-1 overflow-hidden data-[state=inactive]:hidden">
               <LayersPanel
-            elements={elements}
+            elements={visualElements}
             selectedIds={selectedIds}
             disabled={!canEdit}
             onSelect={(id, additive) =>
@@ -1284,8 +1340,9 @@ function EditorPage() {
                   color={bg}
                   mediaId={template.background_media_id ?? null}
                 />
-                {elements.map((el) => (
+                {visualElements.map((el) => (
                   <ElementView
+                    dataValues={dataValues}
                     key={el.id}
                     el={el}
                     selected={selectedIds.includes(el.id)}
@@ -1456,6 +1513,8 @@ function EditorPage() {
               if (!activeElement) return;
               void commitElementUpdate(activeElement.id, { content });
             }}
+            dataFields={dataSource.fields}
+            onOpenData={() => setLeftTab("data")}
           />
         </aside>
       </div>
@@ -1489,7 +1548,7 @@ function EditorPage() {
       />
 
       <TimelinePanel
-        elements={elements}
+        elements={visualElements}
         selectedIds={selectedIds}
         disabled={!canEdit}
         onSelect={(id) => setSelectedIds([id])}
@@ -1593,6 +1652,7 @@ function EditorPage() {
 type ArrangeAction = "front" | "forward" | "backward" | "back";
 
 function ElementView({
+  dataValues,
   el,
   selected,
   canEdit,
@@ -1605,6 +1665,7 @@ function ElementView({
   onShowLayers,
   onContextOpen,
 }: {
+  dataValues: Record<string, string>;
   el: TemplateElement;
   selected: boolean;
   canEdit: boolean;
@@ -1641,7 +1702,7 @@ function ElementView({
       data-rot={String(el.rotation ?? 0)}
       style={style}
     >
-      <StudioElementBody el={el} timeline />
+      <StudioElementBody el={el} timeline dataValues={dataValues} />
     </div>
   );
 
