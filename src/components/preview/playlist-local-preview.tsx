@@ -1,3 +1,8 @@
+import {
+  currentValues,
+  findDataSourceElement,
+  parseDataSource,
+} from "@/lib/studio/data-binding";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
@@ -615,6 +620,10 @@ function TemplateFrame({ item }: { item: Item }) {
           .map((el) => {
             const visible = el.visible ?? true;
             if (!visible) return null;
+            const dsEl = findDataSourceElement(elements);
+            const dataValues = currentValues(
+              parseDataSource((dsEl?.content as Record<string, unknown> | null)?.dataSource),
+            );
             return (
               <div
                 key={el.id}
@@ -631,7 +640,7 @@ function TemplateFrame({ item }: { item: Item }) {
                   pointerEvents: "none",
                 }}
               >
-                <StudioElementBody el={el} />
+                <StudioElementBody el={el} dataValues={dataValues} />
               </div>
             );
           })}

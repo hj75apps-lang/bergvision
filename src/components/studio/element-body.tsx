@@ -48,6 +48,7 @@ import {
   presetKeyframesCss,
 } from "@/lib/studio/element-animation";
 import { useTimelineStore } from "@/lib/studio/timeline-store";
+import { resolveText } from "@/lib/studio/data-binding";
 
 const BV_EL_KEYFRAMES = `
 @keyframes bv-el-in-fade{from{opacity:0}to{opacity:1}}
@@ -72,7 +73,16 @@ const BV_EL_KEYFRAMES = `
  * salva em content.elementAnimation. Com `timeline`, segue o play/pause/stop
  * da linha do tempo do Studio.
  */
-export function ElementBody({ el, timeline = false }: { el: TemplateElement; timeline?: boolean }) {
+export function ElementBody({
+  el,
+  timeline = false,
+  dataValues,
+}: {
+  el: TemplateElement;
+  timeline?: boolean;
+  /** Valores dos campos {{...}} para textos controlados por dados. */
+  dataValues?: Record<string, string>;
+}) {
   const c = (el.content ?? {}) as Record<string, unknown>;
   const a = parseElementAnimation(c.elementAnimation);
   const tlPlaying = useTimelineStore((s) => s.playing);
@@ -82,7 +92,7 @@ export function ElementBody({ el, timeline = false }: { el: TemplateElement; tim
   const playing = timeline ? tlPlaying : true;
   const offset = timeline ? (tlPlaying ? tlAnchor : tlTime) : 0;
   const state = playing ? "running" : "paused";
-  const body = <ElementBodyInner el={el} />;
+  const body = <ElementBodyInner el={el} dataValues={dataValues} />;
   const kfName = `bv-kf-${el.id.replace(/[^a-zA-Z0-9]/g, "")}`;
   const kf = buildKeyframesCss(kfName, a.keyframes);
   const hasExit = a.exit !== "none" && a.exitAt !== null;
@@ -128,11 +138,18 @@ export function ElementBody({ el, timeline = false }: { el: TemplateElement; tim
   );
 }
 
-function ElementBodyInner({ el }: { el: TemplateElement }) {
+function ElementBodyInner({
+  el,
+  dataValues,
+}: {
+  el: TemplateElement;
+  dataValues?: Record<string, string>;
+}) {
   const c = (el.content ?? {}) as Record<string, unknown>;
   switch (el.element_type) {
     case "text": {
-      const text = typeof c.content === "string" ? c.content : "Texto";
+      const rawText = typeof c.content === "string" ? c.content : "Texto";
+      const text = c.dataBound === true ? resolveText(rawText, dataValues ?? {}) : rawText;
       const align = (c.textAlign as string) ?? "left";
       const color = (c.color as string) ?? "#FFFFFF";
       const weight = (c.fontWeight as string) ?? "500";
