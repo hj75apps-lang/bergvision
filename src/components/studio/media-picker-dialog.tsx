@@ -1,6 +1,16 @@
 import { useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, Loader2, Search, Upload } from "lucide-react";
+import { AlertTriangle, Loader2, Search, Trash2, Upload } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 
 import { supabase } from "@/integrations/supabase/client";
@@ -130,6 +140,35 @@ export function MediaPickerDialog({
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [uploadName, setUploadName] = useState<string | null>(null);
   const qc = useQueryClient();
+  const canDelete = ["owner", "admin", "editor"].includes(role);
+  const [toDelete, setToDelete] = useState<PickerMediaFile | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  const handleDelete = async () => {
+    if (!toDelete) return;
+    setDeleting(true);
+    try {
+      const { error } = await supabase.from("media_files").delete().eq("id", toDelete.id);
+      if (error) throw error;
+      const paths = [toDelete.storage_path, toDelete.thumbnail_path].filter(
+        (p): p is string => !!p,
+      );
+      if (paths.length) await supabase.storage.from(BUCKET).remove(paths);
+      toast.success(`${toDelete.name} excluído.`);
+      await qc.invalidateQueries({ queryKey: ["studio_media_picker"] });
+      await qc.invalidateQueries({ queryKey: ["media_files"] });
+      setToDelete(null);
+    } catch (err) {
+      const msg = getSupabaseErrorMessage(err, "Falha ao excluir.");
+      toast.error(
+        /foreign key|violates/i.test(msg)
+          ? "Esta mídia está em uso em uma playlist ou template. Remova-a de lá antes de excluir."
+          : msg,
+      );
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   const filesQ = useQuery({
     queryKey: ["studio_media_picker", orgId, filter],
@@ -367,6 +406,7 @@ export function MediaPickerDialog({
                   file={f}
                   requiredWidth={requiredWidth}
                   requiredHeight={requiredHeight}
+                  onDelete={canDelete ? () => setToDelete(f) : undefined}
                   onPick={() => {
                     if (
                       requiredWidth &&
@@ -388,6 +428,29 @@ export function MediaPickerDialog({
           )}
         </ScrollArea>
       </DialogContent>
+      <AlertDialog open={!!toDelete} onOpenChange={(v) => !v && !deleting && setToDelete(null)}>
+        <AlertDialogContent className="rounded-2xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir mídia?</AlertDialogTitle>
+            <AlertDialogDescription>
+              "{toDelete?.name}" será apagada da biblioteca para liberar espaço. Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={deleting}
+              onClick={(e) => {
+                e.preventDefault();
+                void handleDelete();
+              }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Excluir"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Dialog>
   );
 }
@@ -406,9 +469,11 @@ function PickerCard({
   onPick,
   requiredWidth,
   requiredHeight,
+  onDelete,
 }: {
   file: PickerMediaFile;
   onPick: () => void;
+  onDelete?: () => void;
   requiredWidth?: number;
   requiredHeight?: number;
 }) {
@@ -418,10 +483,25 @@ function PickerCard({
       ? isLowRes(file, requiredWidth, requiredHeight)
       : false;
   return (
+    <div className="group relative">
+    {onDelete && (
+      <button
+        type="button"
+        aria-label={`Excluir ${file.name}`}
+        title="Excluir mídia"
+        onClick={(e) => {
+          e.stopPropagation();
+          onDelete();
+        }}
+        className="absolute right-1.5 top-1.5 z-10 grid h-7 w-7 place-items-center rounded-lg bg-background/85 text-destructive shadow backdrop-blur transition hover:bg-destructive hover:text-destructive-foreground"
+      >
+        <Trash2 className="h-3.5 w-3.5" />
+      </button>
+    )}
     <button
       type="button"
       onClick={onPick}
-      className="group overflow-hidden rounded-xl border border-border/60 bg-card transition hover:border-primary/60 hover:shadow"
+      className="block w-full overflow-hidden rounded-xl border border-border/60 bg-card transition hover:border-primary/60 hover:shadow"
     >
       <div className="relative aspect-video w-full overflow-hidden bg-muted">
         {url ? (
@@ -451,5 +531,6 @@ function PickerCard({
         )}
       </div>
     </button>
+    </div>
   );
 }
