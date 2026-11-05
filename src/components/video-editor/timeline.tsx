@@ -1,8 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Copy, Maximize2, Pause, Play, Plus, SkipBack, Trash2, ZoomIn, ZoomOut } from "lucide-react";
+import {
+  ArrowLeftRight, Columns2, Copy, Group, Maximize2, MousePointer2, MoveHorizontal, Pause, Play, Plus, Redo2, Scissors,
+  SkipBack, SplitSquareHorizontal, Trash2, Undo2, Ungroup, ZoomIn, ZoomOut,
+} from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Switch } from "@/components/ui/switch";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { useEditorAssets } from "@/lib/video-editor/use-editor-media";
 import { ASSET_DRAG_MIME } from "@/lib/video-editor/media";
@@ -11,6 +16,9 @@ import {
   canPlace, fitZoom, formatTimecode, moveClip, rulerStep, sequenceEnd, TRACK_LABEL, tracksCompatible, trimEnd, trimStart,
   type Clip, type TrackKind,
 } from "@/lib/video-editor/timeline";
+import {
+  neighbors, rollEdit, slideEdit, slipEdit, snapToFrame, TOOL_KEY, TOOL_LABEL, type EditTool,
+} from "@/lib/video-editor/edit-ops";
 import { TimelineClip, type ClipPointerMode } from "./timeline-clip";
 import { TimelineTrackHeader } from "./timeline-track";
 
@@ -18,12 +26,34 @@ const HEADER_W = 176;
 const ROW_H = 56;
 const RULER_H = 28;
 
+type DragMode = "move" | "trim-start" | "trim-end" | "roll" | "slip" | "slide";
+
 type Drag = {
-  mode: ClipPointerMode;
+  mode: DragMode;
   x0: number;
   primary: Clip;
   originals: Clip[];
+  /** Roll: clipes à esquerda e à direita do ponto de corte. */
+  roll?: { left: Clip; right: Clip };
+  /** Slide: estado de todos os clipes no início do arraste. */
+  slideBase?: Clip[];
   moved: boolean;
+};
+
+const TOOL_ICON: Record<EditTool, typeof MousePointer2> = {
+  select: MousePointer2,
+  razor: Scissors,
+  roll: Columns2,
+  slip: ArrowLeftRight,
+  slide: MoveHorizontal,
+};
+
+const TOOL_HINT: Record<EditTool, string> = {
+  select: "Selecionar, mover e aparar clipes pelas bordas",
+  razor: "Clique num clipe para dividi-lo naquele ponto",
+  roll: "Arraste a junção entre dois clipes colados",
+  slip: "Arraste para trocar o trecho mostrado, sem mover o clipe",
+  slide: "Arraste o clipe entre os vizinhos, ajustando-os",
 };
 
 export function VideoTimeline() {
@@ -61,17 +91,45 @@ export function VideoTimeline() {
   }, [s.playing]);
 
   /* ---------- arrastar / aparar clipes ---------- */
-  const onClipPointerDown = useCallback((e: React.PointerEvent, clip: Clip, mode: ClipPointerMode) => {
+  const onClipPointerDown = useCallback((e: React.PointerEvent, clip: Clip, part: ClipPointerMode) => {
     if (e.button !== 0) return;
     e.stopPropagation();
     const st = useVideoTimeline.getState();
     const additive = e.shiftKey || e.ctrlKey || e.metaKey;
-    if (additive) { st.select(clip.id, true); return; }
-    if (!st.selected.includes(clip.id)) st.select(clip.id);
-    if (lockedTracks.has(clip.trackId)) return;
-    const ids = mode === "move" ? (st.selected.includes(clip.id) ? st.selected : [clip.id]) : [clip.id];
+    if (st.tool === "select" && additive) { st.select(clip.id, true); return; }
+    if (lockedTracks.has(clip.trackId)) { st.select(clip.id); return; }
+
+    if (st.tool === "razor") {
+      const rect = (e.currentTarget as HTMLElement).closest<HTMLElement>("[data-track-id]")?.getBoundingClientRect();
+      if (!rect) return;
+      st.splitAt(clip.id, snapToFrame(((e.clientX - rect.left) / st.zoom) * 1000));
+      return;
+    }
+
+    st.select(clip.id);
+    let mode: DragMode = part;
+    let roll: Drag["roll"];
+    if (st.tool === "slip") mode = "slip";
+    else if (st.tool === "slide") mode = "slide";
+    else if (st.tool === "roll") {
+      // no corpo do clipe, usa a borda mais próxima
+      let side = part;
+      if (side === "move") {
+        const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+        side = e.clientX - r.left < r.width / 2 ? "trim-start" : "trim-end";
+      }
+      const nb = neighbors(st.clips, clip);
+      if (side === "trim-start" && nb.prev && !lockedTracks.has(nb.prev.trackId)) roll = { left: nb.prev, right: clip };
+      else if (side === "trim-end" && nb.next) roll = { left: clip, right: nb.next };
+      if (roll) mode = "roll";
+      else { toast.info("Roll precisa de dois clipes colados na mesma trilha."); return; }
+    } else if (part === "move") {
+      if (!st.selected.includes(clip.id)) st.select(clip.id);
+    }
+    const sel = useVideoTimeline.getState().selected;
+    const ids = mode === "move" ? (sel.includes(clip.id) ? sel : [clip.id]) : [clip.id];
     dragRef.current = {
-      mode, x0: e.clientX, primary: clip, moved: false,
+      mode, x0: e.clientX, primary: clip, moved: false, roll,
       originals: st.clips.filter((c) => ids.includes(c.id) && !lockedTracks.has(c.trackId)),
     };
     (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
@@ -83,9 +141,36 @@ export function VideoTimeline() {
       if (!d) return;
       const dx = e.clientX - d.x0;
       if (!d.moved && Math.abs(dx) < 3 && d.mode === "move" && Math.abs(e.movementY) < 3) return;
-      d.moved = true;
       const st = useVideoTimeline.getState();
+      if (!d.moved) st.checkpoint();
+      d.moved = true;
       const dms = (dx / st.zoom) * 1000;
+      if (d.mode === "roll" && d.roll) {
+        const [l, r] = rollEdit(d.roll.left, d.roll.right, dms);
+        st.setClips(st.clips.map((c) => (c.id === l.id ? l : c.id === r.id ? r : c)));
+        return;
+      }
+      if (d.mode === "slip") {
+        // arrastar para a direita mostra conteúdo anterior (o conteúdo "anda" junto)
+        const n = slipEdit(d.primary, -dms);
+        st.setClips(st.clips.map((c) => (c.id === n.id ? n : c)));
+        return;
+      }
+      if (d.mode === "slide") {
+        const base = st.clips.map((c) => {
+          const o = d.originals.find((x) => x.id === c.id);
+          return o ?? c;
+        });
+        // vizinhos calculados a partir do estado original do arraste
+        const origin = d.slideBase ?? base;
+        d.slideBase = origin;
+        const r = slideEdit(origin, d.primary, dms);
+        const patch = new Map<string, Clip>([[r.clip.id, r.clip]]);
+        if (r.prev) patch.set(r.prev.id, r.prev);
+        if (r.next) patch.set(r.next.id, r.next);
+        st.setClips(origin.map((c) => patch.get(c.id) ?? c));
+        return;
+      }
       let targetTrack = d.primary.trackId;
       if (d.mode === "move" && d.originals.length === 1) {
         const el = document.elementFromPoint(e.clientX, e.clientY)?.closest<HTMLElement>("[data-track-id]");
