@@ -6,6 +6,7 @@ import {
   Columns,
   Film,
   FileImage,
+  FileUp,
   GalleryHorizontal,
   Heading,
   Image as ImageIcon,
@@ -540,9 +541,11 @@ function normalize(s: string) {
 
 export function ComponentsPanel({
   onAdd,
+  onImport,
   disabled,
 }: {
   onAdd: (item: LibraryItem) => void;
+  onImport?: () => void;
   disabled?: boolean;
 }) {
   const [q, setQ] = useState("");
@@ -558,7 +561,13 @@ export function ComponentsPanel({
 
   return (
     <div className="flex h-full flex-col">
-      <div className="border-b border-border/60 p-2">
+      <div className="space-y-2 border-b border-border/60 p-2">
+        {onImport && (
+          <Button variant="outline" size="sm" disabled={disabled} onClick={onImport}
+            className="h-8 w-full gap-1.5 text-xs transition-all duration-200">
+            <FileUp className="h-3.5 w-3.5" /> Importar PNG / PSD
+          </Button>
+        )}
         <div className="relative">
           <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
           <Input
