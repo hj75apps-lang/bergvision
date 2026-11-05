@@ -332,7 +332,7 @@ function EditorPage() {
 
   // ---- Add / delete / duplicate / update ----
   const addElement = useMutation({
-    mutationFn: async (tool: ToolDef) => {
+    mutationFn: async (tool: ToolDef | LibraryItem) => {
       snapshot();
       const maxZ = elements.reduce((m, e) => Math.max(m, e.z_index ?? 0), 0);
       const parts = (tool as LibraryItem).parts;
@@ -350,11 +350,11 @@ function EditorPage() {
           opacity: 1,
           locked: false,
           visible: true,
-          content: { ...p.defaultContent, groupPath: [{ id: groupId, name: tool.label }] },
+          content: { ...p.defaultContent, groupPath: [{ id: groupId, name: (tool as LibraryItem).label }] },
         }));
         const { data, error } = await supabase.from("template_elements").insert(rows).select("id");
         if (error) throw error;
-        console.log("[Studio:addComposite]", { label: tool.label, count: rows.length });
+        console.log("[Studio:addComposite]", { label: (tool as LibraryItem).label, count: rows.length });
         return (data ?? []).map((r) => r.id as string);
       }
       const { data, error } = await supabase
