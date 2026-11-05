@@ -1,3 +1,9 @@
+import {
+  parseElementAnimation,
+  validateAnimation,
+  type Keyframe,
+} from "@/lib/studio/element-animation";
+import { useTimelineStore } from "@/lib/studio/timeline-store";
 import { needsVimeoOEmbed, resolveVimeoEmbed, toVideoEmbedUrl } from "@/lib/studio/video-embed";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -325,14 +331,37 @@ function TransformBlock({
 
 const ENTRANCE_OPTIONS: Array<[string, string]> = [
   ["none", "Nenhuma"],
-  ["fade", "Aparecer (fade)"],
-  ["up", "Subir"],
-  ["down", "Descer"],
-  ["left", "Entrar pela direita"],
-  ["right", "Entrar pela esquerda"],
-  ["zoom", "Zoom"],
+  ["fade", "Fade In (aparecer)"],
+  ["up", "Slide In · subindo"],
+  ["down", "Slide In · descendo"],
+  ["left", "Slide In · pela direita"],
+  ["right", "Slide In · pela esquerda"],
+  ["zoom", "Zoom In"],
+  ["scale", "Scale In"],
+  ["reveal", "Reveal (revelar)"],
+  ["wipe", "Wipe (cortina)"],
+  ["typewriter", "Typewriter (máquina de escrever)"],
   ["flip", "Virar"],
   ["spin", "Girar"],
+];
+const EXIT_OPTIONS: Array<[string, string]> = [
+  ["none", "Nenhuma"],
+  ["fade", "Fade Out"],
+  ["up", "Slide Out · para cima"],
+  ["down", "Slide Out · para baixo"],
+  ["left", "Slide Out · para a direita"],
+  ["right", "Slide Out · para a esquerda"],
+  ["zoom", "Zoom Out"],
+  ["scale", "Scale Out"],
+];
+const EASING_OPTIONS: Array<[string, string]> = [
+  ["smooth", "Suave"],
+  ["ease", "Padrão"],
+  ["linear", "Linear"],
+  ["ease-in", "Acelerando"],
+  ["ease-out", "Desacelerando"],
+  ["ease-in-out", "Acelera e desacelera"],
+  ["bounce", "Elástico"],
 ];
 const LOOP_OPTIONS: Array<[string, string]> = [
   ["none", "Nenhuma"],
@@ -345,6 +374,36 @@ const LOOP_OPTIONS: Array<[string, string]> = [
   ["zoom", "Zoom contínuo"],
 ];
 
+function SecSlider({ label, value, min, max, step = 0.1, disabled, onChange }: {
+  label: string; value: number; min: number; max: number; step?: number; disabled: boolean; onChange: (v: number) => void;
+}) {
+  const k = 1 / step;
+  return (
+    <>
+      <span className="text-[10px] text-muted-foreground">{label}</span>
+      <Slider value={[Math.round(value * k)]} min={Math.round(min * k)} max={Math.round(max * k)} step={1}
+        disabled={disabled} onValueChange={([v]) => onChange(v / k)} />
+    </>
+  );
+}
+
+function KfNum({ label, value, step, disabled, onCommit }: {
+  label: string; value: number; step: number; disabled: boolean; onCommit: (v: number) => void;
+}) {
+  return (
+    <label className="flex min-w-0 flex-col gap-0.5 text-[10px] text-muted-foreground">
+      {label}
+      <Input type="number" step={step} defaultValue={value} key={value} disabled={disabled}
+        className="h-7 px-1.5 text-xs"
+        onBlur={(e) => {
+          const n = Number(e.target.value);
+          if (Number.isFinite(n)) onCommit(n);
+          else e.target.value = String(value);
+        }} />
+    </label>
+  );
+}
+
 function ElementAnimationBlock({
   element,
   disabled,
@@ -355,56 +414,151 @@ function ElementAnimationBlock({
   onChange: (content: Record<string, unknown>) => void;
 }) {
   const c = (element.content ?? {}) as Record<string, unknown>;
-  const a = (c.elementAnimation ?? {}) as Record<string, unknown>;
-  const entrance = typeof a.entrance === "string" ? a.entrance : "none";
-  const loop = typeof a.loop === "string" ? a.loop : "none";
-  const num = (v: unknown, d: number) => (typeof v === "number" ? v : d);
-  const set = (p: Record<string, unknown>) =>
-    onChange({ ...c, elementAnimation: { ...a, ...p } });
+  const raw = (c.elementAnimation ?? {}) as Record<string, unknown>;
+  const a = parseElementAnimation(raw);
+  const tlTime = useTimelineStore((s) => s.time);
+  const tlDuration = useTimelineStore((s) => s.duration);
+  const tlPlay = useTimelineStore((s) => s.play);
+  const tlSeek = useTimelineStore((s) => s.seek);
+  const set = (p: Record<string, unknown>) => {
+    const next = parseElementAnimation({ ...raw, ...p });
+    const err = validateAnimation(next);
+    if (err) {
+      toast.error(err);
+      return;
+    }
+    console.log("[Animacao:alterar]", { el: element.id, ...p });
+    onChange({ ...c, elementAnimation: { ...raw, ...p } });
+  };
+  const preview = () => {
+    tlSeek(0);
+    tlPlay();
+  };
+  const addKeyframe = () => {
+    const t = Math.round(tlTime * 10) / 10;
+    if (a.keyframes.some((k) => k.t === t)) {
+      toast.error("Já existe um keyframe neste tempo. Mova o indicador da linha do tempo.");
+      return;
+    }
+    const kf: Keyframe = { id: crypto.randomUUID(), t, x: 0, y: 0, scale: 1, rotate: 0, opacity: 1 };
+    set({ keyframes: [...a.keyframes, kf].sort((x, y) => x.t - y.t) });
+  };
+  const updKf = (id: string, p: Partial<Keyframe>) =>
+    set({ keyframes: a.keyframes.map((k) => (k.id === id ? { ...k, ...p } : k)) });
+  const delKf = (id: string) => set({ keyframes: a.keyframes.filter((k) => k.id !== id) });
+
   return (
     <div className="flex min-w-0 flex-col gap-2">
-      <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-        Animação do componente
-      </span>
+      <div className="flex items-center justify-between">
+        <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+          Animação do componente
+        </span>
+        <Button size="sm" variant="outline" className="h-6 px-2 text-[11px]" onClick={preview}>
+          Pré-visualizar
+        </Button>
+      </div>
+
       <Label className="text-xs">Entrada</Label>
-      <Select value={entrance} onValueChange={(v) => set({ entrance: v })} disabled={disabled}>
+      <Select value={a.entrance} onValueChange={(v) => set({ entrance: v })} disabled={disabled}>
         <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
         <SelectContent>
-          {ENTRANCE_OPTIONS.map(([v, l]) => (
-            <SelectItem key={v} value={v}>{l}</SelectItem>
-          ))}
+          {ENTRANCE_OPTIONS.map(([v, l]) => (<SelectItem key={v} value={v}>{l}</SelectItem>))}
         </SelectContent>
       </Select>
-      {entrance !== "none" && (
+      {a.entrance !== "none" && (
+        <SecSlider label={`Duração da entrada (${a.entranceDuration.toFixed(1)}s)`} value={a.entranceDuration}
+          min={0.2} max={10} disabled={disabled} onChange={(v) => set({ entranceDuration: v })} />
+      )}
+      <SecSlider label={`Início / atraso (${a.delay.toFixed(1)}s)`} value={a.delay} min={0} max={30}
+        disabled={disabled} onChange={(v) => set({ delay: v })} />
+
+      <Label className="mt-1 text-xs">Saída</Label>
+      <Select value={a.exit} disabled={disabled}
+        onValueChange={(v) => set(v === "none" ? { exit: v } : {
+          exit: v,
+          exitAt: a.exitAt ?? Math.max(a.delay + (a.entrance !== "none" ? a.entranceDuration : 0), tlDuration - a.exitDuration),
+        })}>
+        <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+        <SelectContent>
+          {EXIT_OPTIONS.map(([v, l]) => (<SelectItem key={v} value={v}>{l}</SelectItem>))}
+        </SelectContent>
+      </Select>
+      {a.exit !== "none" && (
         <>
-          <span className="text-[10px] text-muted-foreground">
-            Duração da entrada ({num(a.entranceDuration, 0.8).toFixed(1)}s)
-          </span>
-          <Slider value={[Math.round(num(a.entranceDuration, 0.8) * 10)]} min={2} max={100} step={1}
-            disabled={disabled} onValueChange={([v]) => set({ entranceDuration: v / 10 })} />
+          <SecSlider label={`Tempo de saída (${(a.exitAt ?? 0).toFixed(1)}s)`} value={a.exitAt ?? 0} min={0}
+            max={Math.max(1, tlDuration)} disabled={disabled} onChange={(v) => set({ exitAt: v })} />
+          <SecSlider label={`Duração da saída (${a.exitDuration.toFixed(1)}s)`} value={a.exitDuration}
+            min={0.2} max={10} disabled={disabled} onChange={(v) => set({ exitDuration: v })} />
         </>
       )}
-      <span className="text-[10px] text-muted-foreground">
-        Atraso ({num(a.delay, 0).toFixed(1)}s)
-      </span>
-      <Slider value={[Math.round(num(a.delay, 0) * 10)]} min={0} max={300} step={1}
-        disabled={disabled} onValueChange={([v]) => set({ delay: v / 10 })} />
+
+      {(a.entrance !== "none" || a.exit !== "none") && (
+        <>
+          <Label className="mt-1 text-xs">Curva de aceleração</Label>
+          <Select value={a.easing} onValueChange={(v) => set({ easing: v })} disabled={disabled}>
+            <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {EASING_OPTIONS.map(([v, l]) => (<SelectItem key={v} value={v}>{l}</SelectItem>))}
+            </SelectContent>
+          </Select>
+          <SecSlider label={`Intensidade (${Math.round(a.intensity * 100)}%)`} value={a.intensity} min={0.2} max={3}
+            disabled={disabled} onChange={(v) => set({ intensity: v })} />
+        </>
+      )}
+
       <Label className="mt-1 text-xs">Repetição</Label>
-      <Select value={loop} onValueChange={(v) => set({ loop: v })} disabled={disabled}>
+      <Select value={a.loop} onValueChange={(v) => set({ loop: v })} disabled={disabled}>
         <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
         <SelectContent>
-          {LOOP_OPTIONS.map(([v, l]) => (
-            <SelectItem key={v} value={v}>{l}</SelectItem>
-          ))}
+          {LOOP_OPTIONS.map(([v, l]) => (<SelectItem key={v} value={v}>{l}</SelectItem>))}
         </SelectContent>
       </Select>
-      {loop !== "none" && (
+      {a.loop !== "none" && (
+        <SecSlider label={`Velocidade (${a.loopDuration.toFixed(1)}s por ciclo)`} value={a.loopDuration}
+          min={0.3} max={30} disabled={disabled} onChange={(v) => set({ loopDuration: v })} />
+      )}
+
+      <div className="mt-2 flex items-center justify-between">
+        <Label className="text-xs">Keyframes</Label>
+        <Button size="sm" variant="outline" className="h-6 px-2 text-[11px]" disabled={disabled} onClick={addKeyframe}>
+          + em {tlTime.toFixed(1)}s
+        </Button>
+      </div>
+      {a.keyframes.length === 0 ? (
+        <p className="text-[10px] text-muted-foreground">
+          Posicione o indicador na linha do tempo e adicione pelo menos 2 keyframes para animar posição, escala, rotação e opacidade.
+        </p>
+      ) : (
         <>
-          <span className="text-[10px] text-muted-foreground">
-            Velocidade ({num(a.loopDuration, 2).toFixed(1)}s por ciclo)
-          </span>
-          <Slider value={[Math.round(num(a.loopDuration, 2) * 10)]} min={3} max={300} step={1}
-            disabled={disabled} onValueChange={([v]) => set({ loopDuration: v / 10 })} />
+          {a.keyframes.length === 1 && (
+            <p className="text-[10px] text-muted-foreground">Adicione mais um keyframe para a animação começar.</p>
+          )}
+          {a.keyframes.map((k) => (
+            <div key={k.id} className="rounded-lg border border-border/60 p-1.5">
+              <div className="mb-1 flex items-center justify-between text-[11px]">
+                <button type="button" className="font-mono text-primary hover:underline" onClick={() => tlSeek(k.t)}>
+                  ◆ {k.t.toFixed(1)}s
+                </button>
+                <Button size="sm" variant="ghost" className="h-5 px-1.5 text-[10px]" disabled={disabled}
+                  aria-label="Excluir keyframe" onClick={() => delKf(k.id)}>Excluir</Button>
+              </div>
+              <div className="grid grid-cols-3 gap-1">
+                <KfNum label="Tempo (s)" value={k.t} step={0.1} disabled={disabled}
+                  onCommit={(v) => updKf(k.id, { t: Math.max(0, Math.min(120, Math.round(v * 10) / 10)) })} />
+                <KfNum label="X (%)" value={k.x} step={1} disabled={disabled} onCommit={(v) => updKf(k.id, { x: v })} />
+                <KfNum label="Y (%)" value={k.y} step={1} disabled={disabled} onCommit={(v) => updKf(k.id, { y: v })} />
+                <KfNum label="Escala" value={k.scale} step={0.1} disabled={disabled}
+                  onCommit={(v) => updKf(k.id, { scale: Math.max(0, Math.min(10, v)) })} />
+                <KfNum label="Rotação (°)" value={k.rotate} step={1} disabled={disabled} onCommit={(v) => updKf(k.id, { rotate: v })} />
+                <KfNum label="Opacidade" value={k.opacity} step={0.1} disabled={disabled}
+                  onCommit={(v) => updKf(k.id, { opacity: Math.max(0, Math.min(1, v)) })} />
+              </div>
+            </div>
+          ))}
+          <div className="flex items-center justify-between">
+            <Label className="text-[11px]">Repetir keyframes</Label>
+            <Switch checked={a.keyframesLoop} disabled={disabled} onCheckedChange={(v) => set({ keyframesLoop: v })} />
+          </div>
         </>
       )}
     </div>

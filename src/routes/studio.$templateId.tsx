@@ -1,3 +1,4 @@
+import { TimelinePanel } from "@/components/studio/timeline-panel";
 import {
   useCallback,
   useEffect,
@@ -1455,6 +1456,14 @@ function EditorPage() {
         </aside>
       </div>
 
+      <TimelinePanel
+        elements={elements}
+        selectedIds={selectedIds}
+        disabled={!canEdit}
+        onSelect={(id) => setSelectedIds([id])}
+        onContentChange={(id, content) => void commitElementUpdate(id, { content })}
+      />
+
       <p className="text-center text-xs text-muted-foreground">
         Ctrl+Z / Ctrl+Shift+Z desfazer/refazer · Delete/Backspace excluir ·
         Ctrl+D duplicar · Ctrl+] / Ctrl+[ camadas · Alt+1 painel de camadas · setas para mover (Shift = 5%)
@@ -1600,7 +1609,7 @@ function ElementView({
       data-rot={String(el.rotation ?? 0)}
       style={style}
     >
-      <StudioElementBody el={el} />
+      <StudioElementBody el={el} timeline />
     </div>
   );
 
