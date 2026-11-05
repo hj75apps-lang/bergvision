@@ -21,6 +21,8 @@ export type Clip = {
   inPoint: number;
   /** Duração do arquivo (null = imagem/gráfico, pode esticar livremente). */
   sourceDuration: number | null;
+  /** Clipes com o mesmo grupo são selecionados e movidos juntos. */
+  groupId?: string;
 };
 
 export const TRACK_LABEL: Record<TrackKind, string> = {
