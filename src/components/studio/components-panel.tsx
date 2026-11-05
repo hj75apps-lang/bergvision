@@ -12,6 +12,9 @@ import {
   Images,
   LayoutGrid,
   ListMusic,
+  Megaphone,
+  Minus,
+  PanelBottom,
   MoveHorizontal,
   Pilcrow,
   QrCode,
@@ -43,6 +46,17 @@ export type LibraryItem = {
   defaultSize: { width: number; height: number };
   disabled?: boolean;
   disabledHint?: string;
+  /** Componente composto: várias camadas inseridas juntas (posições em %). */
+  parts?: LibraryPart[];
+};
+
+export type LibraryPart = {
+  type: ElementType;
+  defaultContent: Record<string, unknown>;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
 };
 
 type Category = { title: string; items: LibraryItem[] };
@@ -50,7 +64,97 @@ type Category = { title: string; items: LibraryItem[] };
 const NEUTRAL_BORDER = "#94A3B8";
 const PRIMARY_FILL = "#3B82F6";
 
+const txt = (
+  content: string,
+  name: string,
+  fontSizePercent: number,
+  fontWeight: string,
+  color = "#FFFFFF",
+): Record<string, unknown> => ({
+  element_type: "text",
+  content,
+  name,
+  fontFamily: "Inter",
+  fontSizePercent,
+  fontWeight,
+  color,
+  textAlign: "left",
+});
+
+const rect = (fill: string, name: string, borderRadius = 0): Record<string, unknown> => ({
+  element_type: "shape",
+  shapeType: "rectangle",
+  fill,
+  borderRadius,
+  borderWidth: 0,
+  name,
+});
+
 export const COMPONENT_LIBRARY: Category[] = [
+  {
+    title: "Gráficos",
+    items: [
+      {
+        type: "text",
+        label: "Manchete",
+        icon: Heading,
+        defaultContent: { ...txt("MANCHETE PRINCIPAL", "Manchete", 9, "800"), textTransform: "uppercase" },
+        defaultSize: { width: 70, height: 14 },
+      },
+      {
+        type: "text",
+        label: "Subtítulo",
+        icon: TypeIcon,
+        defaultContent: txt("Subtítulo da matéria", "Subtítulo", 5, "500", "#E2E8F0"),
+        defaultSize: { width: 60, height: 9 },
+      },
+      {
+        type: "shape",
+        label: "Terço inferior",
+        icon: PanelBottom,
+        defaultContent: {},
+        defaultSize: { width: 0, height: 0 },
+        parts: [
+          { type: "shape", defaultContent: rect("#0F172A", "Terço inferior · fundo", 12), x: 5, y: 74, width: 50, height: 16 },
+          { type: "shape", defaultContent: rect(PRIMARY_FILL, "Terço inferior · faixa", 4), x: 5, y: 74, width: 1.2, height: 16 },
+          { type: "text", defaultContent: txt("Nome do apresentador", "Terço inferior · nome", 5, "700"), x: 8, y: 75.5, width: 45, height: 7.5 },
+          { type: "text", defaultContent: txt("Cargo / função", "Terço inferior · cargo", 3.2, "400", "#CBD5E1"), x: 8, y: 83, width: 45, height: 5.5 },
+        ],
+      },
+      {
+        type: "shape",
+        label: "Terço com tarja",
+        icon: PanelBottom,
+        defaultContent: {},
+        defaultSize: { width: 0, height: 0 },
+        parts: [
+          { type: "shape", defaultContent: rect(PRIMARY_FILL, "Tarja · etiqueta", 6), x: 5, y: 70, width: 14, height: 6 },
+          { type: "text", defaultContent: { ...txt("AO VIVO", "Tarja · etiqueta texto", 3, "800"), textAlign: "center" }, x: 5, y: 70.5, width: 14, height: 5 },
+          { type: "shape", defaultContent: rect("#FFFFFF", "Tarja · fundo", 6), x: 5, y: 77, width: 60, height: 12 },
+          { type: "text", defaultContent: txt("Título da notícia em destaque", "Tarja · título", 4.5, "700", "#0F172A"), x: 7, y: 79, width: 56, height: 8 },
+        ],
+      },
+      {
+        type: "widget",
+        label: "Ticker",
+        icon: Megaphone,
+        defaultContent: {
+          element_type: "widget",
+          widgetType: "ticker",
+          name: "Ticker",
+          widgetConfig: { preset: "classic", customText: "Sua mensagem em movimento aqui", direction: "left", speed: 40 },
+        },
+        defaultSize: { width: 100, height: 8 },
+      },
+      {
+        type: "shape",
+        label: "Linha divisória",
+        icon: Minus,
+        defaultContent: rect("#FFFFFF", "Linha divisória"),
+        defaultSize: { width: 40, height: 0.6 },
+      },
+    ],
+  },
   {
     title: "Layout",
     items: [

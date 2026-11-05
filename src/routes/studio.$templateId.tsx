@@ -332,9 +332,31 @@ function EditorPage() {
 
   // ---- Add / delete / duplicate / update ----
   const addElement = useMutation({
-    mutationFn: async (tool: ToolDef) => {
+    mutationFn: async (tool: ToolDef | LibraryItem) => {
       snapshot();
       const maxZ = elements.reduce((m, e) => Math.max(m, e.z_index ?? 0), 0);
+      const parts = (tool as LibraryItem).parts;
+      if (parts && parts.length > 0) {
+        const groupId = crypto.randomUUID();
+        const rows = parts.map((p, i) => ({
+          template_id: templateId,
+          element_type: p.type,
+          x: p.x,
+          y: p.y,
+          width: p.width,
+          height: p.height,
+          rotation: 0,
+          z_index: maxZ + 1 + i,
+          opacity: 1,
+          locked: false,
+          visible: true,
+          content: { ...p.defaultContent, groupPath: [{ id: groupId, name: (tool as LibraryItem).label }] },
+        }));
+        const { data, error } = await supabase.from("template_elements").insert(rows).select("id");
+        if (error) throw error;
+        console.log("[Studio:addComposite]", { label: (tool as LibraryItem).label, count: rows.length });
+        return (data ?? []).map((r) => r.id as string);
+      }
       const { data, error } = await supabase
         .from("template_elements")
         .insert({
@@ -354,11 +376,11 @@ function EditorPage() {
         .select("id")
         .single();
       if (error) throw error;
-      return data.id as string;
+      return [data.id as string];
     },
-    onSuccess: async (id) => {
+    onSuccess: async (ids) => {
       await qc.invalidateQueries({ queryKey: ["studio_elements", templateId] });
-      setSelectedIds([id]);
+      setSelectedIds(ids);
     },
     onError: (e: unknown) =>
       toast.error(e instanceof Error ? e.message : "Falha ao adicionar."),
