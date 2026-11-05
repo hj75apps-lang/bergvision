@@ -21,6 +21,8 @@ export type Clip = {
   inPoint: number;
   /** Duração do arquivo (null = imagem/gráfico, pode esticar livremente). */
   sourceDuration: number | null;
+  /** Clipes com o mesmo grupo são selecionados e movidos juntos. */
+  groupId?: string;
 };
 
 export const TRACK_LABEL: Record<TrackKind, string> = {
@@ -111,7 +113,14 @@ export function fitZoom(clips: Clip[], widthPx: number): number {
 export function pasteClips(copied: Clip[], at: number): Clip[] {
   if (!copied.length) return [];
   const base = Math.min(...copied.map((c) => c.start));
-  return copied.map((c) => ({ ...c, id: uid(), start: Math.max(0, Math.round(at + c.start - base)) }));
+  // cópias formam grupos novos, sem se juntar aos grupos originais
+  const groupMap = new Map<string, string>();
+  const regroup = (g?: string) => {
+    if (!g) return undefined;
+    if (!groupMap.has(g)) groupMap.set(g, uid());
+    return groupMap.get(g);
+  };
+  return copied.map((c) => ({ ...c, id: uid(), groupId: regroup(c.groupId), start: Math.max(0, Math.round(at + c.start - base)) }));
 }
 
 export function duplicateClips(list: Clip[]): Clip[] {
