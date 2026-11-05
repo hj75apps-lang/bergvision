@@ -4,6 +4,7 @@ import { useSignedUrl } from "@/lib/studio/use-signed-url";
 import { useWaveform } from "@/lib/video-editor/use-waveform";
 import type { EditorAsset } from "@/lib/video-editor/media";
 import type { Clip } from "@/lib/video-editor/timeline";
+import type { EditTool } from "@/lib/video-editor/edit-ops";
 
 export type ClipPointerMode = "move" | "trim-start" | "trim-end";
 
@@ -13,6 +14,7 @@ type Props = {
   zoom: number;
   selected: boolean;
   locked: boolean;
+  tool: EditTool;
   onPointerDown: (e: React.PointerEvent, clip: Clip, mode: ClipPointerMode) => void;
 };
 
@@ -53,7 +55,15 @@ function Thumbs({ asset }: { asset: EditorAsset }) {
   );
 }
 
-export const TimelineClip = memo(function TimelineClip({ clip, asset, zoom, selected, locked, onPointerDown }: Props) {
+const TOOL_CURSOR: Record<EditTool, string> = {
+  select: "cursor-grab active:cursor-grabbing",
+  razor: "cursor-crosshair",
+  roll: "cursor-col-resize",
+  slip: "cursor-ew-resize",
+  slide: "cursor-move",
+};
+
+export const TimelineClip = memo(function TimelineClip({ clip, asset, zoom, selected, locked, tool, onPointerDown }: Props) {
   const left = (clip.start / 1000) * zoom;
   const width = Math.max(4, (clip.duration / 1000) * zoom);
   const kind = asset?.kind ?? "other";
@@ -68,7 +78,7 @@ export const TimelineClip = memo(function TimelineClip({ clip, asset, zoom, sele
       className={cn(
         "absolute top-1 bottom-1 select-none overflow-hidden rounded-lg border touch-none",
         KIND_STYLE[kind],
-        locked ? "cursor-not-allowed opacity-70" : "cursor-grab active:cursor-grabbing",
+        locked ? "cursor-not-allowed opacity-70" : TOOL_CURSOR[tool],
         selected && "ring-2 ring-ring ring-offset-1 ring-offset-background",
       )}
       style={{ left, width }}
@@ -78,7 +88,10 @@ export const TimelineClip = memo(function TimelineClip({ clip, asset, zoom, sele
       <span className="relative z-10 block truncate px-2 pt-0.5 text-[11px] font-medium text-foreground drop-shadow">
         {asset?.name ?? "Mídia removida"}
       </span>
-      {!locked && (
+      {clip.groupId && (
+        <span className="absolute bottom-0.5 right-1 z-10 rounded bg-background/70 px-1 text-[9px] font-medium text-muted-foreground">grupo</span>
+      )}
+      {!locked && (tool === "select" || tool === "roll") && (
         <>
           <span
             aria-label="Aparar início"

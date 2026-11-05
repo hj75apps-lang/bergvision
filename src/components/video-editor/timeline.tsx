@@ -106,7 +106,7 @@ export function VideoTimeline() {
       return;
     }
 
-    st.select(clip.id);
+    if (st.tool !== "select" || !st.selected.includes(clip.id)) st.select(clip.id);
     let mode: DragMode = part;
     let roll: Drag["roll"];
     if (st.tool === "slip") mode = "slip";
@@ -123,8 +123,6 @@ export function VideoTimeline() {
       else if (side === "trim-end" && nb.next) roll = { left: clip, right: nb.next };
       if (roll) mode = "roll";
       else { toast.info("Roll precisa de dois clipes colados na mesma trilha."); return; }
-    } else if (part === "move") {
-      if (!st.selected.includes(clip.id)) st.select(clip.id);
     }
     const sel = useVideoTimeline.getState().selected;
     const ids = mode === "move" ? (sel.includes(clip.id) ? sel : [clip.id]) : [clip.id];
@@ -157,12 +155,8 @@ export function VideoTimeline() {
         return;
       }
       if (d.mode === "slide") {
-        const base = st.clips.map((c) => {
-          const o = d.originals.find((x) => x.id === c.id);
-          return o ?? c;
-        });
-        // vizinhos calculados a partir do estado original do arraste
-        const origin = d.slideBase ?? base;
+        // vizinhos calculados a partir do estado do início do arraste
+        const origin = d.slideBase ?? st.clips;
         d.slideBase = origin;
         const r = slideEdit(origin, d.primary, dms);
         const patch = new Map<string, Clip>([[r.clip.id, r.clip]]);
@@ -226,6 +220,11 @@ export function VideoTimeline() {
     s.setPlayhead(xToMs(e.clientX - rect.left));
   };
 
+  const splitNow = () => {
+    const n = useVideoTimeline.getState().splitAtPlayhead();
+    if (!n) toast.info("Posicione o cursor sobre um clipe para cortar.");
+  };
+
   /* ---------- atalhos ---------- */
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -233,16 +232,30 @@ export function VideoTimeline() {
       if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName) || t.closest("[role=dialog]"))) return;
       const st = useVideoTimeline.getState();
       const mod = e.ctrlKey || e.metaKey;
-      if (e.key === "Delete" || e.key === "Backspace") { if (st.selected.length) { e.preventDefault(); st.deleteSelected(); } }
-      else if (mod && e.key.toLowerCase() === "c") { if (st.selected.length) { e.preventDefault(); st.copy(); } }
-      else if (mod && e.key.toLowerCase() === "v") { e.preventDefault(); st.paste(); }
-      else if (mod && e.key.toLowerCase() === "d") { e.preventDefault(); st.duplicate(); }
+      const k = e.key.toLowerCase();
+      if (mod && k === "z" && e.shiftKey) { e.preventDefault(); st.redo(); }
+      else if (mod && k === "z") { e.preventDefault(); st.undo(); }
+      else if (mod && k === "y") { e.preventDefault(); st.redo(); }
+      else if (mod && k === "c") { if (st.selected.length) { e.preventDefault(); st.copy(); } }
+      else if (mod && k === "v") { e.preventDefault(); st.paste(); }
+      else if (mod && k === "d") { e.preventDefault(); st.duplicate(); }
+      else if (mod && k === "a") { e.preventDefault(); st.selectAll(); }
+      else if (mod && k === "k") { e.preventDefault(); splitNow(); }
+      else if (mod && k === "g" && e.shiftKey) { e.preventDefault(); st.ungroup(); }
+      else if (mod && k === "g") { e.preventDefault(); st.group(); }
+      else if (mod || e.altKey) return;
+      else if ((e.key === "Delete" || e.key === "Backspace") && e.shiftKey) { if (st.selected.length) { e.preventDefault(); st.rippleDeleteSelected(); } }
+      else if (e.key === "Delete" || e.key === "Backspace") { if (st.selected.length) { e.preventDefault(); st.deleteSelected(); } }
       else if (e.key === " ") { e.preventDefault(); st.setPlaying(!st.playing); }
       else if (e.key === "Home") { e.preventDefault(); st.setPlayhead(0); }
       else if (e.key === "End") { e.preventDefault(); st.setPlayhead(sequenceEnd(st.clips)); }
       else if (e.key === "+" || e.key === "=") st.setZoom(st.zoom * 1.25);
       else if (e.key === "-") st.setZoom(st.zoom / 1.25);
-      else if (e.key === "Escape") st.select(null);
+      else if (e.key === "Escape") { st.select(null); st.setTool("select"); }
+      else {
+        const tool = (Object.keys(TOOL_KEY) as EditTool[]).find((t) => TOOL_KEY[t].toLowerCase() === k);
+        if (tool) { e.preventDefault(); st.setTool(tool); }
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -284,8 +297,37 @@ export function VideoTimeline() {
           {formatTimecode(s.playhead)} / {formatTimecode(end)}
         </span>
         <div className="mx-1 h-5 w-px bg-border" />
+        <div role="radiogroup" aria-label="Ferramenta" className="flex items-center gap-0.5 rounded-lg bg-muted/40 p-0.5">
+          {(Object.keys(TOOL_LABEL) as EditTool[]).map((t) => {
+            const Icon = TOOL_ICON[t];
+            return (
+              <Tooltip key={t}>
+                <TooltipTrigger asChild>
+                  <Button
+                    size="icon" variant={s.tool === t ? "secondary" : "ghost"} className="h-7 w-7"
+                    role="radio" aria-checked={s.tool === t} aria-label={`${TOOL_LABEL[t]} (${TOOL_KEY[t]})`}
+                    onClick={() => s.setTool(t)}
+                  ><Icon className="h-4 w-4" /></Button>
+                </TooltipTrigger>
+                <TooltipContent>{TOOL_LABEL[t]} ({TOOL_KEY[t]}) — {TOOL_HINT[t]}</TooltipContent>
+              </Tooltip>
+            );
+          })}
+        </div>
+        <Button size="icon" variant="ghost" className="h-8 w-8" aria-label="Cortar no cursor (Ctrl+K)" title="Cortar no cursor (Ctrl+K)" disabled={!s.clips.length} onClick={splitNow}><SplitSquareHorizontal className="h-4 w-4" /></Button>
+        <div className="mx-1 h-5 w-px bg-border" />
+        <Button size="icon" variant="ghost" className="h-8 w-8" aria-label="Desfazer (Ctrl+Z)" title="Desfazer (Ctrl+Z)" disabled={!s.past.length} onClick={s.undo}><Undo2 className="h-4 w-4" /></Button>
+        <Button size="icon" variant="ghost" className="h-8 w-8" aria-label="Refazer (Ctrl+Shift+Z)" title="Refazer (Ctrl+Shift+Z)" disabled={!s.future.length} onClick={s.redo}><Redo2 className="h-4 w-4" /></Button>
+        <div className="mx-1 h-5 w-px bg-border" />
+        <Button size="icon" variant="ghost" className="h-8 w-8" aria-label="Agrupar (Ctrl+G)" title="Agrupar (Ctrl+G)" disabled={s.selected.length < 2} onClick={s.group}><Group className="h-4 w-4" /></Button>
+        <Button size="icon" variant="ghost" className="h-8 w-8" aria-label="Desagrupar (Ctrl+Shift+G)" title="Desagrupar (Ctrl+Shift+G)" disabled={!s.selected.length} onClick={s.ungroup}><Ungroup className="h-4 w-4" /></Button>
         <Button size="icon" variant="ghost" className="h-8 w-8" aria-label="Duplicar" disabled={!s.selected.length} onClick={s.duplicate}><Copy className="h-4 w-4" /></Button>
-        <Button size="icon" variant="ghost" className="h-8 w-8" aria-label="Excluir clipe" disabled={!s.selected.length} onClick={s.deleteSelected}><Trash2 className="h-4 w-4" /></Button>
+        <Button size="icon" variant="ghost" className="h-8 w-8" aria-label="Excluir clipe (Delete)" title="Excluir clipe (Delete)" disabled={!s.selected.length} onClick={s.deleteSelected}><Trash2 className="h-4 w-4" /></Button>
+        <Button size="sm" variant="ghost" className="h-8 rounded-lg" title="Excluir e fechar o espaço (Shift+Delete)" disabled={!s.selected.length} onClick={s.rippleDeleteSelected}>Excluir e fechar</Button>
+        <label className="flex items-center gap-1.5 px-1 text-xs text-muted-foreground" title="Ao excluir e fechar, puxa também as outras trilhas para manter tudo sincronizado">
+          <Switch checked={s.rippleAllTracks} onCheckedChange={s.setRippleAllTracks} aria-label="Fechar espaço em todas as trilhas" />
+          Todas as trilhas
+        </label>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button size="sm" variant="ghost" className="h-8 rounded-lg"><Plus className="mr-1 h-4 w-4" />Trilha</Button>
@@ -345,7 +387,7 @@ export function VideoTimeline() {
                 {s.clips.filter((c) => c.trackId === tr.id).map((c) => (
                   <TimelineClip
                     key={c.id} clip={c} asset={assetMap.get(c.assetId)} zoom={s.zoom}
-                    selected={s.selected.includes(c.id)} locked={tr.locked} onPointerDown={onClipPointerDown}
+                    selected={s.selected.includes(c.id)} locked={tr.locked} tool={s.tool} onPointerDown={onClipPointerDown}
                   />
                 ))}
               </div>
@@ -361,6 +403,9 @@ export function VideoTimeline() {
           </div>
         </div>
       </div>
+      {s.clips.length > 0 && (
+        <p className="border-t border-border/60 px-3 py-1.5 text-xs text-muted-foreground">{TOOL_LABEL[s.tool]}: {TOOL_HINT[s.tool]}.</p>
+      )}
       {!s.clips.length && (
         <p className="border-t border-border/60 px-3 py-2 text-xs text-muted-foreground">
           Arraste arquivos da biblioteca para uma trilha. Shift ou Ctrl + clique seleciona vários clipes.
