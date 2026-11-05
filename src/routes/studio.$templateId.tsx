@@ -1600,7 +1600,7 @@ function ElementView({
       data-rot={String(el.rotation ?? 0)}
       style={style}
     >
-      <StudioElementBody el={el} />
+      <StudioElementBody el={el} timeline />
     </div>
   );
 

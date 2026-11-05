@@ -41,6 +41,14 @@ function widgetBgStyle(
   return { backgroundColor: `${color}${hex}` };
 }
 
+import {
+  buildKeyframesCss,
+  easingCss,
+  parseElementAnimation,
+  presetKeyframesCss,
+} from "@/lib/studio/element-animation";
+import { useTimelineStore } from "@/lib/studio/timeline-store";
+
 const BV_EL_KEYFRAMES = `
 @keyframes bv-el-in-fade{from{opacity:0}to{opacity:1}}
 @keyframes bv-el-in-up{from{opacity:0;transform:translateY(30%)}to{opacity:1;transform:none}}
@@ -59,52 +67,64 @@ const BV_EL_KEYFRAMES = `
 @keyframes bv-el-loop-zoom{0%,100%{transform:scale(1)}50%{transform:scale(1.15)}}
 `;
 
-/** Animação individual do componente (entrada + repetição), salva em content.elementAnimation. */
-export function ElementBody({ el }: { el: TemplateElement }) {
+/**
+ * Animação individual do componente (entrada, saída, keyframes e repetição),
+ * salva em content.elementAnimation. Com `timeline`, segue o play/pause/stop
+ * da linha do tempo do Studio.
+ */
+export function ElementBody({ el, timeline = false }: { el: TemplateElement; timeline?: boolean }) {
   const c = (el.content ?? {}) as Record<string, unknown>;
-  const a = (c.elementAnimation ?? {}) as Record<string, unknown>;
-  const entrance = typeof a.entrance === "string" ? a.entrance : "none";
-  const loop = typeof a.loop === "string" ? a.loop : "none";
-  const clamp = (v: unknown, d: number, min: number, max: number) =>
-    Math.max(min, Math.min(max, typeof v === "number" ? v : d));
-  const inDur = clamp(a.entranceDuration, 0.8, 0.2, 10);
-  const delay = clamp(a.delay, 0, 0, 30);
-  const loopDur = clamp(a.loopDuration, 2, 0.3, 30);
+  const a = parseElementAnimation(c.elementAnimation);
+  const tlPlaying = useTimelineStore((s) => s.playing);
+  const tlAnchor = useTimelineStore((s) => s.anchor);
+  const tlEpoch = useTimelineStore((s) => s.epoch);
+  const tlTime = useTimelineStore((s) => (timeline && !s.playing ? s.time : 0));
+  const playing = timeline ? tlPlaying : true;
+  const offset = timeline ? (tlPlaying ? tlAnchor : tlTime) : 0;
+  const state = playing ? "running" : "paused";
   const body = <ElementBodyInner el={el} />;
-  if (entrance === "none" && loop === "none") return body;
+  const kfName = `bv-kf-${el.id.replace(/[^a-zA-Z0-9]/g, "")}`;
+  const kf = buildKeyframesCss(kfName, a.keyframes);
+  const hasExit = a.exit !== "none" && a.exitAt !== null;
+  if (a.entrance === "none" && a.loop === "none" && !kf && !hasExit) return body;
   const full = { width: "100%", height: "100%" };
-  const loopTiming =
-    loop === "spin" ? "linear" : loop === "blink" ? "steps(2,start)" : "ease-in-out";
+  const ease = easingCss(a.easing);
+  const css: string[] = [BV_EL_KEYFRAMES];
+  const anim = (name: string, dur: number, timing: string, delay: number, rest: string) => ({
+    ...full,
+    animation: `${name} ${dur}s ${timing} ${(delay - offset).toFixed(3)}s ${rest}`,
+    animationPlayState: state,
+    WebkitAnimationPlayState: state,
+  });
   let node = body;
-  if (loop !== "none") {
+  if (a.loop !== "none") {
+    const loopTiming =
+      a.loop === "spin" ? "linear" : a.loop === "blink" ? "steps(2,start)" : "ease-in-out";
+    const start = a.entrance !== "none" ? a.entranceDuration + a.delay : a.delay;
+    node = <div style={anim(`bv-el-loop-${a.loop}`, a.loopDuration, loopTiming, start, "infinite")}>{node}</div>;
+  }
+  if (kf) {
+    css.push(kf.css);
     node = (
-      <div
-        style={{
-          ...full,
-          animation: `bv-el-loop-${loop} ${loopDur}s ${loopTiming} ${entrance !== "none" ? inDur + delay : delay}s infinite`,
-        }}
-      >
-        {node}
-      </div>
+      <div style={anim(kfName, kf.duration, "linear", 0, a.keyframesLoop ? "infinite" : "both")}>{node}</div>
     );
   }
-  if (entrance !== "none") {
-    node = (
-      <div
-        style={{
-          ...full,
-          animation: `bv-el-in-${entrance} ${inDur}s cubic-bezier(0.22,1,0.36,1) ${delay}s both`,
-        }}
-      >
-        {node}
-      </div>
-    );
+  if (a.entrance !== "none") {
+    const name = `${kfName}-in`;
+    css.push(presetKeyframesCss(name, a.entrance, "in", a.intensity));
+    const timing = a.entrance === "typewriter" ? "steps(24,end)" : ease;
+    node = <div style={anim(name, a.entranceDuration, timing, a.delay, "both")}>{node}</div>;
+  }
+  if (hasExit) {
+    const name = `${kfName}-out`;
+    css.push(presetKeyframesCss(name, a.exit, "out", a.intensity));
+    node = <div style={anim(name, a.exitDuration, ease, a.exitAt ?? 0, "forwards")}>{node}</div>;
   }
   return (
-    <>
-      <style>{BV_EL_KEYFRAMES}</style>
+    <div key={timeline ? tlEpoch : 0} style={full}>
+      <style>{css.join("\n")}</style>
       {node}
-    </>
+    </div>
   );
 }
 
