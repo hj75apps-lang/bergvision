@@ -25,6 +25,7 @@ import { Route as TemplatesRouteImport } from './routes/templates'
 import { Route as InviteTokenRouteImport } from './routes/invite.$token'
 import { Route as StudioIndexRouteImport } from './routes/studio.index'
 import { Route as StudioTemplateIdRouteImport } from './routes/studio.$templateId'
+import { Route as StudioVideoRouteImport } from './routes/studio.video'
 import { Route as ApiAiImageRouteImport } from './routes/api/ai/image'
 import { Route as ApiAiVideoRouteImport } from './routes/api/ai/video'
 
@@ -108,6 +109,11 @@ const StudioTemplateIdRoute = StudioTemplateIdRouteImport.update({
   path: '/$templateId',
   getParentRoute: () => StudioRoute,
 } as any)
+const StudioVideoRoute = StudioVideoRouteImport.update({
+  id: '/video',
+  path: '/video',
+  getParentRoute: () => StudioRoute,
+} as any)
 const ApiAiImageRoute = ApiAiImageRouteImport.update({
   id: '/api/ai/image',
   path: '/api/ai/image',
@@ -135,6 +141,7 @@ export interface FileRoutesByFullPath {
   '/templates': typeof TemplatesRoute
   '/invite/$token': typeof InviteTokenRoute
   '/studio/$templateId': typeof StudioTemplateIdRoute
+  '/studio/video': typeof StudioVideoRoute
   '/studio/': typeof StudioIndexRoute
   '/api/ai/image': typeof ApiAiImageRoute
   '/api/ai/video': typeof ApiAiVideoRoute
@@ -154,6 +161,7 @@ export interface FileRoutesByTo {
   '/templates': typeof TemplatesRoute
   '/invite/$token': typeof InviteTokenRoute
   '/studio/$templateId': typeof StudioTemplateIdRoute
+  '/studio/video': typeof StudioVideoRoute
   '/studio': typeof StudioIndexRoute
   '/api/ai/image': typeof ApiAiImageRoute
   '/api/ai/video': typeof ApiAiVideoRoute
@@ -175,6 +183,7 @@ export interface FileRoutesById {
   '/templates': typeof TemplatesRoute
   '/invite/$token': typeof InviteTokenRoute
   '/studio/$templateId': typeof StudioTemplateIdRoute
+  '/studio/video': typeof StudioVideoRoute
   '/studio/': typeof StudioIndexRoute
   '/api/ai/image': typeof ApiAiImageRoute
   '/api/ai/video': typeof ApiAiVideoRoute
@@ -197,6 +206,7 @@ export interface FileRouteTypes {
     | '/templates'
     | '/invite/$token'
     | '/studio/$templateId'
+    | '/studio/video'
     | '/studio/'
     | '/api/ai/image'
     | '/api/ai/video'
@@ -216,6 +226,7 @@ export interface FileRouteTypes {
     | '/templates'
     | '/invite/$token'
     | '/studio/$templateId'
+    | '/studio/video'
     | '/studio'
     | '/api/ai/image'
     | '/api/ai/video'
@@ -236,6 +247,7 @@ export interface FileRouteTypes {
     | '/templates'
     | '/invite/$token'
     | '/studio/$templateId'
+    | '/studio/video'
     | '/studio/'
     | '/api/ai/image'
     | '/api/ai/video'
@@ -374,6 +386,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof StudioTemplateIdRouteImport
       parentRoute: typeof StudioRoute
     }
+    '/studio/video': {
+      id: '/studio/video'
+      path: '/video'
+      fullPath: '/studio/video'
+      preLoaderRoute: typeof StudioVideoRouteImport
+      parentRoute: typeof StudioRoute
+    }
     '/api/ai/image': {
       id: '/api/ai/image'
       path: '/api/ai/image'
@@ -393,11 +412,13 @@ declare module '@tanstack/react-router' {
 
 interface StudioRouteChildren {
   StudioTemplateIdRoute: typeof StudioTemplateIdRoute
+  StudioVideoRoute: typeof StudioVideoRoute
   StudioIndexRoute: typeof StudioIndexRoute
 }
 
 const StudioRouteChildren: StudioRouteChildren = {
   StudioTemplateIdRoute: StudioTemplateIdRoute,
+  StudioVideoRoute: StudioVideoRoute,
   StudioIndexRoute: StudioIndexRoute,
 }
 

@@ -334,6 +334,9 @@ function StudioPage() {
         </div>
         {canManage && (
           <div className="flex flex-wrap gap-2">
+            <Button variant="outline" className="rounded-xl" size="lg" onClick={() => navigate({ to: "/studio/video" })}>
+              Editor de vídeo
+            </Button>
             <Button
               variant="outline"
               className="rounded-xl"
