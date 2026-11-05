@@ -1,3 +1,5 @@
+import { ImportGraphicDialog } from "@/components/studio/import-graphic-dialog";
+import { persistImportedLayers } from "@/lib/studio/graphic-import-upload";
 import { TimelinePanel } from "@/components/studio/timeline-panel";
 import {
   useCallback,
@@ -146,7 +148,7 @@ type ToolDef = {
 
 function EditorPage() {
   const { templateId } = Route.useParams();
-  const { membership } = useAuth();
+  const { membership, user } = useAuth();
   const role = membership?.role ?? "viewer";
   const canEdit = role === "owner" || role === "admin" || role === "editor";
   const navigate = useNavigate();
@@ -677,6 +679,7 @@ function EditorPage() {
   );
 
   const [leftTab, setLeftTab] = useState<string>("components");
+  const [importOpen, setImportOpen] = useState(false);
 
   const arrangeLayers = useCallback(
     async (ids: string[], action: ArrangeAction) => {
@@ -1234,6 +1237,7 @@ function EditorPage() {
               <ComponentsPanel
                 disabled={!canEdit || addElement.isPending}
                 onAdd={(item: LibraryItem) => addElement.mutate(item)}
+                onImport={() => setImportOpen(true)}
               />
             </TabsContent>
           </Tabs>
@@ -1455,6 +1459,34 @@ function EditorPage() {
           />
         </aside>
       </div>
+
+      <ImportGraphicDialog
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        canvasWidth={template.canvas_width}
+        canvasHeight={template.canvas_height}
+        onConfirm={async (report, fileName, onProgress) => {
+          const orgId = template.organization_id ?? membership?.organization_id;
+          if (!orgId) throw new Error("Organização não encontrada.");
+          snapshot();
+          const maxZ = elements.reduce((m, e) => Math.max(m, e.z_index ?? 0), 0);
+          const ids = await persistImportedLayers({
+            layers: report.layers,
+            templateId,
+            orgId,
+            uploaderId: user?.id ?? null,
+            baseZ: maxZ,
+            fileLabel: fileName,
+            onProgress,
+          });
+          console.log("[ImportGraphic:saved]", { count: ids.length });
+          await qc.invalidateQueries({ queryKey: ["studio_elements", templateId] });
+          void qc.invalidateQueries({ queryKey: ["media_files"] });
+          void qc.invalidateQueries({ queryKey: ["studio_media_picker"] });
+          setSelectedIds(ids);
+          toast.success(`${ids.length} camada(s) importada(s) de ${fileName}.`);
+        }}
+      />
 
       <TimelinePanel
         elements={elements}
