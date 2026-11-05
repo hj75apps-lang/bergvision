@@ -37,7 +37,8 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import type { ElementType } from "@/lib/studio/types";
+import type { ElementType, TemplateElement } from "@/lib/studio/types";
+import { SavedComponentsSection } from "./saved-components-section";
 
 export type LibraryItem = {
   type: ElementType;
@@ -58,6 +59,8 @@ export type LibraryPart = {
   y: number;
   width: number;
   height: number;
+  rotation?: number;
+  opacity?: number;
 };
 
 type Category = { title: string; items: LibraryItem[] };
@@ -543,10 +546,12 @@ export function ComponentsPanel({
   onAdd,
   onImport,
   disabled,
+  selectedElements = [],
 }: {
   onAdd: (item: LibraryItem) => void;
   onImport?: () => void;
   disabled?: boolean;
+  selectedElements?: TemplateElement[];
 }) {
   const [q, setQ] = useState("");
 
@@ -580,6 +585,12 @@ export function ComponentsPanel({
       </div>
       <ScrollArea className="flex-1">
         <div className="space-y-4 p-2">
+          <SavedComponentsSection
+            selectedElements={selectedElements}
+            canEdit={!disabled}
+            onInsert={onAdd}
+            search={q}
+          />
           {filtered.length === 0 && (
             <div className="py-8 text-center text-xs text-muted-foreground">
               Nenhum componente encontrado
