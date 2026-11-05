@@ -131,3 +131,34 @@ export function elementEnd(a: ElementAnimation, timelineDuration: number): numbe
   if (a.exit !== "none" && a.exitAt !== null) return Math.min(timelineDuration, a.exitAt + a.exitDuration);
   return timelineDuration;
 }
+
+/** Estado "fora de cena" de um efeito de entrada/saída, já com a intensidade aplicada. */
+export function offState(kind: string, intensity: number): string {
+  const d = Math.round(30 * intensity * 100) / 100;
+  const s = Math.max(0, Math.round((1 - 0.4 * intensity) * 100) / 100);
+  switch (kind) {
+    case "fade": return "opacity:0";
+    case "up": return `opacity:0;transform:translateY(${d}%)`;
+    case "down": return `opacity:0;transform:translateY(-${d}%)`;
+    case "left": return `opacity:0;transform:translateX(${d}%)`;
+    case "right": return `opacity:0;transform:translateX(-${d}%)`;
+    case "zoom": return `opacity:0;transform:scale(${s})`;
+    case "scale": return `transform:scale(0)`;
+    case "flip": return "opacity:0;transform:perspective(600px) rotateY(90deg)";
+    case "spin": return `opacity:0;transform:rotate(-${Math.round(180 * intensity)}deg) scale(.5)`;
+    case "reveal": return "clip-path:inset(0 100% 0 0);-webkit-clip-path:inset(0 100% 0 0)";
+    case "wipe": return "clip-path:inset(100% 0 0 0);-webkit-clip-path:inset(100% 0 0 0)";
+    case "typewriter": return "clip-path:inset(0 100% 0 0);-webkit-clip-path:inset(0 100% 0 0)";
+    default: return "opacity:1";
+  }
+}
+
+const ON_STATE = "opacity:1;transform:none;clip-path:inset(0 0 0 0);-webkit-clip-path:inset(0 0 0 0)";
+
+/** @keyframes de entrada (fora → dentro) ou saída (dentro → fora). */
+export function presetKeyframesCss(name: string, kind: string, mode: "in" | "out", intensity: number): string {
+  const off = offState(kind, intensity);
+  return mode === "in"
+    ? `@keyframes ${name}{from{${off}}to{${ON_STATE}}}`
+    : `@keyframes ${name}{from{${ON_STATE}}to{${off}}}`;
+}
