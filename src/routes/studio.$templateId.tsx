@@ -1,3 +1,4 @@
+import { TimelinePanel } from "@/components/studio/timeline-panel";
 import {
   useCallback,
   useEffect,
