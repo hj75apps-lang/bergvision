@@ -36,7 +36,7 @@ export const MAX_PARTS = 200;
 
 /** Elementos internos (ex.: dados ocultos) não entram na biblioteca. */
 const isInternal = (el: TemplateElement) =>
-  Boolean((el.content as Record<string, unknown> | null)?.studioData);
+  Boolean((el.content as Record<string, unknown> | null)?.isDataSource === true);
 
 /** Converte elementos selecionados em partes reutilizáveis, mantendo % e ordem das camadas. */
 export function buildPartsFromElements(elements: TemplateElement[]): SavedPart[] {

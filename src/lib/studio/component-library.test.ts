@@ -19,7 +19,7 @@ describe("biblioteca de componentes", () => {
   });
 
   it("não salva o elemento oculto de dados", () => {
-    expect(buildPartsFromElements([el({ content: { studioData: {} } })])).toHaveLength(0);
+    expect(buildPartsFromElements([el({ content: { isDataSource: true } })])).toHaveLength(0);
   });
 
   it("sugere ticker para widget ticker sozinho", () => {
