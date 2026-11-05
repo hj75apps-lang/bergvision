@@ -6,6 +6,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { MediaLibrary } from "@/components/video-editor/media-library";
 import { MediaPreview } from "@/components/video-editor/media-preview";
 import { VideoTimeline } from "@/components/video-editor/timeline";
+import { SequenceBar } from "@/components/video-editor/sequence-bar";
 import type { EditorAsset } from "@/lib/video-editor/media";
 
 export const Route = createFileRoute("/studio/video")({
@@ -44,6 +45,7 @@ function VideoEditorPage() {
           <MediaLibrary orgId={membership?.organization_id} canEdit={canEdit} onPreview={setSelected} />
         </aside>
         <section className="flex flex-col gap-3">
+          <SequenceBar orgId={membership?.organization_id} />
           <MediaPreview asset={selected} />
           {selected && <p className="truncate text-sm text-muted-foreground">{selected.name}</p>}
           <VideoTimeline />
