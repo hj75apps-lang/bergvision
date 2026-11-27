@@ -57,13 +57,13 @@ export const TextElementSchema = z.object({
 
 export const ImageElementSchema = z.object({
   element_type: z.literal('image'),
-  mediaFileId: z.string().uuid(),
+  mediaFileId: z.guid(),
   fit: z.enum(['contain', 'cover', 'fill']).default('cover'),
 });
 
 export const VideoElementSchema = z.object({
   element_type: z.literal('video'),
-  mediaFileId: z.string().uuid(),
+  mediaFileId: z.guid(),
   fit: z.enum(['contain', 'cover', 'fill']).default('cover'),
   loop: z.boolean().default(true),
   muted: z.boolean().default(true),
@@ -71,13 +71,13 @@ export const VideoElementSchema = z.object({
 
 export const LogoElementSchema = z.object({
   element_type: z.literal('logo'),
-  mediaFileId: z.string().uuid(),
+  mediaFileId: z.guid(),
   fit: z.enum(['contain', 'cover']).default('contain'),
 });
 
 export const PlaylistElementSchema = z.object({
   element_type: z.literal('playlist'),
-  playlistId: z.string().uuid(),
+  playlistId: z.guid(),
 });
 
 /* --- Widgets: config validada por widgetType --- */
@@ -161,7 +161,7 @@ export const IframeWidgetConfigSchema = z.object({
 export const WidgetElementSchema = z.object({
   element_type: z.literal('widget'),
   widgetType: z.enum(['clock', 'weather', 'rss', 'news', 'iframe']),
-  widgetConfig: z.record(z.any()),
+  widgetConfig: z.record(z.string(), z.any()),
 });
 
 const widgetConfigByType = {
