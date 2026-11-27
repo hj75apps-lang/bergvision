@@ -10,7 +10,10 @@ export const PROTOCOL_VERSION = "1.0" as const;
 
 const isoUtc = z
   .string()
-  .regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,3})?Z$/, "deve ser ISO 8601 em UTC (sufixo Z)");
+  .regex(
+    /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,3})?Z$/,
+    "deve ser ISO 8601 em UTC (sufixo Z)",
+  );
 const uuid = z.guid();
 const hhmm = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "HH:mm");
 const ianaTz = z.string().min(3).regex(/^[A-Za-z_]+(\/[A-Za-z0-9_+\-]+)+$|^UTC$/, "timezone IANA");
@@ -140,10 +143,12 @@ export const ManifestStateSchema = z.enum(["received", "validated", "prepared", 
 export const ItemStateSchema = z.enum(["ready_local", "stream_only", "blocked", "failed"]);
 
 const measured = <T extends z.ZodString | z.ZodNumber>(t: T) =>
-  z.object({ value: t.nullable(), reason: z.string().nullable() }).refine(
-    (v) => v.value !== null || (v.reason !== null && v.reason.length > 0),
-    "valor null exige motivo",
-  );
+  z
+    .object({ value: t.nullable(), reason: z.string().nullable() })
+    .refine(
+      (v) => v.value !== null || (v.reason !== null && v.reason.length > 0),
+      "valor null exige motivo",
+    );
 
 export const DeviceStatusSchema = z.object({
   desiredRevision: z.number().int().positive().nullable(),

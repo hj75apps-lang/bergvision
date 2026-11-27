@@ -547,7 +547,8 @@ export function PlaylistEditor({
 
   const saveMeta = useMutation({
     mutationFn: async () => {
-      if (!assignedPlayersQ.isSuccess) throw new Error("Não foi possível consultar os vínculos atuais.");
+      if (!assignedPlayersQ.isSuccess)
+        throw new Error("Não foi possível consultar os vínculos atuais.");
       const { error } = await supabase.rpc("save_playlist_settings", {
         p_playlist_id: playlist.id,
         p_name: name.trim() || "Sem nome",
@@ -657,13 +658,14 @@ export function PlaylistEditor({
       });
       if (error) throw error;
     },
-    onSettled: () =>
-      qc.invalidateQueries({ queryKey: ["playlist_items", playlist.id] }),
+    onSettled: () => qc.invalidateQueries({ queryKey: ["playlist_items", playlist.id] }),
     onError: (err, { previous }) => {
       const index = new Map(previous.map((id, position) => [id, position]));
-      setItems((current) => [...current].sort((a, b) =>
-        (index.get(a.id) ?? previous.length) - (index.get(b.id) ?? previous.length),
-      ));
+      setItems((current) =>
+        [...current].sort(
+          (a, b) => (index.get(a.id) ?? previous.length) - (index.get(b.id) ?? previous.length),
+        ),
+      );
       toast.error(err.message || "Falha ao reordenar.");
     },
   });
