@@ -130,8 +130,10 @@ Deno.serve(async (req) => {
   if (targetErr)
     return json({ error: "target_lookup_failed", detail: targetErr.message }, 500);
   if (!target) return json({ error: "target_not_found" }, 404);
-  const isSystemTemplate = scope === "template" && Boolean((target as any).is_system);
-  if (!isSystemTemplate && target.organization_id !== profile.organization_id)
+  const record = target as unknown as { organization_id: string | null; is_system?: boolean };
+  const isSystemTemplate =
+    scope === "template" && record.organization_id === null && record.is_system === true;
+  if (!isSystemTemplate && record.organization_id !== profile.organization_id)
     return json({ error: "forbidden_target" }, 403);
 
   // ---- Insere a sessão de preview (expires_at usa o default de 15 min) ----
