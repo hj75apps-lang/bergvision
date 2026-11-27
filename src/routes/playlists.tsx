@@ -461,7 +461,8 @@ export function PlaylistEditor({
           "id, playlist_id, item_type, media_file_id, template_id, position, duration, transition, media:media_files(id, name, type), template:templates(id, name, type)",
         )
         .eq("playlist_id", playlist.id)
-        .order("position");
+        .order("position")
+        .order("id");
       if (error) throw error;
       return (data ?? []).map((r: any) => ({
         ...r,
@@ -546,52 +547,34 @@ export function PlaylistEditor({
 
   const saveMeta = useMutation({
     mutationFn: async () => {
-      const payload = {
-        name: name.trim() || "Sem nome",
-        is_active: isActive,
-        schedule_start: scheduleStart || null,
-        schedule_end: scheduleEnd || null,
-        schedule_days: scheduleDays.length > 0 ? scheduleDays : null,
-        schedule_date_start: dateStart ? format(dateStart, "yyyy-MM-dd") : null,
-        schedule_date_end: dateEnd ? format(dateEnd, "yyyy-MM-dd") : null,
-      };
-      const { error } = await supabase
-        .from("playlists")
-        .update(payload)
-        .eq("id", playlist.id);
+      if (!assignedPlayersQ.isSuccess)
+        throw new Error("Não foi possível consultar os vínculos atuais.");
+      const { error } = await supabase.rpc("save_playlist_settings", {
+        p_playlist_id: playlist.id,
+        p_name: name.trim() || "Sem nome",
+        p_active: isActive,
+        p_start: scheduleStart || null,
+        p_end: scheduleEnd || null,
+        p_days: scheduleDays.length > 0 ? scheduleDays : null,
+        p_date_start: dateStart ? format(dateStart, "yyyy-MM-dd") : null,
+        p_date_end: dateEnd ? format(dateEnd, "yyyy-MM-dd") : null,
+        p_previous_players: assignedPlayersQ.data,
+        p_selected_players: selectedPlayerIds,
+      });
       if (error) throw error;
-
-      // Sincroniza vínculos com players (diff)
-      const current = new Set(assignedPlayersQ.data ?? []);
-      const next = new Set(selectedPlayerIds);
-      const toAdd = [...next].filter((id) => !current.has(id));
-      const toRemove = [...current].filter((id) => !next.has(id));
-      if (toRemove.length > 0) {
-        const { error: delErr } = await supabase
-          .from("playlist_players")
-          .delete()
-          .eq("playlist_id", playlist.id)
-          .in("player_id", toRemove);
-        if (delErr) throw delErr;
-      }
-      if (toAdd.length > 0 && orgId) {
-        const rows = toAdd.map((pid) => ({
-          playlist_id: playlist.id,
-          player_id: pid,
-          organization_id: orgId,
-        }));
-        const { error: insErr } = await supabase
-          .from("playlist_players")
-          .insert(rows);
-        if (insErr) throw insErr;
-      }
     },
     onSuccess: () => {
       toast.success("Playlist salva.");
       qc.invalidateQueries({ queryKey: ["playlists-list", orgId] });
       qc.invalidateQueries({ queryKey: ["playlist_players", playlist.id] });
     },
-    onError: (err: any) => toast.error(err?.message || "Falha ao salvar."),
+    onError: (err) => {
+      const code = (err as { code?: string }).code;
+      if (code === "PT409" || code === "40001") {
+        void qc.invalidateQueries({ queryKey: ["playlist_players", playlist.id] });
+      }
+      toast.error(err.message || "Falha ao salvar.");
+    },
   });
 
   const addItem = useMutation({
@@ -668,34 +651,37 @@ export function PlaylistEditor({
   });
 
   const reorder = useMutation({
-    mutationFn: async (newItems: PlaylistItem[]) => {
-      // Atualiza positions em lote
-      const updates = newItems.map((it, idx) =>
-        supabase
-          .from("playlist_items")
-          .update({ position: idx })
-          .eq("id", it.id),
-      );
-      const results = await Promise.all(updates);
-      const err = results.find((r) => r.error)?.error;
-      if (err) throw err;
+    mutationFn: async ({ previous, next }: { previous: string[]; next: string[] }) => {
+      const { error } = await supabase.rpc("reorder_playlist_items", {
+        p_playlist_id: playlist.id,
+        p_previous_ids: previous,
+        p_ordered_ids: next,
+      });
+      if (error) throw error;
     },
-    onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ["playlist_items", playlist.id] }),
-    onError: (err: any) => toast.error(err?.message || "Falha ao reordenar."),
+    onSettled: () => qc.invalidateQueries({ queryKey: ["playlist_items", playlist.id] }),
+    onError: (err, { previous }) => {
+      const index = new Map(previous.map((id, position) => [id, position]));
+      setItems((current) =>
+        [...current].sort(
+          (a, b) => (index.get(a.id) ?? previous.length) - (index.get(b.id) ?? previous.length),
+        ),
+      );
+      toast.error(err.message || "Falha ao reordenar.");
+    },
   });
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
 
   const onDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
-    if (!over || active.id === over.id) return;
+    if (!over || active.id === over.id || reorder.isPending) return;
     const oldIndex = items.findIndex((i) => i.id === active.id);
     const newIndex = items.findIndex((i) => i.id === over.id);
     if (oldIndex < 0 || newIndex < 0) return;
     const next = arrayMove(items, oldIndex, newIndex);
     setItems(next);
-    reorder.mutate(next);
+    reorder.mutate({ previous: items.map((item) => item.id), next: next.map((item) => item.id) });
   };
 
   const availableMedia = useMemo(() => mediaQ.data ?? [], [mediaQ.data]);

@@ -56,28 +56,28 @@ export const TextElementSchema = z.object({
 });
 
 export const ImageElementSchema = z.object({
-  element_type: z.literal('image'),
-  mediaFileId: z.string().uuid(),
-  fit: z.enum(['contain', 'cover', 'fill']).default('cover'),
+  element_type: z.literal("image"),
+  mediaFileId: z.guid(),
+  fit: z.enum(["contain", "cover", "fill"]).default("cover"),
 });
 
 export const VideoElementSchema = z.object({
-  element_type: z.literal('video'),
-  mediaFileId: z.string().uuid(),
-  fit: z.enum(['contain', 'cover', 'fill']).default('cover'),
+  element_type: z.literal("video"),
+  mediaFileId: z.guid(),
+  fit: z.enum(["contain", "cover", "fill"]).default("cover"),
   loop: z.boolean().default(true),
   muted: z.boolean().default(true),
 });
 
 export const LogoElementSchema = z.object({
-  element_type: z.literal('logo'),
-  mediaFileId: z.string().uuid(),
-  fit: z.enum(['contain', 'cover']).default('contain'),
+  element_type: z.literal("logo"),
+  mediaFileId: z.guid(),
+  fit: z.enum(["contain", "cover"]).default("contain"),
 });
 
 export const PlaylistElementSchema = z.object({
-  element_type: z.literal('playlist'),
-  playlistId: z.string().uuid(),
+  element_type: z.literal("playlist"),
+  playlistId: z.guid(),
 });
 
 /* --- Widgets: config validada por widgetType --- */
@@ -159,9 +159,9 @@ export const IframeWidgetConfigSchema = z.object({
 });
 
 export const WidgetElementSchema = z.object({
-  element_type: z.literal('widget'),
-  widgetType: z.enum(['clock', 'weather', 'rss', 'news', 'iframe']),
-  widgetConfig: z.record(z.any()),
+  element_type: z.literal("widget"),
+  widgetType: z.enum(["clock", "weather", "rss", "news", "iframe"]),
+  widgetConfig: z.record(z.string(), z.any()),
 });
 
 const widgetConfigByType = {

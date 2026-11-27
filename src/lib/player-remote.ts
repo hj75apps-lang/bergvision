@@ -35,7 +35,8 @@ export async function pausePlayer(playerId: string): Promise<number> {
     const { error: delErr } = await supabase
       .from("playlist_players")
       .delete()
-      .eq("player_id", playerId);
+      .eq("player_id", playerId)
+      .in("playlist_id", ids);
     if (delErr) throw delErr;
   }
   return ids.length;
@@ -44,10 +45,11 @@ export async function pausePlayer(playerId: string): Promise<number> {
 export async function resumePlayer(playerId: string, organizationId: string): Promise<number> {
   const ids = getPausedLinks(playerId) ?? [];
   if (ids.length > 0) {
-    const { data: existing } = await supabase
+    const { data: existing, error: selectError } = await supabase
       .from("playlist_players")
       .select("playlist_id")
       .eq("player_id", playerId);
+    if (selectError) throw selectError;
     const have = new Set((existing ?? []).map((l: { playlist_id: string }) => l.playlist_id));
     const rows = ids
       .filter((id) => !have.has(id))

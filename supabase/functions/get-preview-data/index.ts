@@ -53,7 +53,7 @@ type MediaFile = {
   duration: number | null;
 };
 
-async function fetchMediaMap(ids: string[]): Promise<Map<string, MediaFile>> {
+async function fetchMediaMap(ids: string[], organizationId: string): Promise<Map<string, MediaFile>> {
   const clean = Array.from(new Set(ids.filter(Boolean)));
   if (clean.length === 0) return new Map();
   const { data, error } = await admin
@@ -61,7 +61,8 @@ async function fetchMediaMap(ids: string[]): Promise<Map<string, MediaFile>> {
     .select(
       "id, name, type, storage_path, thumbnail_path, width, height, duration",
     )
-    .in("id", clean);
+    .in("id", clean)
+    .eq("organization_id", organizationId);
   if (error) throw error;
   const map = new Map<string, MediaFile>();
   for (const m of (data ?? []) as MediaFile[]) map.set(m.id, m);
@@ -95,19 +96,23 @@ async function signMediaMap(
 
 // ---------------- Playlist ----------------
 
-async function loadPlaylist(playlistId: string) {
+async function loadPlaylist(playlistId: string, organizationId: string, seen: string[] = []) {
+  const key = `playlist:${playlistId}`;
+  if (seen.includes(key) || seen.length >= 12) return null;
+  const path = [...seen, key];
   const [{ data: playlist, error: pErr }, { data: items, error: iErr }] =
     await Promise.all([
       admin
         .from("playlists")
         .select("*")
         .eq("id", playlistId)
+        .eq("organization_id", organizationId)
         .maybeSingle(),
       admin
         .from("playlist_items")
         .select("*")
         .eq("playlist_id", playlistId)
-        .order("position"),
+        .order("position").order("id"),
     ]);
   if (pErr) throw pErr;
   if (iErr) throw iErr;
@@ -127,8 +132,8 @@ async function loadPlaylist(playlistId: string) {
   );
 
   const [media, templatePayloads] = await Promise.all([
-    signMediaMap(await fetchMediaMap(mediaIds)),
-    Promise.all(templateIds.map((id) => loadTemplate(id))),
+    signMediaMap(await fetchMediaMap(mediaIds, organizationId)),
+    Promise.all(templateIds.map((id) => loadTemplate(id, organizationId, path))),
   ]);
   const templateMap = new Map<string, any>();
   templateIds.forEach((id, idx) => {
@@ -187,14 +192,19 @@ function collectMediaIdsFromElements(elements: any[]): string[] {
   return ids;
 }
 
-async function loadTemplate(templateId: string) {
+async function loadTemplate(templateId: string, organizationId: string, seen: string[] = []) {
+  const key = `template:${templateId}`;
+  if (seen.includes(key) || seen.length >= 12) return null;
+  const path = [...seen, key];
   const { data: template, error: tErr } = await admin
     .from("templates")
     .select("*")
     .eq("id", templateId)
     .maybeSingle();
   if (tErr) throw tErr;
-  if (!template) return null;
+  if (!template ||
+      (template.organization_id !== organizationId &&
+        !(template.organization_id === null && template.is_system === true))) return null;
 
   const type = (template as any).type ?? "grid";
 
@@ -224,7 +234,7 @@ async function loadTemplate(templateId: string) {
       ...collectPlaylistIdsFromElements(elements),
     ]),
   );
-  const playlists = await Promise.all(playlistIds.map((id) => loadPlaylist(id)));
+  const playlists = await Promise.all(playlistIds.map((id) => loadPlaylist(id, organizationId, path)));
   const playlistMap = new Map<string, any>();
   for (const p of playlists) if (p) playlistMap.set(p.id, p);
 
@@ -236,7 +246,7 @@ async function loadTemplate(templateId: string) {
       (template as any).background_media_id,
     ].filter(Boolean) as string[]),
   );
-  const media = await signMediaMap(await fetchMediaMap(directMediaIds));
+  const media = await signMediaMap(await fetchMediaMap(directMediaIds, organizationId));
 
   const backgroundMediaId = (template as any).background_media_id ?? null;
   const background_media = backgroundMediaId
@@ -296,7 +306,8 @@ Deno.serve(async (req) => {
     .maybeSingle();
 
   if (sErr) return json({ error: "session_lookup_failed" }, 500);
-  if (!session) return json({ error: "not_found" }, 404);
+  if (!session?.organization_id) return json({ error: "not_found" }, 404);
+  const organizationId = session.organization_id as string;
 
   const expiresAt = new Date((session as any).expires_at);
   if (!isFinite(expiresAt.getTime()) || expiresAt.getTime() < Date.now())
@@ -308,7 +319,7 @@ Deno.serve(async (req) => {
     const expiresIso = (session as any).expires_at as string;
 
     if (scope === "template") {
-      const payload = await loadTemplate(targetId);
+      const payload = await loadTemplate(targetId, organizationId);
       if (!payload) return json({ error: "template_not_found" }, 404);
       return json({
         mode: "live",
@@ -323,6 +334,7 @@ Deno.serve(async (req) => {
         .from("players")
         .select("*")
         .eq("id", targetId)
+        .eq("organization_id", organizationId)
         .maybeSingle();
       if (pErr) return json({ error: "player_lookup_failed" }, 500);
       if (!player) return json({ error: "player_not_found" }, 404);
@@ -338,7 +350,7 @@ Deno.serve(async (req) => {
           zones: [],
           elements: [],
         });
-      const payload = await loadTemplate(templateId);
+      const payload = await loadTemplate(templateId, organizationId);
       if (!payload) return json({ error: "template_not_found" }, 404);
       return json({
         mode: "live",
@@ -350,7 +362,7 @@ Deno.serve(async (req) => {
     }
 
     if (scope === "playlist") {
-      const playlist = await loadPlaylist(targetId);
+      const playlist = await loadPlaylist(targetId, organizationId);
       if (!playlist) return json({ error: "playlist_not_found" }, 404);
       return json({
         mode: "live",
