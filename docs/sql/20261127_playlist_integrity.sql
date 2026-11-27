@@ -32,7 +32,7 @@ begin
     into current_ids from public.playlist_items as i where i.playlist_id = p_playlist_id;
 
   if p_previous_ids is distinct from current_ids then
-    raise exception 'A playlist mudou. Confira a ordem atual e tente novamente.' using errcode = '40001';
+    raise exception 'A playlist mudou. Confira a ordem atual e tente novamente.' using errcode = 'PT409';
   end if;
 
   if p_ordered_ids is null or cardinality(p_ordered_ids) <> cardinality(current_ids)
@@ -93,7 +93,7 @@ begin
     into current_players from public.playlist_players as pp where pp.playlist_id = p_playlist_id;
   if p_previous_players is null or cardinality(p_previous_players) <> cardinality(current_players)
      or not (p_previous_players @> current_players and current_players @> p_previous_players) then
-    raise exception 'Os vínculos mudaram. Confira os players atuais e tente novamente.' using errcode = '40001';
+    raise exception 'Os vínculos mudaram. Confira os players atuais e tente novamente.' using errcode = 'PT409';
   end if;
   if p_selected_players is null or array_position(p_selected_players, null) is not null then
     raise exception 'Seleção de players inválida' using errcode = '22023';
@@ -145,5 +145,7 @@ create policy device_commands_same_organization on public.device_commands
     exists (select 1 from public.players p
             where p.id = player_id and p.organization_id = device_commands.organization_id)
   );
+
+notify pgrst, 'reload schema';
 
 commit;

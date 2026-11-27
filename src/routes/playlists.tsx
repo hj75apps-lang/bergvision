@@ -569,7 +569,8 @@ export function PlaylistEditor({
       qc.invalidateQueries({ queryKey: ["playlist_players", playlist.id] });
     },
     onError: (err) => {
-      if ((err as { code?: string }).code === "40001") {
+      const code = (err as { code?: string }).code;
+      if (code === "PT409" || code === "40001") {
         void qc.invalidateQueries({ queryKey: ["playlist_players", playlist.id] });
       }
       toast.error(err.message || "Falha ao salvar.");
